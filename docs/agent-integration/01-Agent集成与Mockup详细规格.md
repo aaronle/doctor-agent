@@ -1,7 +1,7 @@
 # Agent 集成与 Mockup 详细规格
 
-版本：`v0.1-draft`  
-主责：Agent 集成条线  
+版本：`v0.1-draft`
+主责：Agent 集成条线
 当前策略：先实现正式契约和 Mock Runtime，后续通过 Adapter 接入 AgentScope。
 
 ## 1. 集成层职责
@@ -58,7 +58,7 @@ flowchart LR
 
 `POST /api/v1/agent-tasks`
 
-请求：`task_request_v1`。  
+请求：`task_request_v1`。
 响应：`202 Accepted`，返回 `task_id`、当前状态和事件订阅地址。
 
 ### 4.2 查询任务

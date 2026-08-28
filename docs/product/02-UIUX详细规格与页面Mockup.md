@@ -1,7 +1,7 @@
 # Doctor Agent 一期 UI/UX 详细规格与页面 Mockup
 
-版本：`v0.1-draft`  
-参考：`references/ui-demo/AI-HIS门诊模块V4.3.html`  
+版本：`v0.1-draft`
+参考：`references/ui-demo/AI-HIS门诊模块V4.3.html`
 说明：继承 Demo 的信息架构与交互语言，不继承单文件 Mock 技术实现。
 
 ## 1. 设计目标

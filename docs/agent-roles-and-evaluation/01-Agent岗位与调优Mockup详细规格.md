@@ -1,7 +1,7 @@
 # Agent 岗位与调优 Mockup 详细规格
 
-版本：`v0.1-draft`  
-主责：Agent 岗位定义和调优条线  
+版本：`v0.1-draft`
+主责：Agent 岗位定义和调优条线
 当前策略：先完成岗位、上下文、输出、评测和 Mock；后续逐步接入真实模型、Skills 和 AgentScope。
 
 ## 1. 本条线的当前交付
