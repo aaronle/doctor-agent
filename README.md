@@ -18,15 +18,21 @@ Worker、智能体岗位与 Sub-agent 的最终拆分方案尚未定稿，现阶
 
 ## 当前文档
 
+- [一期研发总纲](docs/00-一期研发总纲.md)
+- [产品功能详细规格](docs/product/01-产品功能详细规格.md)
+- [UI/UX 详细规格与页面 Mockup](docs/product/02-UIUX详细规格与页面Mockup.md)
+- [Agent 集成与 Mockup 详细规格](docs/agent-integration/01-Agent集成与Mockup详细规格.md)
+- [Agent 岗位与调优 Mockup 详细规格](docs/agent-roles-and-evaluation/01-Agent岗位与调优Mockup详细规格.md)
+- [快速开发准备与迭代计划](docs/implementation/01-快速开发准备与迭代计划.md)
 - [一期产品设计与工作界面方案](docs/product/AI-HIS医生智能体一期产品设计与工作界面方案.docx)
 - [文档目录说明](docs/README.md)
 - [项目交接入口](HANDOVER.md)
 
 ## 当前状态
 
-- 已完成一期产品理念、范围、界面、集成边界和调优框架的首版整理。
+- 已完成一期产品理念、范围、界面、集成边界和调优框架的首版整理，并形成三条线的详细 Markdown 规格。
+- 当前执行口径为：产品功能开发条线快速实现；Agent 集成和 Agent 岗位/调优条线先使用正式契约上的 Mock。
 - 尚未确定技术栈、AgentScope 接口协议、数据接入清单、评测数据集版本及发布环境。
 - 尚未配置远程 Git 仓库和部署环境。
 
 进入项目后，请先阅读 [`HANDOVER.md`](HANDOVER.md)，再开展需求、设计、开发、测试或部署工作。
-

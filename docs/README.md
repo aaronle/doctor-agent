@@ -10,3 +10,16 @@
 
 跨条线文档必须明确主责目录，并用链接引用，避免维护多份相互冲突的副本。
 
+## 一期详细规格入口
+
+- [`00-一期研发总纲.md`](00-一期研发总纲.md)
+- [`product/01-产品功能详细规格.md`](product/01-产品功能详细规格.md)
+- [`product/02-UIUX详细规格与页面Mockup.md`](product/02-UIUX详细规格与页面Mockup.md)
+- [`agent-integration/01-Agent集成与Mockup详细规格.md`](agent-integration/01-Agent集成与Mockup详细规格.md)
+- [`agent-roles-and-evaluation/01-Agent岗位与调优Mockup详细规格.md`](agent-roles-and-evaluation/01-Agent岗位与调优Mockup详细规格.md)
+- [`implementation/01-快速开发准备与迭代计划.md`](implementation/01-快速开发准备与迭代计划.md)
+
+## 参考材料
+
+- [`product/AI-HIS医生智能体一期产品设计与工作界面方案.docx`](product/AI-HIS医生智能体一期产品设计与工作界面方案.docx)
+- [`../references/ui-demo/AI-HIS门诊模块V4.3.html`](../references/ui-demo/AI-HIS门诊模块V4.3.html)

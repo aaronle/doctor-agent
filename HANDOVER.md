@@ -9,9 +9,11 @@
 ## 1. 接手顺序
 
 1. 阅读本文件。
-2. 阅读 `docs/product/AI-HIS医生智能体一期产品设计与工作界面方案.docx`。
-3. 检查当前 Git 状态和最近提交。
-4. 根据任务所属条线进入对应文档目录，不跨线隐式改变职责边界。
+2. 阅读 `docs/00-一期研发总纲.md`。
+3. 阅读 `docs/product/AI-HIS医生智能体一期产品设计与工作界面方案.docx`。
+4. 根据任务所属条线阅读对应详细 Markdown。
+5. 检查当前 Git 状态和最近提交。
+6. 不跨线隐式改变职责边界。
 
 ```sh
 cd "/Users/leying/Documents/北大医疗/AI Native Systems/projects/doctor-agent"
@@ -52,6 +54,7 @@ git log -3 --oneline
 
 ## 4. 当前明确的边界
 
+- 当前执行策略：产品功能开发条线尽快实现真实产品；Agent 集成和 Agent 岗位/调优两条线先以正式契约上的 Mock 支撑开发。
 - 产品研发与 Agent 调优并行，不等待产品全部完成后再开始调优。
 - Agent 托管于北大国际医院搭建的阿里 AgentScope 框架；本项目负责定义向上对产品、向下对 AgentScope 的集成契约。
 - 卡片、产品交互和结果展现属于 Agent 集成条线。
@@ -66,15 +69,19 @@ doctor-agent/
 ├── HANDOVER.md
 ├── README.md
 └── docs/
+    ├── 00-一期研发总纲.md
     ├── README.md
     ├── product/
     ├── agent-integration/
-    └── agent-roles-and-evaluation/
+    ├── agent-roles-and-evaluation/
+    └── implementation/
 ```
 
 - `docs/product/`：产品范围、用户流程、UI/UX、功能验收。
 - `docs/agent-integration/`：AgentScope、Skills、MCP、数据上下文、接口协议、卡片和展现协议。
 - `docs/agent-roles-and-evaluation/`：岗位定义、调用规则、输出规范、评测集、指标和调优记录。
+- `docs/implementation/`：快速开发、纵向薄切、环境、测试和迭代计划。
+- `references/ui-demo/`：原始 HTML Demo，只作为 UI/UX 参考，不作为生产代码基线。
 
 后续增加源码、自动化测试和部署文件时，再按实际技术栈创建 `src/`、`tests/`、`deploy/` 等目录，不预设空架构。
 
@@ -94,4 +101,3 @@ doctor-agent/
 - 当前未配置远程仓库；不得自行创建或推送 GitHub 仓库。
 - 密钥、真实患者数据、生产导出、访问令牌和运行时环境文件不得提交 Git。
 - 引入临床数据前必须明确脱敏、授权、审计、留存和删除规则。
-
