@@ -1,7 +1,5 @@
 interface:
   display_name: "Grill Me"
-  short_description: "深挖产品需求、边界、验收与 Harness 约束"
-  default_prompt: "Use $grill-me to pressure-test this Doctor Agent requirement before planning or implementation."
-
+  short_description: "Sharpen a plan through interview"
 policy:
   allow_implicit_invocation: false

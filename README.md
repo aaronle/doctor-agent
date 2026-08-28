@@ -37,7 +37,7 @@ Worker、智能体岗位与 Sub-agent 的最终拆分方案尚未定稿，现阶
 
 ## 项目级 Skill
 
-- `$grill-me`：在需求、规格或重要变更进入开发前，逐项澄清目标、验收、边界、替代方案和假设，并生成 Doctor Agent 专属 Harness 约束。
-- 仅显式调用，不自动触发；输入 `$grill-me` 后指定需要审查的需求或 Markdown。
+- `$grill-me`：来自 `mattpocock/skills` 的显式入口，用多轮追问打磨计划、设计或产品决策。
+- 该入口调用同仓库的 `grilling` 主 Skill，因此两者均作为当前项目的 Codex Skill 安装。
 
 进入项目后，请先阅读 [`HANDOVER.md`](HANDOVER.md)，再开展需求、设计、开发、测试或部署工作。

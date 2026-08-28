@@ -104,6 +104,7 @@ doctor-agent/
 
 ## 8. 项目级 Skill
 
-- `.agents/skills/grill-me/`：需求澄清与歧义门禁 Skill，来源为 `max4c/skills` 的 `skills/grill-me`。
-- 已增加 Doctor Agent 产品扩展，将确认结果转为验收标准、Mock Fixture 和 Harness Constraints。
-- 已设置 `allow_implicit_invocation: false`，仅在用户明确输入 `$grill-me` 时运行。
+- `.agents/skills/grill-me/`：来源为 `mattpocock/skills` 的 `skills/productivity/grill-me`，是仅显式调用的 `$grill-me` 入口。
+- `.agents/skills/grilling/`：同源的主实现，由 `$grill-me` 转交调用，按设计树的当前前沿分轮追问。
+- 本次安装对应的上游修订为 `6654f6b60cd9d5be8b54c6fafe44346dabeb3b76`。
+- Codex 兼容处理：入口移除 Codex 不支持的 `disable-model-invocation` 字段，并将其 `Skill tool` 转交改为对本地 `grilling/SKILL.md` 的引用；主实现保持上游原文。
