@@ -101,3 +101,9 @@ doctor-agent/
 - 当前未配置远程仓库；不得自行创建或推送 GitHub 仓库。
 - 密钥、真实患者数据、生产导出、访问令牌和运行时环境文件不得提交 Git。
 - 引入临床数据前必须明确脱敏、授权、审计、留存和删除规则。
+
+## 8. 项目级 Skill
+
+- `.agents/skills/grill-me/`：需求澄清与歧义门禁 Skill，来源为 `max4c/skills` 的 `skills/grill-me`。
+- 已增加 Doctor Agent 产品扩展，将确认结果转为验收标准、Mock Fixture 和 Harness Constraints。
+- 已设置 `allow_implicit_invocation: false`，仅在用户明确输入 `$grill-me` 时运行。
