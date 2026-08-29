@@ -137,14 +137,32 @@ class LlmClient:
             text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
             usage = data.get("usage") or {}
 
-            # 解析失败时重发请求，而不是去修补那串坏 JSON。
-            # 重问是安全的（模型换一次采样通常就正常了）；猜测性修补不是 ——
-            # 半截 JSON 补全后会变成一份看起来正常、实则残缺的临床结论。
+            # 解析失败时**带着纠错提示重问**，而不是去修补那串坏 JSON。
+            #
+            # 不能原样重发：temperature 固定为 0，同一请求必然得到同一份坏输出，
+            # 重试纯属浪费调用与时间。把上一轮的坏输出和错误原因回灌进去，
+            # 请求变了，模型才有机会改对。
+            #
+            # 也不做猜测性修补 —— 半截 JSON 补全后会变成一份看起来正常、
+            # 实则残缺的临床结论，这比降级到本地规则危险得多。
             try:
                 parsed = extract_json_object(text)
             except LlmError as exc:
                 self._log(agent_key, target_model, attempt, len(payload), "bad-json", started)
                 if attempt < MAX_ATTEMPTS:
+                    body["messages"] = [
+                        *body["messages"],
+                        {"role": "assistant", "content": text[:2000]},
+                        {
+                            "role": "user",
+                            "content": (
+                                f"上面的输出不是合法 JSON（{exc}）。"
+                                "最常见的原因是字符串值内部出现了半角双引号 \" —— 引用原文请改用中文引号「」。"
+                                "请重新输出一次完整且合法的 JSON 对象，内容不变，只修正格式。"
+                            ),
+                        },
+                    ]
+                    payload = json.dumps(body, ensure_ascii=False)
                     await asyncio.sleep(BACKOFF_MS[attempt - 1] / 1000)
                     continue
                 raise LlmError(f"模型连续返回不可解析的 JSON：{exc}") from exc
