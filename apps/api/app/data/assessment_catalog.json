@@ -1,0 +1,201 @@
+{
+  "note": "专项评估技能目录。V4.3 把这 33 项写死在打包产物里；一期改由后端提供，前端不得写死数据。一期只实现目录展示，单项能力的 Agent 化不在范围内。",
+  "source": "AI-HIS门诊模块V4.3.html",
+  "categories": [
+    {
+      "name": "诊疗质控助手",
+      "count": 7,
+      "items": [
+        {
+          "name": "诊断预后分析",
+          "level": "danger",
+          "desc": "帮助医师与患者科学认识预后，合理制定治疗目标与方案，改善医患沟通与治疗决策质量。"
+        },
+        {
+          "name": "专病风险评估",
+          "level": "danger",
+          "desc": "早期识别高危患者，落实专病风险分层管理，降低门诊不良结局发生率。"
+        },
+        {
+          "name": "院感风险监测",
+          "level": "warning",
+          "desc": ""
+        },
+        {
+          "name": "不良事件监测",
+          "level": "danger",
+          "desc": ""
+        },
+        {
+          "name": "传染病预警报告",
+          "level": "warning",
+          "desc": ""
+        },
+        {
+          "name": "突发公共卫生事件监测",
+          "level": "danger",
+          "desc": ""
+        },
+        {
+          "name": "危急值闭环管理",
+          "level": "danger",
+          "desc": ""
+        }
+      ]
+    },
+    {
+      "name": "患者服务助手",
+      "count": 10,
+      "items": [
+        {
+          "name": "慢病早期筛查与风险评估",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "职业病服务评估",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "转诊服务评估",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "慢病健康管理包",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "专病健康体检服务",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "专病全病程服务评估",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "智能设备服务评估",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "检查检验预约及引导服务",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "健康教育与生活方式干预",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "康复门诊与中医适宜技术服务",
+          "level": "success",
+          "desc": ""
+        }
+      ]
+    },
+    {
+      "name": "运营管理助手",
+      "count": 9,
+      "items": [
+        {
+          "name": "诊疗权限管理服务",
+          "level": "warning",
+          "desc": ""
+        },
+        {
+          "name": "预约确认服务",
+          "level": "warning",
+          "desc": ""
+        },
+        {
+          "name": "医保合规开单",
+          "level": "warning",
+          "desc": ""
+        },
+        {
+          "name": "合理控费评估",
+          "level": "warning",
+          "desc": ""
+        },
+        {
+          "name": "自费与超医保评估",
+          "level": "warning",
+          "desc": ""
+        },
+        {
+          "name": "医保飞检风险评估",
+          "level": "danger",
+          "desc": ""
+        },
+        {
+          "name": "医疗资源效率",
+          "level": "warning",
+          "desc": ""
+        },
+        {
+          "name": "医生工作量与绩效核算",
+          "level": "warning",
+          "desc": ""
+        },
+        {
+          "name": "首诊复诊比例配置",
+          "level": "warning",
+          "desc": ""
+        }
+      ]
+    },
+    {
+      "name": "临床科研助手",
+      "count": 3,
+      "items": [
+        {
+          "name": "科研课题入组评估",
+          "level": "info",
+          "desc": ""
+        },
+        {
+          "name": "药物临床试验评估",
+          "level": "info",
+          "desc": ""
+        },
+        {
+          "name": "科研课题智能推荐",
+          "level": "info",
+          "desc": ""
+        }
+      ]
+    },
+    {
+      "name": "临床教学助手",
+      "count": 4,
+      "items": [
+        {
+          "name": "教学病例评估推荐",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "处方与病历点评",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "考核题库推荐",
+          "level": "success",
+          "desc": ""
+        },
+        {
+          "name": "教学档案",
+          "level": "success",
+          "desc": ""
+        }
+      ]
+    }
+  ]
+}

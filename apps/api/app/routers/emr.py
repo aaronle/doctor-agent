@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -71,6 +72,24 @@ async def _run_isolated(agent, ctx: dict, **kwargs):
         return await agent.run(session, ctx, **kwargs)
     finally:
         session.close()
+
+
+# ------------------------------------------------------------------ 专项评估目录
+
+# V4.3 把 33 项专项评估写死在打包产物里。一期改由后端提供：
+# 规格要求前端零写死数据，任何界面上的内容都要经由 API。
+_CATALOG_PATH = Path(__file__).resolve().parents[1] / "data/assessment_catalog.json"
+
+
+@router.get("/assessment-catalog")
+def assessment_catalog() -> dict:
+    """
+    专项评估技能目录，五分类 33 项。
+
+    这是 V4.3 的 20 个端点之外唯一新增的接口，因为原界面把它硬编码了。
+    一期只做目录展示，单项能力的 Agent 化不在范围内。
+    """
+    return json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))
 
 
 # ------------------------------------------------------------------ 聚合读取

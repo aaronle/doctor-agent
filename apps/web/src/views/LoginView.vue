@@ -1,42 +1,55 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Lock, User } from '@element-plus/icons-vue'
 
-import { login } from '../api'
+import { useSession } from '../stores/session'
 
 const router = useRouter()
-const username = ref('张医生')
-const password = ref('demo')
-const error = ref('')
-const busy = ref(false)
+const session = useSession()
 
-async function submit() {
-  error.value = ''
-  busy.value = true
-  try {
-    const result = await login(username.value, password.value)
-    sessionStorage.setItem('doctor_agent_token', result.access_token)
-    sessionStorage.setItem('doctor_agent_doctor', JSON.stringify(result.doctor))
-    await router.replace('/outpatient')
-  } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '登录失败'
-  } finally {
-    busy.value = false
-  }
+const username = ref('张医生')
+const password = ref('123456')
+
+function submit() {
+  session.login(username.value)
+  router.push('/outpatient/list')
 }
 </script>
 
 <template>
-  <main class="login-page">
-    <form class="login-card" @submit.prevent="submit">
-      <div class="login-mark">⌾</div>
-      <h1>AI门诊工作站</h1>
-      <p>北京大学国际医院 · 医生辅助演示</p>
-      <label><span>医生</span><input v-model="username" autocomplete="username" aria-label="用户名" /></label>
-      <label><span>密码</span><input v-model="password" type="password" autocomplete="current-password" aria-label="密码" /></label>
-      <div v-if="error" class="login-error">{{ error }}</div>
-      <button type="submit" :disabled="busy">{{ busy ? '正在进入…' : '进入医生智能体' }}</button>
-      <small>信息暂存于浏览器会话 · 当前为产品演示数据</small>
-    </form>
-  </main>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-logo">
+          <el-icon :size="24"><Lock /></el-icon>
+        </div>
+        <h1 class="login-title">惠每AI门诊工作站</h1>
+        <p class="login-sub">北京大学国际医院 · 一期 MVP</p>
+      </div>
+
+      <el-form size="large">
+        <el-form-item required>
+          <el-input v-model="username" :prefix-icon="User" clearable placeholder="医生工号或姓名" @keyup.enter="submit" />
+        </el-form-item>
+        <el-form-item required>
+          <el-input
+            v-model="password"
+            :prefix-icon="Lock"
+            type="password"
+            show-password
+            placeholder="密码"
+            @keyup.enter="submit"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button class="login-btn" type="primary" @click="submit">进入门诊工作站</el-button>
+        </el-form-item>
+      </el-form>
+
+      <p class="login-hint">一期未接入医院 SSO，任意账号密码均可登录 · 演示病例，非真实患者数据</p>
+    </div>
+  </div>
 </template>
+
+<style scoped src="../styles/Login.scoped.css"></style>

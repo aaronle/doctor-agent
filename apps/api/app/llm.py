@@ -22,7 +22,12 @@ logger = logging.getLogger("doctor_agent.llm")
 
 # 仅这两类错误值得重试：限流与网关侧故障。4xx 参数错误重试只会重复失败。
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
-BACKOFF_MS = (500, 1500)
+
+# 退避比 Ticket System 的 500/1500 更长：这里一次首屏会并发发四个岗位的请求，
+# 网关一次瞬时 502 就会同时打掉四个、整页降级。实测并发本身没问题，
+# 是抖动窗口比 2 秒重试窗口长，因此把总重试窗口拉到约 6 秒。
+BACKOFF_MS = (500, 1500, 4000)
+MAX_ATTEMPTS = len(BACKOFF_MS) + 1
 
 # 够装下最长的一份七段病历；再大只会拖慢首屏而没有实际收益
 MAX_TOKENS = 4096
@@ -102,7 +107,7 @@ class LlmClient:
         started = time.monotonic()
 
         last_error: str = ""
-        for attempt in range(1, 4):
+        for attempt in range(1, MAX_ATTEMPTS + 1):
             try:
                 async with httpx.AsyncClient(timeout=self.settings.timeout_seconds) as client:
                     response = await client.post(
@@ -117,14 +122,14 @@ class LlmClient:
                 data = response.json()
             except _Retry:
                 self._log(agent_key, target_model, attempt, len(payload), last_error, started)
-                if attempt < 3:
+                if attempt < MAX_ATTEMPTS:
                     await asyncio.sleep(BACKOFF_MS[attempt - 1] / 1000)
                     continue
-                raise LlmError(f"模型通道重试 3 次仍失败：{last_error}") from None
+                raise LlmError(f"模型通道重试 {MAX_ATTEMPTS} 次仍失败：{last_error}") from None
             except httpx.HTTPError as exc:
                 last_error = type(exc).__name__
                 self._log(agent_key, target_model, attempt, len(payload), last_error, started)
-                if attempt < 3:
+                if attempt < MAX_ATTEMPTS:
                     await asyncio.sleep(BACKOFF_MS[attempt - 1] / 1000)
                     continue
                 raise LlmError(f"模型通道请求失败：{last_error}") from exc

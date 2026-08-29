@@ -113,6 +113,8 @@ def _full_view(session: Session, patient: Patient) -> dict:
             "days": o.days,
             "status": o.status,
             "category": o.category,
+            # 检查与检验同为 category=exam，靠 exam_type 区分，界面据此分到两个子页
+            "exam_type": o.exam_type,
         }
         for o in issued
     ]
