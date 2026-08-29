@@ -48,16 +48,81 @@ export function useVoiceInterview(getPatientId: () => string) {
   const active = computed(() => state.value === 'playing' || state.value === 'paused')
 
   /**
-   * 追问清单的完成判定：每播完一轮医患问答（2 条）算问掉一条。
-   * 与 V4.3 一致 —— 清单是「本次问诊要覆盖的点」，不是逐字匹配对话内容。
+   * 追问清单的完成判定：**语义判定**，不是按轮次顺序划掉。
+   *
+   * 「覆盖」是蕴含关系不是相似关系 —— 患者答「右手拿筷子拿不稳」完整回答了
+   * 「哪一侧肢体无力」，两句几乎零字面重叠。所以关键词法与向量相似度都不适用，
+   * 交给后端 /voice/coverage 由模型判定。
+   *
+   * 判定是**单调**的：一旦标记为已问就不再回退。既符合直觉，也让每次只需要
+   * 把还开着的问题发过去，对话越往后 payload 越小。
    */
-  const askedCount = computed(() => Math.min(questions.value.length, Math.floor(playedCount.value / 2)))
-  const doneQuestions = computed(() => questions.value.slice(0, askedCount.value))
+  const coveredIndexes = ref<Set<number>>(new Set())
+  const coverageEvidence = ref<Map<number, string>>(new Map())
+  const coverageDegraded = ref(false)
+
+  const doneQuestions = computed(() => questions.value.filter((_, i) => coveredIndexes.value.has(i)))
   const pendingQuestions = computed(() =>
-    questions.value.map((text, index) => ({ text, index, done: index < askedCount.value })),
+    questions.value.map((text, index) => ({
+      text,
+      index,
+      done: coveredIndexes.value.has(index),
+      evidence: coverageEvidence.value.get(index) ?? '',
+    })),
   )
   /** 当前该问的那一条，浮层里高亮显示 */
   const currentQuestion = computed(() => pendingQuestions.value.find((q) => !q.done) ?? null)
+
+  /** 医生手动勾销 —— 最便宜的正确性兜底，模型判错时一键纠正 */
+  function toggleQuestionDone(index: number) {
+    const next = new Set(coveredIndexes.value)
+    next.has(index) ? next.delete(index) : next.add(index)
+    coveredIndexes.value = next
+  }
+
+  let coveragePending = false
+
+  /**
+   * 判定当前还开着的问题有没有被对话覆盖。
+   *
+   * 异步非阻塞：界面任何时候都不等它。失败或降级时**不做任何标记** ——
+   * 退回关键词或按轮次猜都会往「错标已问」偏，而错标会让该问的问题
+   * 再也不提醒，那是不能接受的方向。宁可让医生看一份冗余的完整清单。
+   */
+  async function judgeCoverage() {
+    const patientId = getPatientId()
+    if (!patientId || coveragePending || !questions.value.length) return
+
+    const open = pendingQuestions.value.filter((q) => !q.done)
+    if (!open.length || !messages.value.length) return
+
+    coveragePending = true
+    try {
+      const result = await api.voiceCoverage(
+        patientId,
+        open.map((q) => q.text),
+        messages.value,
+      )
+      coverageDegraded.value = Boolean(result.degraded)
+      if (result.degraded) return
+
+      const next = new Set(coveredIndexes.value)
+      const evidence = new Map(coverageEvidence.value)
+      for (const item of result.covered) {
+        // 后端返回的序号是「还开着的问题」里的位置，要映射回原始下标
+        const origin = open[item.index - 1]
+        if (!origin) continue
+        next.add(origin.index)
+        evidence.set(origin.index, item.evidence)
+      }
+      coveredIndexes.value = next
+      coverageEvidence.value = evidence
+    } catch {
+      // 判定失败就保持现状，不猜
+    } finally {
+      coveragePending = false
+    }
+  }
 
   /** 已播出的对话全文，用于判断哪些观察项已经被问到 */
   const spokenText = computed(() => messages.value.map((m) => m.text).join(''))
@@ -92,10 +157,16 @@ export function useVoiceInterview(getPatientId: () => string) {
     if (playedCount.value >= script.value.length) {
       stopTimer()
       state.value = 'ended'
+      // 播完再判一次，兜住奇数轮结尾
+      void judgeCoverage()
       return
     }
     messages.value = [...messages.value, script.value[playedCount.value]]
     playedCount.value += 1
+
+    // 一轮医患问答闭合时判一次。实时 ASR 下这里换成「静默 N 秒」的停顿判定，
+    // 判定逻辑本身不用改。
+    if (playedCount.value % 2 === 0) void judgeCoverage()
   }
 
   function startTimer() {
@@ -113,6 +184,8 @@ export function useVoiceInterview(getPatientId: () => string) {
     stopTimer()
     messages.value = []
     playedCount.value = 0
+    coveredIndexes.value = new Set()
+    coverageEvidence.value = new Map()
     pickedObservations.value = new Set()
     error.value = ''
     state.value = 'playing'
@@ -238,6 +311,9 @@ export function useVoiceInterview(getPatientId: () => string) {
     pendingQuestions,
     doneQuestions,
     currentQuestion,
+    coverageDegraded,
+    toggleQuestionDone,
+    judgeCoverage,
     observations,
     coveredObservations,
     pickedObservations,

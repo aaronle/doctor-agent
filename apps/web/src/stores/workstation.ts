@@ -50,6 +50,9 @@ export const useWorkstation = defineStore('workstation', () => {
     handledAlerts.value = new Set([...handledAlerts.value, id])
   }
 
+  /** 已处置的红色风险 id，回写时随请求上送供服务端二次校验 */
+  const handledAlertIds = computed(() => [...handledAlerts.value])
+
   async function loadQueue() {
     queue.value = await api.patients()
   }
@@ -118,6 +121,7 @@ export const useWorkstation = defineStore('workstation', () => {
     openRedAlerts,
     writeBackBlocked,
     markAlertHandled,
+    handledAlertIds,
     loadQueue,
     selectPatient,
     loadSummary,

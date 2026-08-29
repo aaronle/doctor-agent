@@ -227,11 +227,26 @@ export const api = {
       provider: string
       degraded: boolean
     }>(`/api/emr/voice/init/${id}`),
+  /** 语义覆盖判定：判断追问清单里哪些已在对话中得到回答 */
+  voiceCoverage: (patientId: string, openQuestions: string[], transcript: { role: string; text: string }[]) =>
+    post<{ covered: { index: number; evidence: string }[]; provider: string; degraded: boolean }>(
+      '/api/emr/voice/coverage',
+      { patient_id: patientId, open_questions: openQuestions, transcript },
+    ),
   voiceComplete: (body: Record<string, unknown>) => post<Record<string, unknown>>('/api/emr/voice/complete', body),
   voiceHistory: (id: string) =>
     get<{ patient_id: string; sessions: { ended_at: string; summary: string; messages: unknown[] }[] }>(
       `/api/emr/voice/history/${id}`,
     ),
+
+  /** 确认并回写诊断。服务端会再校验一次红色风险闭环，前端禁用只是体验。 */
+  diagnosisWriteBack: (patientId: string, diagnoses: string[], primary: string, handledAlerts: string[]) =>
+    post<{ ok: boolean; message: string }>('/api/emr/diagnosis/write-back', {
+      patient_id: patientId,
+      diagnoses,
+      primary,
+      handled_alerts: handledAlerts,
+    }),
 
   // V4.3 把 33 项专项评估硬编码在打包产物里；改由后端提供以满足「前端零写死数据」
   assessmentCatalog: () =>

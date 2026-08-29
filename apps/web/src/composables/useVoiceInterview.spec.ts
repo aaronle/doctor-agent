@@ -9,10 +9,14 @@ const DIALOG = [
   { role: 'patient', text: '这三天差不多。' },
 ]
 
-function stubInit(payload: Partial<Record<string, unknown>> = {}) {
+/** 覆盖判定的桩：默认判「第一条已覆盖」，用于验证映射与单调性 */
+function stubInit(payload: Partial<Record<string, unknown>> = {}, coverage: { index: number; evidence: string }[] = []) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
+      if (url.includes('/voice/coverage')) {
+        return new Response(JSON.stringify({ covered: coverage, provider: 'haiku', degraded: false }), { status: 200 })
+      }
       if (url.includes('/voice/init/')) {
         return new Response(
           JSON.stringify({
@@ -73,18 +77,75 @@ describe('语音问诊', () => {
     expect(voice.messages.value).toHaveLength(DIALOG.length)
   })
 
-  it('追问清单随对话推进逐条划掉', async () => {
-    stubInit()
+  it('追问清单按语义判定划掉，不是按轮次顺序', async () => {
+    // 后端判定「第 2 条（有无进行性加重）已覆盖」——若按轮次顺序，划掉的会是第 1 条
+    stubInit({}, [{ index: 2, evidence: '这三天差不多。' }])
     const voice = useVoiceInterview(() => 'P006')
 
     await voice.start()
     expect(voice.doneQuestions.value).toHaveLength(0)
-    expect(voice.currentQuestion.value?.index).toBe(0)
 
-    // 一轮医患问答（2 条）算问掉一条
     await vi.advanceTimersByTimeAsync(1400)
-    expect(voice.doneQuestions.value).toHaveLength(1)
-    expect(voice.currentQuestion.value?.index).toBe(1)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(voice.doneQuestions.value).toEqual(['有无进行性加重？'])
+    expect(voice.currentQuestion.value?.index).toBe(0)
+  })
+
+  it('覆盖判定是单调的，已标记的不会回退', async () => {
+    stubInit({}, [{ index: 1, evidence: 'x' }])
+    const voice = useVoiceInterview(() => 'P006')
+    await voice.start()
+    await vi.advanceTimersByTimeAsync(1400)
+    await vi.advanceTimersByTimeAsync(0)
+    const first = voice.doneQuestions.value.length
+    expect(first).toBeGreaterThan(0)
+
+    // 后续判定不再返回该条，它也不能掉回未问
+    await vi.advanceTimersByTimeAsync(1400)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(voice.doneQuestions.value.length).toBeGreaterThanOrEqual(first)
+  })
+
+  it('判定降级时不做任何标记，宁可让清单冗余也不错标已问', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/voice/coverage')) {
+          return new Response(JSON.stringify({ covered: [], provider: 'local-rules', degraded: true }), { status: 200 })
+        }
+        if (url.includes('/voice/init/')) {
+          return new Response(
+            JSON.stringify({
+              greeting: '您好', patient_name: '赵某某', chief_complaint: '右侧肢体无力', diagnoses: [],
+              dialog: DIALOG, questions: ['哪一侧肢体无力？', '有无进行性加重？'], observations: [],
+              provider: 'haiku', degraded: false,
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      }),
+    )
+    const voice = useVoiceInterview(() => 'P006')
+    await voice.start()
+    await vi.advanceTimersByTimeAsync(1400)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(voice.coverageDegraded.value).toBe(true)
+    expect(voice.doneQuestions.value).toHaveLength(0)
+  })
+
+  it('医生可手动勾销，模型判错时能一键纠正', async () => {
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006')
+    await voice.start()
+
+    voice.toggleQuestionDone(1)
+    expect(voice.doneQuestions.value).toContain('有无进行性加重？')
+
+    voice.toggleQuestionDone(1)
+    expect(voice.doneQuestions.value).not.toContain('有无进行性加重？')
   })
 
   it('待观察清单会剔掉对话中已经问到的条目', async () => {

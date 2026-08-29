@@ -144,9 +144,17 @@ async function confirmDiagnoses() {
       '确认回写',
       { type: 'warning' },
     )
-    ElMessage.success('诊断已回写（本地库 + 审计）')
-  } catch {
-    // 用户取消
+    const result = await api.diagnosisWriteBack(
+      ws.patientId,
+      [...checkedDiagnoses.value],
+      primaryDiagnosis.value,
+      ws.handledAlertIds,
+    )
+    ElMessage.success(result.message)
+    ws.patient = await api.patient(ws.patientId)
+  } catch (error) {
+    // ElMessageBox 取消会抛字符串 'cancel'，真实错误才提示
+    if (error instanceof Error) ElMessage.error(`回写失败：${error.message}`)
   } finally {
     writingBack.value = false
   }
@@ -213,6 +221,102 @@ const recordCompleteness = computed(() => {
   const filled = RECORD_SECTIONS.filter(([key]) => (ws.record[key] ?? '').trim() && ws.record[key] !== '未采集').length
   return Math.round((filled / RECORD_SECTIONS.length) * 100)
 })
+
+// ---------------------------------------------------------------- 医嘱回写
+
+const addingOrder = ref('')
+const writingOrders = ref(false)
+
+/** 单条推荐用药加入医嘱单 */
+async function addRecommendedOrder(order: { drug: string; dose: string; freq: string; route: string }) {
+  addingOrder.value = order.drug
+  try {
+    await api.createOrder({
+      patient_id: ws.patientId,
+      drug: order.drug,
+      dose: order.dose,
+      freq: order.freq,
+      route: order.route,
+      days: '30',
+    })
+    ElMessage.success(`「${order.drug}」已加入医嘱单`)
+    ws.patient = await api.patient(ws.patientId)
+  } catch (error) {
+    ElMessage.error(`加入失败：${(error as Error).message}`)
+  } finally {
+    addingOrder.value = ''
+  }
+}
+
+/** 整单回写：把全部推荐用药与推荐检查一次性开出 */
+async function writeBackAllOrders() {
+  const drugs = summary.value?.recommended_orders ?? []
+  const exams = (summary.value?.todos ?? []).filter((t) => t.type === 'exam')
+  if (!drugs.length && !exams.length) {
+    ElMessage.warning('没有可回写的推荐医嘱')
+    return
+  }
+  if (ws.writeBackBlocked) {
+    ElMessage.warning(`${ws.openRedAlerts.length} 条红色风险未处置，已阻断回写`)
+    return
+  }
+
+  await ElMessageBox.confirm(
+    `将开立 ${drugs.length} 条用药、${exams.length} 项检查。一期写入本地库并留审计，不触达真实 HIS。`,
+    '确认回写到医嘱',
+    { type: 'warning' },
+  )
+
+  writingOrders.value = true
+  try {
+    for (const order of drugs) {
+      await api.createOrder({
+        patient_id: ws.patientId,
+        drug: order.drug,
+        dose: order.dose,
+        freq: order.freq,
+        route: order.route,
+        days: '30',
+      })
+    }
+    for (const exam of exams) {
+      await api.createExam({
+        patient_id: ws.patientId,
+        name: exam.title,
+        type: '检验',
+        route: '门诊',
+        freq: '一次',
+      })
+    }
+    ElMessage.success(`已回写 ${drugs.length + exams.length} 条医嘱（本地库 + 审计）`)
+    ws.patient = await api.patient(ws.patientId)
+  } catch (error) {
+    ElMessage.error(`回写失败：${(error as Error).message}`)
+  } finally {
+    writingOrders.value = false
+  }
+}
+
+// ---------------------------------------------------------------- 智能笔记检索
+
+/**
+ * 智能笔记的「检」按钮：按关键词检索本次语音问诊内容。
+ * 原件 title 就是「检索语音就诊内容」—— 它不是重新生成病历。
+ */
+const noteHits = ref<{ role: string; text: string }[]>([])
+
+function searchVoiceContent() {
+  const keyword = smartNote.value.trim()
+  if (!keyword) {
+    ElMessage.warning('先在智能笔记里输入关键词')
+    return
+  }
+  const source = voice.messages.value.length ? voice.messages.value : (summary.value?.dialog_script ?? [])
+  noteHits.value = source.filter((turn) => turn.text.includes(keyword))
+  ElMessage.info(
+    noteHits.value.length ? `在问诊内容里命中 ${noteHits.value.length} 处` : `问诊内容里没有「${keyword}」`,
+  )
+}
 
 // ---------------------------------------------------------------- 共病
 
@@ -534,16 +638,32 @@ onMounted(async () => {
                     <div class="rc-row smart-note-row">
                       <span class="rc-label">智能笔记</span>
                       <div class="rc-field smart-note-field">
-                        <textarea v-model="smartNote" placeholder="随手记要点，AI 生成病历时会一并参考" />
+                        <textarea v-model="smartNote" placeholder="输入关键词，点击“检”检索语音就诊内容" />
                       </div>
                       <button
                         class="rc-writeback-icon smart-note-search"
-                        title="按笔记内容重新生成病历"
-                        :disabled="generating"
-                        @click="generateRecord"
+                        title="检索语音就诊内容"
+                        @click="searchVoiceContent"
                       >
                         检
                       </button>
+                    </div>
+
+                    <!-- 检索命中：点一条把该句并入智能笔记，供病历生成参考 -->
+                    <div v-if="noteHits.length" class="rc-row">
+                      <span class="rc-label">命中</span>
+                      <div class="rc-field">
+                        <div
+                          v-for="(hit, i) in noteHits"
+                          :key="i"
+                          class="obs-float-item"
+                          :title="'点击并入智能笔记'"
+                          @click="smartNote = `${smartNote}｜${hit.text}`"
+                        >
+                          {{ hit.role === 'doctor' ? '医生' : '患者' }}：{{ hit.text }}
+                        </div>
+                      </div>
+                      <button class="rc-writeback-icon" title="清空检索结果" @click="noteHits = []">清</button>
                     </div>
 
                     <div v-for="[key, label] in RECORD_SECTIONS" :key="key" class="rc-row">
@@ -693,10 +813,35 @@ onMounted(async () => {
                 <div class="treat-section-title">推荐用药</div>
                 <span class="treat-section-count">{{ summary?.recommended_orders?.length ?? 0 }} 项</span>
               </div>
+
+              <div class="btab-writeback-bar">
+                <el-button
+                  type="success"
+                  size="small"
+                  class="writeback-primary-btn"
+                  :loading="writingOrders"
+                  @click="writeBackAllOrders"
+                >
+                  ✔ 确认并回写到医嘱
+                </el-button>
+                <span class="writeback-hint">
+                  {{ ws.writeBackBlocked ? `${ws.openRedAlerts.length} 条红色风险未处置，回写被阻断` : '回写后写入本地医嘱表并留审计' }}
+                </span>
+              </div>
               <div class="treat-list">
                 <div v-for="order in summary?.recommended_orders ?? []" :key="order.drug" class="treat-card">
                   <div class="treat-top">
                     <div class="treat-drug-wrap"><span class="treat-drug">{{ order.drug }}</span></div>
+                    <el-button
+                      type="primary"
+                      size="small"
+                      link
+                      class="treat-writeback-btn"
+                      :loading="addingOrder === order.drug"
+                      @click="addRecommendedOrder(order)"
+                    >
+                      添加到医嘱单
+                    </el-button>
                   </div>
                   <div class="treat-spec">{{ order.dose }} · {{ order.freq }} · {{ order.route }}</div>
                   <div class="treat-basis">{{ order.basis }}</div>
@@ -924,14 +1069,26 @@ onMounted(async () => {
       <div v-if="voice.active.value && voice.questions.value.length" class="pending-float" :style="pendingStyle">
         <div class="pending-title"><span class="pending-dot" /> AI 追问提示 </div>
         <div class="pending-list">
-          <div v-if="voice.currentQuestion.value" class="pq-item">
+          <!-- 当前该问的一条。点一下可手动标记已问，模型判错时医生能一键纠正。 -->
+          <div
+            v-if="voice.currentQuestion.value"
+            class="pq-item"
+            title="点击标记为已问"
+            @click="voice.toggleQuestionDone(voice.currentQuestion.value.index)"
+          >
             <span class="pq-num">{{ voice.currentQuestion.value.index + 1 }}</span>
             <span class="pq-text">{{ voice.currentQuestion.value.text }}</span>
           </div>
           <div class="pq-done-list">
-            <div v-for="text in voice.doneQuestions.value" :key="text" class="pq-item done">
+            <div
+              v-for="item in voice.pendingQuestions.value.filter((q) => q.done)"
+              :key="item.index"
+              class="pq-item done"
+              :title="item.evidence ? `依据：${item.evidence}` : '点击撤销'"
+              @click="voice.toggleQuestionDone(item.index)"
+            >
               <span class="pq-check">✓</span>
-              <span class="pq-text">{{ text }}</span>
+              <span class="pq-text">{{ item.text }}</span>
             </div>
           </div>
         </div>

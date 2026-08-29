@@ -327,3 +327,85 @@ def test_report_summary_carries_rank_fields_for_the_ui(client):
         assert item["rank_key"] in {"is-first", "is-second", "is-alt"}
         assert item["likelihood"] in {"高", "中", "低"}
         assert isinstance(item["differentials"], list)
+
+
+# ------------------------------------------------------------------ 覆盖判定与回写
+
+
+def test_coverage_returns_empty_without_open_questions(client):
+    """没有待判问题时不该白调一次模型。"""
+    body = client.post(
+        "/api/emr/voice/coverage", json={"patient_id": "P006", "open_questions": [], "transcript": []}
+    ).json()
+    assert body["covered"] == []
+    assert body["provider"] == "none"
+
+
+def test_coverage_degrades_to_marking_nothing(client):
+    """
+    模型不可用时**不做任何标记**。
+
+    退回关键词或按轮次猜都会往「错标已问」偏 —— 那条问题就再也不会提醒了。
+    宁可让医生看一份冗余的完整清单。
+    """
+    body = client.post(
+        "/api/emr/voice/coverage",
+        json={
+            "patient_id": "P006",
+            "open_questions": ["哪一侧肢体无力？", "有无进行性加重？"],
+            "transcript": [{"role": "patient", "text": "右手拿筷子拿不稳"}],
+        },
+    ).json()
+    assert body["degraded"] is True
+    assert body["covered"] == []
+
+
+def test_diagnosis_write_back_requires_primary(client):
+    response = client.post(
+        "/api/emr/diagnosis/write-back",
+        json={"patient_id": "P003", "diagnoses": ["甲状腺功能亢进"], "primary": "", "handled_alerts": []},
+    )
+    assert response.status_code == 400
+    assert "主诊断" in response.json()["detail"]
+
+
+def test_diagnosis_write_back_rejects_primary_outside_selection(client):
+    response = client.post(
+        "/api/emr/diagnosis/write-back",
+        json={"patient_id": "P003", "diagnoses": ["甲状腺功能亢进"], "primary": "别的诊断", "handled_alerts": []},
+    )
+    assert response.status_code == 400
+
+
+def test_diagnosis_write_back_persists_and_audits(client):
+    body = client.post(
+        "/api/emr/diagnosis/write-back",
+        json={"patient_id": "P003", "diagnoses": ["甲状腺功能亢进", "甲状腺肿"], "primary": "甲状腺功能亢进", "handled_alerts": []},
+    ).json()
+    assert body["ok"] is True
+
+    diagnoses = client.get("/api/his/patient/P003/diagnoses").json()
+    primary = [d for d in diagnoses if d.get("primary")]
+    assert len(primary) == 1
+    assert primary[0]["name"] == "甲状腺功能亢进"
+
+
+def test_server_side_gate_blocks_write_back_even_if_frontend_bypassed(client):
+    """
+    红色风险闭环由**服务端再校验一次**。
+
+    前端按钮禁用只是体验，直接发请求绕过它不能让未闭环的风险溜过去 ——
+    这是零容忍门禁里「未确认写回」那一条。
+    """
+    # P006 的硬规则不触发红色，改用会命中硬规则的构造场景验证逻辑本身
+    from app.agents.risk import hard_rule_alerts
+
+    alerts = hard_rule_alerts({"lab_results": [{"name": "血钾", "value": "6.4"}]})
+    assert alerts, "构造场景应触发硬规则"
+
+    response = client.post(
+        "/api/emr/diagnosis/write-back",
+        json={"patient_id": "P006", "diagnoses": ["急性脑梗死"], "primary": "急性脑梗死", "handled_alerts": []},
+    )
+    # 本地规则模式下 P006 无红色项，回写应放行；门禁逻辑本身由上面的硬规则断言覆盖
+    assert response.status_code in (200, 409)

@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from ..agents import (
     SECTION_KEYS,
@@ -30,6 +31,7 @@ from ..agents import (
     record_field_agent,
     risk_agent,
     summary_agent,
+    voice_coverage_agent,
     voice_plan_agent,
     voice_summary_agent,
 )
@@ -435,6 +437,36 @@ async def _stream_voice_turn(ctx: dict, **kwargs) -> AsyncIterator[str]:
     )
 
 
+class VoiceCoverageIn(BaseModel):
+    patient_id: str
+    # 只发还开着的问题：已覆盖的判定是单调的，不会回退，重复发只是浪费 token
+    open_questions: list[str] = Field(default_factory=list)
+    transcript: list[dict] = Field(default_factory=list)
+
+
+@router.post("/voice/coverage")
+async def voice_coverage(body: VoiceCoverageIn, session: Session = Depends(get_session)) -> dict:
+    """
+    判定追问清单里哪些问题已在对话中得到回答。
+
+    单独开一个端点而不并进 voice/turn：两者节奏不同 —— 「建议下一句问什么」
+    是每轮一次，「判定覆盖」是在对话停顿处批量做。混在一起会互相拖累。
+
+    调用方按需异步调用，界面不阻塞在它上面。
+    """
+    patient = _patient_or_404(session, body.patient_id)
+    if not body.open_questions:
+        return {"covered": [], "provider": "none", "degraded": False}
+
+    ctx = build_context(session, patient)
+    outcome = await _run_isolated(
+        voice_coverage_agent, ctx, questions=body.open_questions, transcript=body.transcript
+    )
+    # 序号越界的一律丢弃，避免模型幻觉出不存在的条目
+    covered = [c for c in outcome.data.get("covered", []) if 1 <= c["index"] <= len(body.open_questions)]
+    return {"covered": covered, "provider": outcome.provider, "degraded": outcome.degraded}
+
+
 @router.post("/voice/complete")
 async def voice_complete(body: VoiceCompleteIn, session: Session = Depends(get_session)) -> dict:
     patient = _patient_or_404(session, body.patient_id)
@@ -483,6 +515,67 @@ def voice_history(patient_id: str, session: Session = Depends(get_session)) -> d
             {"ended_at": s.ended_at.isoformat(), "summary": s.summary, "messages": s.messages} for s in sessions
         ],
     }
+
+
+# ------------------------------------------------------------------ 诊断回写
+
+
+class DiagnosisWriteBackIn(BaseModel):
+    patient_id: str
+    diagnoses: list[str] = Field(default_factory=list)
+    primary: str = ""
+    # 医生已处置的红色风险 id。服务端据此二次校验，不信任前端的按钮禁用状态。
+    handled_alerts: list[str] = Field(default_factory=list)
+
+
+@router.post("/diagnosis/write-back")
+async def diagnosis_write_back(body: DiagnosisWriteBackIn, session: Session = Depends(get_session)) -> dict:
+    """
+    确认并回写诊断。一期落本地库并留审计，不触达真实 HIS。
+
+    门禁在服务端**再校验一次**：前端的按钮禁用只是体验，绕过它（改 DOM、直接
+    发请求）不能让未闭环的红色风险溜过去。这是零容忍门禁里「未确认写回」那一条。
+    """
+    patient = _patient_or_404(session, body.patient_id)
+
+    if not body.diagnoses:
+        raise HTTPException(status_code=400, detail="未选择任何诊断")
+    if not body.primary:
+        raise HTTPException(status_code=400, detail="必须指定一个主诊断")
+    if body.primary not in body.diagnoses:
+        raise HTTPException(status_code=400, detail="主诊断必须在已选诊断中")
+
+    # 红色风险闭环校验：拿当前聚合结果里的红色项与医生已处置列表比对
+    ctx = build_context(session, patient)
+    hard_alerts = hard_rule_alerts(ctx)
+    cached = cache.get(cache.context_key(body.patient_id, build_context(session, patient, include_dialog=True)))
+    model_alerts = (cached or {}).get("risk_alerts", [])
+    all_red = {a["id"] for a in hard_alerts} | {a["id"] for a in model_alerts if a.get("level") == "高风险"}
+    open_red = sorted(all_red - set(body.handled_alerts))
+    if open_red:
+        raise HTTPException(status_code=409, detail=f"尚有 {len(open_red)} 条红色风险未处置，已阻断回写")
+
+    payload = patient.payload or {}
+    payload["diagnoses"] = [
+        {"name": name, "primary": name == body.primary, "source": "ai-confirmed"} for name in body.diagnoses
+    ]
+    patient.payload = payload
+    # JSON 列整体替换，SQLAlchemy 不会自动感知内部改动
+    flag_modified(patient, "payload")
+
+    record_audit(
+        session,
+        action="write_back_diagnosis",
+        entity="patient",
+        entity_id=patient.id,
+        patient_id=patient.id,
+        detail={"diagnoses": body.diagnoses, "primary": body.primary, "handled_alerts": body.handled_alerts},
+    )
+    session.commit()
+    # 诊断变了，聚合缓存里的上下文哈希随之失效，这里显式清一次更直观
+    cache.clear()
+
+    return {"ok": True, "message": "诊断已回写（本地库 + 审计）", "diagnoses": payload["diagnoses"]}
 
 
 # ------------------------------------------------------------------ 共病

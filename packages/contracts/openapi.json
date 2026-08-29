@@ -734,6 +734,50 @@
         }
       }
     },
+    "/api/emr/voice/coverage": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Voice Coverage",
+        "description": "判定追问清单里哪些问题已在对话中得到回答。\n\n单独开一个端点而不并进 voice/turn：两者节奏不同 —— 「建议下一句问什么」\n是每轮一次，「判定覆盖」是在对话停顿处批量做。混在一起会互相拖累。\n\n调用方按需异步调用，界面不阻塞在它上面。",
+        "operationId": "voice_coverage_api_emr_voice_coverage_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceCoverageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Voice Coverage Api Emr Voice Coverage Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/emr/voice/complete": {
       "post": {
         "tags": [
@@ -804,6 +848,50 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Voice History Api Emr Voice History  Patient Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/diagnosis/write-back": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Diagnosis Write Back",
+        "description": "确认并回写诊断。一期落本地库并留审计，不触达真实 HIS。\n\n门禁在服务端**再校验一次**：前端的按钮禁用只是体验，绕过它（改 DOM、直接\n发请求）不能让未闭环的红色风险溜过去。这是零容忍门禁里「未确认写回」那一条。",
+        "operationId": "diagnosis_write_back_api_emr_diagnosis_write_back_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiagnosisWriteBackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Diagnosis Write Back Api Emr Diagnosis Write Back Post"
                 }
               }
             }
@@ -1022,6 +1110,38 @@
           "patient_id"
         ],
         "title": "ConsultationIn"
+      },
+      "DiagnosisWriteBackIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "diagnoses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Diagnoses"
+          },
+          "primary": {
+            "type": "string",
+            "title": "Primary",
+            "default": ""
+          },
+          "handled_alerts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Handled Alerts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "DiagnosisWriteBackIn"
       },
       "ExamIn": {
         "properties": {
@@ -1278,6 +1398,34 @@
           "patient_id"
         ],
         "title": "VoiceCompleteIn"
+      },
+      "VoiceCoverageIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "open_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Open Questions"
+          },
+          "transcript": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Transcript"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "VoiceCoverageIn"
       },
       "VoiceTurnIn": {
         "properties": {
