@@ -219,19 +219,36 @@ describe('语音问诊', () => {
     expect(voice.observations.value).toContain('睡眠质量')
   })
 
-  it('暂停后不再推进，继续后恢复', async () => {
+  it('继续问诊：脚本没播完就接着播', async () => {
     stubInit()
     const voice = useVoiceInterview(() => 'P006')
     await voice.start()
+    await vi.advanceTimersByTimeAsync(1400)
+    const played = voice.messages.value.length
 
-    voice.pause()
-    const frozen = voice.messages.value.length
+    // 结束后再点继续，应从上次的位置接着播，而不是重头来
+    await voice.finish()
+    expect(voice.state.value).toBe('ended')
+
+    voice.resumeCapture()
+    expect(voice.state.value).toBe('playing')
+    await vi.advanceTimersByTimeAsync(1400)
+    expect(voice.messages.value.length).toBeGreaterThan(played)
+  })
+
+  it('继续问诊：内容已播完则切回可录入状态，不假装还有可播的', async () => {
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006')
+    await play(voice, DIALOG.length)
+    await vi.advanceTimersByTimeAsync(1400)
+    await voice.finish()
+
+    const before = voice.messages.value.length
+    voice.resumeCapture()
+
+    expect(voice.state.value).toBe('awaiting')
     await vi.advanceTimersByTimeAsync(5000)
-    expect(voice.messages.value).toHaveLength(frozen)
-
-    voice.resume()
-    await vi.advanceTimersByTimeAsync(0)
-    expect(voice.messages.value.length).toBeGreaterThan(frozen)
+    expect(voice.messages.value).toHaveLength(before)
   })
 
   it('没有演示脚本时不假装播放', async () => {

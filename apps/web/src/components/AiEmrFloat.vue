@@ -404,51 +404,40 @@ async function sendChat(preset?: string) {
  * 合成一个按钮的话，医生只改了智能笔记也要等 20 秒的重算；分开之后各付各的时间。
  */
 
-const updatingAnalysis = ref(false)
+const finishing = ref(false)
 const actionStep = ref('')
 
 /**
- * 两个动作的共同前置：把问诊记录落库。
+ * 「结束问诊」：一次做完收尾与全部下游生成。
  *
- * 下游的上下文装配（latest_dialog）读的是持久化后的问诊记录 ——
- * 不先落库，医生刚问出来的内容就进不了病历与分析。
+ * 病情概况、鉴别诊断、风险、共病都是**打开工作站时**算好的，也就是在问诊
+ * 之前。不在这里回灌一次，医生问出来的新信息就进不了那些面板，这一场问诊
+ * 等于白做。病历同理。
+ *
+ * 顺序：落库问诊记录 → 重算聚合分析 → 重新起草病历。
+ * 落库必须在最前 —— 下游上下文（latest_dialog）读的是持久化后的记录。
  */
-async function persistInterview() {
-  if (!voice.messages.value.length) return
-  actionStep.value = '落库问诊记录…'
-  // 只落库，不结束 —— 结束是医生点「结束问诊」的事
-  await voice.persist()
-}
-
-/** 生成：按本次问诊重新起草病历七段 */
-async function generateFromInterview() {
-  if (!ws.patientId || generating.value) return
+async function finishAndGenerate() {
+  if (!ws.patientId || finishing.value) return
+  finishing.value = true
   try {
-    await persistInterview()
-    actionStep.value = '起草病历…'
-    await generateRecord()
-    ElMessage.success('病历已按本次问诊重新起草，确认后写入')
-  } catch (error) {
-    ElMessage.error(`生成失败：${(error as Error).message}`)
-  } finally {
-    actionStep.value = ''
-  }
-}
+    if (voice.messages.value.length) {
+      actionStep.value = '落库问诊记录…'
+      await voice.finish()
+    }
 
-/** 更新：按本次问诊重算病情概况、鉴别诊断、风险与共病 */
-async function updateAnalysis() {
-  if (!ws.patientId || updatingAnalysis.value) return
-  updatingAnalysis.value = true
-  try {
-    await persistInterview()
     actionStep.value = '重新分析病情、诊断与风险…'
     await ws.loadSummary(true)
     if (ws.summaryError) throw new Error(ws.summaryError)
-    ElMessage.success('病情概况、鉴别诊断与风险已按本次问诊更新')
+
+    actionStep.value = '起草病历…'
+    await generateRecord()
+
+    ElMessage.success('问诊已结束，病历与分析已按本次内容生成')
   } catch (error) {
-    ElMessage.error(`更新失败：${(error as Error).message}`)
+    ElMessage.error(`生成失败：${(error as Error).message}`)
   } finally {
-    updatingAnalysis.value = false
+    finishing.value = false
     actionStep.value = ''
   }
 }
@@ -694,7 +683,7 @@ onMounted(async () => {
                       link
                       title="按本次问诊重新起草病历七段"
                       :loading="generating"
-                      @click="generateFromInterview"
+                      @click="finishAndGenerate"
                     >
                       AI 生成
                     </el-button>
@@ -1084,59 +1073,31 @@ onMounted(async () => {
               ● 语音问诊
             </el-button>
 
+            <!--
+              问诊中只有两个按钮，构成一个可重复的循环：
+                继续问诊 → 继续录入（跟患者对话，或医生自己补充）
+                结束问诊 → 落库 + 生成病历 + 更新概况/诊断/风险/共病
+              还要补就再点继续。医生不需要判断该点哪个。
+            -->
             <template v-else>
-              <!-- 播放中 / 暂停：控制推进 -->
-              <el-button v-if="voice.state.value === 'playing'" type="warning" size="small" @click="voice.pause()">
-                ⏸ 暂停问诊
-              </el-button>
-              <el-button v-else-if="voice.state.value === 'paused'" type="primary" size="small" @click="voice.resume()">
-                ▶ 继续问诊
-              </el-button>
-              <el-button v-else size="small" @click="voice.restart()">🔄 重新问诊</el-button>
-
-              <el-button size="small" plain class="obs-toggle-btn" @click="voice.showObservations.value = true">
-                📋 补充观察
-              </el-button>
-
-              <!--
-                结束问诊只有这一个入口，且只能由医生点。
-                内容播完只是进入 awaiting，不代表问诊结束 —— 结束会生成问诊小结，
-                小结要进病历，属于有后果的动作，必须医生确认。
-              -->
               <el-button
-                v-if="voice.state.value !== 'ended'"
-                type="danger"
-                size="small"
-                :loading="voice.finishing.value"
-                @click="voice.finish()"
-              >
-                ■ 结束问诊
-              </el-button>
-
-              <!--
-                生成 / 更新：把问诊内容灌进下游产出。
-                病情概况、鉴别诊断、风险、共病都是打开工作站时算好的（问诊之前），
-                不点这一下，医生问出来的新信息就进不了那些面板。
-              -->
-              <el-button
-                v-if="voice.messages.value.length"
-                type="success"
-                size="small"
-                title="按本次问诊重新起草病历七段"
-                :loading="generating"
-                @click="generateFromInterview"
-              >
-                ⚡ 生成
-              </el-button>
-              <el-button
-                v-if="voice.messages.value.length"
                 type="primary"
                 size="small"
-                title="按本次问诊重算病情概况、鉴别诊断、风险与共病"
-                :loading="updatingAnalysis"
-                @click="updateAnalysis"
+                :disabled="voice.state.value === 'playing'"
+                :title="voice.state.value === 'playing' ? '问诊进行中' : '继续语音录入，或补充内容'"
+                @click="voice.resumeCapture()"
               >
-                ⟳ 更新
+                {{ voice.state.value === 'playing' ? '● 问诊进行中' : '▶ 继续问诊' }}
+              </el-button>
+
+              <el-button
+                type="danger"
+                size="small"
+                :loading="finishing"
+                title="结束问诊，并按本次内容生成病历与全部分析"
+                @click="finishAndGenerate"
+              >
+                ■ 结束问诊
               </el-button>
             </template>
           </div>
@@ -1152,7 +1113,7 @@ onMounted(async () => {
                 @keyup.enter.exact="submitInput"
               />
               <div class="chat-float-actions">
-                <button class="float-voice-btn" title="语音问诊" @click="voice.state.value === 'idle' ? voice.start() : voice.pause()">
+                <button class="float-voice-btn" title="语音问诊" @click="voice.resumeCapture()">
                   🎤
                 </button>
                 <button class="float-send-btn" :disabled="chatting || voice.manualThinking.value" @click="submitInput">↑</button>

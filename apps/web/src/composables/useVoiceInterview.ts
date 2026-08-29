@@ -5,12 +5,14 @@ import { api, streamSse } from '../api'
 /**
  * 语音问诊（F01）。
  *
- * 状态机：idle → playing ⇄ paused → awaiting →（医生点结束）→ ended
+ * 状态机：idle → playing → awaiting ⇄（继续问诊）→ ended →（继续问诊）→ awaiting
  *   - idle     ：显示「● 语音问诊」
  *   - playing  ：逐条推进医患对话
- *   - paused   ：医生暂停
- *   - awaiting ：**内容播完，但问诊还没结束** —— 医生可继续手动补问，或点「结束问诊」
- *   - ended    ：医生已结束，问诊小结已生成
+ *   - awaiting ：**内容播完，但问诊还没结束** —— 可继续录入，或点「结束问诊」
+ *   - ended    ：医生已结束并生成全部内容；点「继续问诊」可回到 awaiting 接着录
+ *
+ * 界面只有两个按钮：「▶ 继续问诊」与「■ 结束问诊」，构成一个可重复的循环 ——
+ * 继续录入 → 结束并生成 → 还要补就再继续。医生不需要判断该点哪个按钮。
  *
  * 为什么「播完」不等于「结束」：
  *   1. 正式环境是连续音频流，根本没有「播完」这个事件。靠静音判断会把医生
@@ -28,7 +30,7 @@ import { api, streamSse } from '../api'
  * 播放结束后医生仍可手动补问，走 voice/turn。
  */
 
-export type VoiceState = 'idle' | 'playing' | 'paused' | 'awaiting' | 'ended'
+export type VoiceState = 'idle' | 'playing' | 'awaiting' | 'ended'
 
 export interface VoiceTurnMessage {
   role: 'doctor' | 'patient'
@@ -45,6 +47,7 @@ export function useVoiceInterview(getPatientId: () => string) {
   /** 模型给的候选观察项全集，不随对话变化 */
   const allObservations = ref<string[]>([])
   const pickedObservations = ref<Set<string>>(new Set())
+  // 问诊进行中自动浮出，不藏在按钮后面 —— 「待观察问题」本就该在对话过程中看得见
   const showObservations = ref(false)
   const error = ref('')
   const degraded = ref(false)
@@ -214,6 +217,8 @@ export function useVoiceInterview(getPatientId: () => string) {
         error.value = '模型通道不可用，追问清单为通用问法，未生成补充观察项。'
       }
 
+      showObservations.value = true
+
       const dialog = (init.dialog ?? []) as { role: string; text: string }[]
       script.value = dialog.map((turn) => ({
         role: turn.role === 'patient' ? 'patient' : 'doctor',
@@ -233,23 +238,27 @@ export function useVoiceInterview(getPatientId: () => string) {
     }
   }
 
-  function pause() {
-    if (state.value !== 'playing') return
-    stopTimer()
-    state.value = 'paused'
+  /**
+   * 「继续问诊」：继续启动语音录入。
+   *
+   * 脚本还没播完就接着播；已经播完（或已结束）就切回可录入状态，
+   * 医生可以继续跟患者对话，或自己补充内容。
+   */
+  function resumeCapture() {
+    if (state.value === 'idle') {
+      void start()
+      return
+    }
+    if (playedCount.value < script.value.length) {
+      state.value = 'playing'
+      startTimer()
+      return
+    }
+    // 内容已播完：不假装还有可播的，直接开放手动录入
+    state.value = 'awaiting'
   }
 
-  function resume() {
-    if (state.value !== 'paused') return
-    state.value = 'playing'
-    startTimer()
-  }
-
-  function restart() {
-    void start()
-  }
-
-  /** 手动补问会让问诊从 awaiting 回到「进行中」的语义，但不重启播放 */
+  /** 手动补问会让问诊从已结束回到进行中，但不重启播放 */
   function ensureOpen() {
     if (state.value === 'ended') state.value = 'awaiting'
   }
@@ -364,9 +373,7 @@ export function useVoiceInterview(getPatientId: () => string) {
     error,
     degraded,
     start,
-    pause,
-    resume,
-    restart,
+    resumeCapture,
     persist,
     finish,
     toggleObservation,
