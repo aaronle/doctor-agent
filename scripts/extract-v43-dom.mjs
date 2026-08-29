@@ -105,6 +105,41 @@ const TARGETS = [
     hash: '#/outpatient/P001',
     steps: async (page) => page.locator('.sidebar-toggle').first().click(),
   },
+
+  // 语音问诊进行中。V4.3 会自动播放 dialog_script，播放过程中浮出
+  // 「AI 追问提示」并累积「补充观察」。这一组状态此前完全没有采集到 ——
+  // 脚本从没启动过问诊，导致重建时整块功能缺失。
+  {
+    key: '40-voice-playing',
+    hash: '#/outpatient/P006',
+    steps: async (page) => {
+      await page.locator('.action-bar button', { hasText: '语音问诊' }).first().click();
+      // 只等 2.5 秒：对话脚本约 7 秒播完就转 ended，追问提示浮层随之消失。
+      // 等太久会采到播放结束后的空状态 —— 这正是首轮抽取漏掉整块功能的原因。
+      await page.waitForTimeout(2500);
+    },
+  },
+  {
+    key: '41-voice-observations',
+    hash: '#/outpatient/P006',
+    steps: async (page) => {
+      await page.locator('.action-bar button', { hasText: '语音问诊' }).first().click();
+      await page.waitForTimeout(2500);
+      const toggle = page.locator('.obs-toggle-btn').first();
+      if (await toggle.isVisible().catch(() => false)) await toggle.click();
+      await page.waitForTimeout(800);
+    },
+  },
+
+  // 鉴别诊断的「需鉴别（N）」展开态
+  {
+    key: '42-differential-expanded',
+    hash: '#/outpatient/P006',
+    steps: async (page) => {
+      await page.locator('.dd-diff-toggle').first().click();
+      await page.waitForTimeout(600);
+    },
+  },
 ];
 
 /**

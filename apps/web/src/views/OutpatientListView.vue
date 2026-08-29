@@ -67,7 +67,7 @@ onMounted(load)
     <div class="his-header">
       <div class="his-header-left">
         <span class="his-logo">🏥</span>
-        <span class="his-title">惠每门诊工作站</span>
+        <span class="his-title">AI 门诊工作站</span>
         <span class="his-subtitle">HIS · 门诊管理系统</span>
       </div>
       <div class="his-header-right">

@@ -164,6 +164,30 @@
       "domBytes": 96511,
       "outlineLines": 1096,
       "classCount": 368
+    },
+    {
+      "key": "40-voice-playing",
+      "hash": "#/outpatient/P006",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 99584,
+      "outlineLines": 1157,
+      "classCount": 391
+    },
+    {
+      "key": "41-voice-observations",
+      "hash": "#/outpatient/P006",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 101068,
+      "outlineLines": 1179,
+      "classCount": 396
+    },
+    {
+      "key": "42-differential-expanded",
+      "hash": "#/outpatient/P006",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 98618,
+      "outlineLines": 1119,
+      "classCount": 393
     }
   ]
 }

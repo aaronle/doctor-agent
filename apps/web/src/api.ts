@@ -110,14 +110,27 @@ export interface RiskItem {
   rule?: string
 }
 
+export interface DifferentialRef {
+  name: string
+  likelihood: string
+  reason: string
+}
+
 export interface SuspectedDiagnosis {
   name: string
   confidence: number
   icd?: string
   desc?: string
+  suggestion?: string
   supporting?: string[]
   opposing?: string[]
   missing?: string[]
+  /** 以下四项由后端按置信度排序派生，界面直接用，不在前端重算 */
+  rank?: number
+  rank_label?: string
+  rank_key?: string
+  likelihood?: string
+  differentials?: DifferentialRef[]
 }
 
 export interface ComorbidityCondition {
@@ -201,10 +214,19 @@ export const api = {
       { patient_id: patientId, field, note_text: noteText },
     ),
 
+  // 问诊开场包：一次返回播放一整场问诊所需的全部内容
   voiceInit: (id: string) =>
-    get<{ greeting: string; patient_name: string; chief_complaint: string; diagnoses: unknown[] }>(
-      `/api/emr/voice/init/${id}`,
-    ),
+    get<{
+      greeting: string
+      patient_name: string
+      chief_complaint: string
+      diagnoses: unknown[]
+      dialog: { role: string; text: string }[]
+      questions: string[]
+      observations: string[]
+      provider: string
+      degraded: boolean
+    }>(`/api/emr/voice/init/${id}`),
   voiceComplete: (body: Record<string, unknown>) => post<Record<string, unknown>>('/api/emr/voice/complete', body),
   voiceHistory: (id: string) =>
     get<{ patient_id: string; sessions: { ended_at: string; summary: string; messages: unknown[] }[] }>(

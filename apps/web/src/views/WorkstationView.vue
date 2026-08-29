@@ -177,7 +177,7 @@ onMounted(async () => {
         <el-button text class="back-btn" :icon="ArrowLeft" @click="router.push('/outpatient/list')">候诊列表</el-button>
         <span class="his-divider">|</span>
         <span class="his-logo">🏥</span>
-        <span class="his-title">惠每门诊工作站</span>
+        <span class="his-title">AI 门诊工作站</span>
       </div>
       <div class="his-header-right">
         <el-tag v-if="ws.isDegraded" size="small" type="warning" effect="light">

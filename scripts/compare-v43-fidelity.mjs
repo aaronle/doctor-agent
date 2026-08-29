@@ -27,7 +27,11 @@ const APP_URL = process.env.APP_URL ?? 'http://127.0.0.1:4173';
 const VIEWPORT = { width: 1600, height: 1000 };
 
 // 决定视觉观感的属性。颜色与字号错一点就会整体走样，优先看这些。
-const PROPS = ['width', 'height', 'fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor', 'padding', 'borderRadius'];
+//
+// 刻意不比 width / height：两者都由内容长度决定。去掉「惠每」后标题变短、
+// 真实模型产出的诊断描述比 fixture 长，都会让尺寸对不上，但那是内容差异
+// 不是还原度差异。真正决定观感的是字号、字重、行高、配色与盒模型内距。
+const PROPS = ['fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor', 'padding', 'borderRadius'];
 
 // 每个页面挑一组有代表性的 class 做比对
 const PAGES = [
@@ -39,9 +43,36 @@ const PAGES = [
   },
   {
     name: '门诊工作站',
-    hash: '#/outpatient/P001',
-    path: '/outpatient/P001',
-    selectors: ['.workstation-page', '.his-header', '.basic-info-strip', '.workstation-body', '.his-record-panel', '.panel-title-bar', '.form-row', '.fl', '.tips-drawer', '.tips-tab-nav', '.ttab', '.assistant-panel', '.rc-label', '.skill-chip'],
+    // 用 P006：只有带红色预警的患者才会渲染 risk-alert-section
+    hash: '#/outpatient/P006',
+    path: '/outpatient/P006',
+    selectors: [
+      '.workstation-page', '.his-header', '.basic-info-strip', '.workstation-body', '.his-record-panel',
+      '.panel-title-bar', '.form-row', '.fl', '.tips-drawer', '.tips-tab-nav', '.ttab', '.assistant-panel',
+      '.rc-label', '.skill-chip',
+      // 鉴别诊断与风险提示：首轮重建做成了自拟结构，与原件差得最远的两块
+      '.dd-card', '.dd-header', '.dd-title', '.dd-confirm-btn', '.dd-rec-item', '.dd-card-top',
+      '.dd-primary-tag', '.dd-primary-name', '.dd-icd', '.dd-reason', '.dd-diff-label', '.dd-diff-count',
+      '.risk-alert-section', '.ra-title', '.ra-card', '.ra-card-name', '.ra-card-suggestion', '.ra-view-btn',
+    ],
+  },
+  {
+    name: '语音问诊播放中',
+    hash: '#/outpatient/P006',
+    path: '/outpatient/P006',
+    // 点「语音问诊」后 2.5 秒内采集：对话脚本约 7 秒播完就转 ended，浮层随之消失
+    // V4.3 的问诊数据是本地的，点完即播；重建版要先等 voiceInit 的真实模型
+    // 调用返回，所以等浮层出现而不是死等固定时长。
+    prepare: async (page) => {
+      await page.locator('.action-bar button', { hasText: '语音问诊' }).first().click();
+      await page.locator('.pending-float').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+      await page.locator('.msg-bubble').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(800);
+    },
+    selectors: [
+      '.pending-float', '.pending-title', '.pending-list', '.pq-item', '.pq-num', '.pq-text',
+      '.msg-bubble', '.bubble-role', '.bubble-content', '.mode-badge',
+    ],
   },
 ];
 
@@ -100,9 +131,21 @@ for (const target of PAGES) {
   await refPage.waitForTimeout(1800);
   await appPage.goto(`${APP_URL}${target.path}`, { waitUntil: 'networkidle' });
   // 工作站首屏要等四个岗位跑完，给足时间
-  await appPage.waitForTimeout(target.path.includes('P001') ? 25000 : 2000);
+  await appPage.waitForTimeout(target.path.includes('/outpatient/P') ? 25000 : 2000);
 
-  const [ref, app] = await Promise.all([collect(refPage, target.selectors), collect(appPage, target.selectors)]);
+  // 两边各自「准备完立刻采集」，不能先准备两边再一起采：
+  // 原件的问诊浮层约 7 秒后随播放结束消失，而重建版要等真实模型返回，
+  // 等回来时原件那边早没了，会误报成「原件中不存在」。
+  let ref;
+  let app;
+  if (target.prepare) {
+    await target.prepare(refPage);
+    ref = await collect(refPage, target.selectors);
+    await target.prepare(appPage);
+    app = await collect(appPage, target.selectors);
+  } else {
+    [ref, app] = await Promise.all([collect(refPage, target.selectors), collect(appPage, target.selectors)]);
+  }
 
   console.log(`\n■ ${target.name}`);
   for (const selector of target.selectors) {

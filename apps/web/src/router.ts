@@ -21,7 +21,7 @@ export const router = createRouter({ history: createWebHistory(), routes })
 
 router.beforeEach((to) => {
   const session = useSession()
-  document.title = `${to.meta.title ?? '门诊'} · 惠每AI门诊`
+  document.title = `${to.meta.title ?? '门诊'} · AI 门诊工作站`
   if (!to.meta.noAuth && !session.loggedIn) {
     return { path: '/login' }
   }

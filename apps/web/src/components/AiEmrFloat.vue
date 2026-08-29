@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { api, streamSse, type RiskItem } from '../api'
@@ -42,8 +42,35 @@ function startResize(event: MouseEvent) {
   window.addEventListener('mouseup', up)
 }
 
+const voice = useVoiceInterview(() => ws.patientId)
+
 const summary = computed(() => ws.summary)
 const patient = computed(() => ws.patient)
+
+/**
+ * 两个浮层的位置。
+ *
+ * V4.3 把 position/right/top 写成内联样式（由 JS 按面板几何算出），
+ * CSS 里只有观感没有位置 —— 只搬 CSS 会让浮层塌到文档流里。
+ * 这里沿用它的取值；医生智能体面板关闭时右移，避免悬空。
+ */
+const floatRight = computed(() => (panelOpen.value ? 308 : 20))
+const pendingStyle = computed(() => ({
+  position: 'fixed' as const,
+  right: `${floatRight.value}px`,
+  top: '105px',
+  width: '220px',
+  zIndex: 2100,
+}))
+const obsStyle = computed(() => ({
+  position: 'fixed' as const,
+  right: `${floatRight.value}px`,
+  top: '320px',
+  width: '220px',
+  maxHeight: 'calc(100vh - 340px)',
+  zIndex: 2090,
+}))
+
 
 // ---------------------------------------------------------------- 诊断管理
 
@@ -65,6 +92,35 @@ function toggleDiagnosis(name: string) {
 function markPrimary(name: string) {
   if (!checkedDiagnoses.value.has(name)) toggleDiagnosis(name)
   primaryDiagnosis.value = primaryDiagnosis.value === name ? '' : name
+}
+
+const candidateNames = computed(() => (summary.value?.suspected_diagnoses ?? []).map((d) => d.name))
+const allChecked = computed(
+  () => candidateNames.value.length > 0 && candidateNames.value.every((n) => checkedDiagnoses.value.has(n)),
+)
+const someChecked = computed(
+  () => checkedDiagnoses.value.size > 0 && !allChecked.value,
+)
+
+function toggleAll() {
+  checkedDiagnoses.value = allChecked.value ? new Set() : new Set(candidateNames.value)
+  if (!checkedDiagnoses.value.size) primaryDiagnosis.value = ''
+}
+
+/** 「需鉴别（N）」的展开态，按诊断名记录 */
+const expandedDifferentials = ref<Set<string>>(new Set())
+
+function toggleDifferential(name: string) {
+  const next = new Set(expandedDifferentials.value)
+  next.has(name) ? next.delete(name) : next.add(name)
+  expandedDifferentials.value = next
+}
+
+/** 可能性徽标配色，与 V4.3 的 .dd-likelihood.high|mid|low 对应 */
+function likelihoodClass(likelihood: string) {
+  if (likelihood === '高') return 'high'
+  if (likelihood === '中') return 'mid'
+  return 'low'
 }
 
 /** 回写前置条件：至少一条诊断、必须有主诊断、红色风险已闭环。 */
@@ -190,6 +246,22 @@ const chatInput = ref('')
 const chatMessages = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
 const chatting = ref(false)
 
+/**
+ * 对话区自动滚到底，让新播出的一条始终可见。
+ * 必须放在 chatMessages 声明之后 —— 放前面会在模块求值时命中暂时性死区，
+ * 整个组件挂载失败（构建不报错，只在运行时炸）。
+ */
+const chatScrollEl = ref<HTMLElement | null>(null)
+
+watch(
+  () => [voice.messages.value.length, chatMessages.value.length],
+  async () => {
+    await nextTick()
+    const el = chatScrollEl.value
+    if (el) el.scrollTop = el.scrollHeight
+  },
+)
+
 async function sendChat(preset?: string) {
   const text = (preset ?? chatInput.value).trim()
   if (!text || chatting.value) return
@@ -218,23 +290,15 @@ async function sendChat(preset?: string) {
 
 // ---------------------------------------------------------------- 语音问诊
 
-const voice = useVoiceInterview(() => ws.patientId)
-
-/**
- * 输入框一个框服务两种模式：语音问诊进行中时写患者所述，否则写向智能体提问。
- * 用可读写 computed 代理，避免在模板里对 v-model 写三元表达式（那是非法的）。
- */
-const inputText = computed({
-  get: () => (voice.active.value ? voice.transcript.value : chatInput.value),
-  set: (value: string) => {
-    if (voice.active.value) voice.transcript.value = value
-    else chatInput.value = value
-  },
-})
+/** 问诊已开始时，输入框用于补录患者所述；否则用于向智能体提问。 */
+const inVoice = computed(() => voice.state.value !== 'idle')
 
 function submitInput() {
-  if (voice.active.value) voice.submitTurn()
-  else sendChat()
+  const text = chatInput.value.trim()
+  if (!text) return
+  chatInput.value = ''
+  if (inVoice.value) voice.askManual(text)
+  else sendChat(text)
 }
 
 const quickSkills = computed(() => {
@@ -335,31 +399,103 @@ onMounted(async () => {
 
                 <div class="dd-card">
                   <div class="dd-header">
+                    <el-checkbox
+                      class="dd-title-check"
+                      :model-value="allChecked"
+                      :indeterminate="someChecked"
+                      title="全选诊断"
+                      @change="toggleAll"
+                    />
                     <span class="dd-title">鉴别诊断</span>
-                    <button class="todo-action-btn tab-record dd-confirm-btn" @click="activeTab = '诊断管理'">去确认诊断</button>
+                    <button class="todo-action-btn tab-record dd-confirm-btn" @click="confirmDiagnoses">确认诊断</button>
                   </div>
+
                   <div class="dd-rec-list">
                     <div
-                      v-for="(item, index) in summary?.differential_diagnosis?.items ?? []"
+                      v-for="item in summary?.suspected_diagnoses ?? []"
                       :key="item.name"
                       class="dd-rec-item"
-                      :class="{ primary: index === 0, selected: index === 0 }"
+                      :class="{
+                        primary: item.rank === 0,
+                        selected: checkedDiagnoses.has(item.name),
+                        focus: primaryDiagnosis === item.name,
+                      }"
                     >
                       <div class="dd-card-main">
+                        <el-checkbox
+                          class="todo-item-check dd-card-check"
+                          :model-value="checkedDiagnoses.has(item.name)"
+                          @change="toggleDiagnosis(item.name)"
+                        />
                         <div class="dd-card-body">
-                          <div class="susp-top">
-                            <span class="susp-name">{{ item.name }}</span>
+                          <div class="dd-card-top">
+                            <span class="dd-primary-tag dd-rank-tag" :class="item.rank_key">{{ item.rank_label }}</span>
+                            <span class="dd-primary-name" @click="markPrimary(item.name)">{{ item.name }}</span>
+                            <em v-if="item.icd" class="dd-icd">{{ item.icd }}</em>
                           </div>
-                          <div class="dd-inline-summary">
-                            <div><strong>支持：</strong>{{ (item.supporting ?? []).join('；') || '未获得' }}</div>
-                            <div><strong>反对：</strong>{{ (item.opposing ?? []).join('；') || '未获得' }}</div>
-                            <div><strong>缺失：</strong>{{ (item.missing ?? []).join('；') || '—' }}</div>
+                          <p class="dd-reason">{{ item.desc }}</p>
+                        </div>
+                      </div>
+
+                      <div class="dd-inline-panel">
+                        <div class="dd-inline-summary">
+                          <div class="dd-diff-block">
+                            <div class="dd-diff-label dd-diff-toggle" @click="toggleDifferential(item.name)">
+                              <span>需鉴别</span>
+                              <span class="dd-diff-count">（{{ item.differentials?.length ?? 0 }}）</span>
+                              <span class="dd-diff-arrow" :class="{ open: expandedDifferentials.has(item.name) }">›</span>
+                            </div>
+                            <div v-if="expandedDifferentials.has(item.name)" class="dd-diff-body">
+                              <div v-for="(other, i) in item.differentials ?? []" :key="other.name" class="dd-diff-row">
+                                <span class="dd-diff-idx">{{ i + 1 }}</span>
+                                <div class="dd-diff-main">
+                                  <div class="dd-diff-title">
+                                    <span class="dd-diff-name">{{ other.name }}</span>
+                                    <span class="dd-likelihood sm" :class="likelihoodClass(other.likelihood)">
+                                      {{ other.likelihood }}
+                                    </span>
+                                  </div>
+                                  <p class="dd-reason">{{ other.reason }}</p>
+                                </div>
+                              </div>
+                              <div v-if="item.suggestion" class="dd-suggest">
+                                <span class="dd-suggest-label">建议</span>
+                                <span>{{ item.suggestion }}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div v-if="!summary?.differential_diagnosis?.items?.length" class="diag-empty">
+
+                    <div v-if="!summary?.suspected_diagnoses?.length" class="diag-empty">
                       {{ ws.loadingSummary ? '智能体分析中…' : '暂无鉴别诊断' }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 风险提示：红/黄分级 + 逐条「查看建议」，与 V4.3 的 risk-alert-section 一致 -->
+                <div v-if="summary?.risk_assessments?.length" class="risk-alert-section">
+                  <div class="ra-header">
+                    <div class="ra-title">风险提示</div>
+                  </div>
+                  <div class="ra-list">
+                    <div
+                      v-for="risk in summary.risk_assessments"
+                      :key="risk.id"
+                      class="ra-card"
+                      :class="risk.color === 'danger' ? 'ra-card-danger' : 'ra-card-warning'"
+                    >
+                      <div class="ra-card-body">
+                        <div
+                          class="ra-card-name"
+                          :class="risk.color === 'danger' ? 'ra-name-danger' : 'ra-name-warning'"
+                        >
+                          {{ risk.name }}
+                        </div>
+                        <div class="ra-card-suggestion">{{ risk.summary }}</div>
+                      </div>
+                      <button class="ra-view-btn" @click="handleAlert(risk)">查看建议</button>
                     </div>
                   </div>
                 </div>
@@ -676,13 +812,14 @@ onMounted(async () => {
 
         <div class="copilot-tab-bar">
           <div class="ctab active">
+            <span v-if="voice.state.value !== 'idle'" class="mode-badge voice">语</span>
             <span class="patient-tab-name">{{ patient?.name }}</span>
             <span class="patient-tab-meta">· {{ patient?.gender }} · {{ patient?.age }}岁</span>
           </div>
         </div>
 
         <div class="chat-area">
-          <div class="chat-messages">
+          <div ref="chatScrollEl" class="chat-messages">
             <div v-if="!chatMessages.length && !voice.messages.value.length" class="quick-skill-area">
               <div class="quick-skill-title">本科常用 Skill</div>
               <div class="quick-skill-grid">
@@ -693,61 +830,67 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div v-for="(message, index) in chatMessages" :key="`c${index}`" class="record-node">
-              <div class="node-header">
-                <span class="node-title">{{ message.role === 'user' ? '医生' : 'AI' }}</span>
+            <!-- 问诊对话气泡：医生绿、患者蓝，与 V4.3 一致 -->
+            <div v-for="(turn, index) in voice.messages.value" :key="`v${index}`" class="msg-bubble" :class="turn.role">
+              <div class="bubble-meta">
+                <span class="bubble-role">{{ turn.role === 'doctor' ? '医生' : '患者' }}</span>
               </div>
-              <div class="node-content">{{ message.content || '…' }}</div>
+              <div class="bubble-content">{{ turn.text || '…' }}</div>
             </div>
 
-            <template v-if="voice.active.value || voice.messages.value.length">
-              <div class="tab-section-title">语音问诊</div>
-              <div v-for="(turn, index) in voice.messages.value" :key="`v${index}`" class="record-node">
-                <div class="node-header">
-                  <span class="node-title">{{ turn.role === 'doctor' ? '建议追问' : '患者' }}</span>
-                </div>
-                <div class="node-content">{{ turn.text }}</div>
+            <!-- 与智能体的普通问答 -->
+            <div v-for="(message, index) in chatMessages" :key="`c${index}`" class="msg-bubble" :class="message.role === 'user' ? 'doctor' : 'patient'">
+              <div class="bubble-meta">
+                <span class="bubble-role">{{ message.role === 'user' ? '医生' : 'AI' }}</span>
               </div>
-              <div v-if="voice.observations.value.length" class="risk-summary">
-                <strong>观察项：</strong>{{ voice.observations.value.join('；') }}
-              </div>
-              <div v-if="voice.error.value" class="risk-summary"><strong>提示：</strong>{{ voice.error.value }}</div>
-            </template>
+              <div class="bubble-content">{{ message.content || '…' }}</div>
+            </div>
+
+            <div v-if="voice.error.value" class="voice-ready-hint">{{ voice.error.value }}</div>
           </div>
 
           <div class="action-bar">
-            <el-button v-if="!voice.active.value" type="primary" size="small" @click="voice.start()">● 语音问诊</el-button>
+            <el-button v-if="voice.state.value === 'idle'" type="primary" size="small" @click="voice.start()">
+              ● 语音问诊
+            </el-button>
+            <template v-else-if="voice.state.value === 'playing'">
+              <el-button type="warning" size="small" @click="voice.pause()">⏸ 暂停问诊</el-button>
+              <el-button size="small" plain class="obs-toggle-btn" @click="voice.showObservations.value = true">
+                📋 补充观察
+              </el-button>
+            </template>
+            <template v-else-if="voice.state.value === 'paused'">
+              <el-button type="primary" size="small" @click="voice.resume()">▶ 继续问诊</el-button>
+              <el-button size="small" plain class="obs-toggle-btn" @click="voice.showObservations.value = true">
+                📋 补充观察
+              </el-button>
+            </template>
             <template v-else>
-              <el-button size="small" :loading="voice.thinking.value" @click="voice.submitTurn()">提交本轮</el-button>
-              <el-button type="danger" size="small" @click="voice.finish()">结束问诊</el-button>
+              <el-button size="small" @click="voice.restart()">🔄 重新问诊</el-button>
+              <el-button type="primary" size="small" @click="voice.finish()">生成问诊小结</el-button>
             </template>
           </div>
 
           <div class="chat-input-wrap">
             <div class="chat-textarea-wrap">
               <el-input
-                v-model="inputText"
+                v-model="chatInput"
                 class="chat-textarea"
                 type="textarea"
                 :rows="2"
-                :placeholder="voice.active.value ? '患者所述（语音识别结果可编辑，也可手动输入）' : '向医生智能体提问…'"
+                :placeholder="inVoice ? '补充患者所述内容…' : '发消息或补充内容...'"
                 @keyup.enter.exact="submitInput"
               />
               <div class="chat-float-actions">
-                <button
-                  class="float-voice-btn"
-                  :class="{ active: voice.listening.value }"
-                  :title="voice.supported ? '语音识别' : '当前浏览器不支持语音识别，请手动输入'"
-                  @click="voice.toggleListening()"
-                >
+                <button class="float-voice-btn" title="语音问诊" @click="voice.state.value === 'idle' ? voice.start() : voice.pause()">
                   🎤
                 </button>
-                <button class="float-send-btn" :disabled="chatting" @click="submitInput">↑</button>
+                <button class="float-send-btn" :disabled="chatting || voice.manualThinking.value" @click="submitInput">↑</button>
               </div>
             </div>
             <div class="chat-toolbar">
               <div class="tb-left">
-                <span class="tb-hint">{{ voice.supported ? '' : '浏览器不支持语音识别，已切换为手动输入' }}</span>
+                <button class="tb-plus-btn" title="更多">＋</button>
               </div>
               <div class="tb-actions">
                 <button class="tb-action-btn" @click="sendChat('请解读本次检查检验的异常结果')">报告解读</button>
@@ -755,6 +898,42 @@ onMounted(async () => {
                 <button class="tb-action-btn" @click="generateRecord">生成病历</button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI 追问提示：问诊播放中浮在右侧，已问到的逐条划掉 -->
+      <div v-if="voice.active.value && voice.questions.value.length" class="pending-float" :style="pendingStyle">
+        <div class="pending-title"><span class="pending-dot" /> AI 追问提示 </div>
+        <div class="pending-list">
+          <div v-if="voice.currentQuestion.value" class="pq-item">
+            <span class="pq-num">{{ voice.currentQuestion.value.index + 1 }}</span>
+            <span class="pq-text">{{ voice.currentQuestion.value.text }}</span>
+          </div>
+          <div class="pq-done-list">
+            <div v-for="text in voice.doneQuestions.value" :key="text" class="pq-item done">
+              <span class="pq-check">✓</span>
+              <span class="pq-text">{{ text }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 补充观察：候选信息点，医生勾选后并入问诊小结 -->
+      <div v-if="voice.showObservations.value && voice.observations.value.length" class="obs-float" :style="obsStyle">
+        <div class="obs-float-header">
+          <span class="obs-float-title">补充观察</span>
+          <el-button link size="small" class="obs-float-close" @click="voice.showObservations.value = false">✕</el-button>
+        </div>
+        <div class="obs-float-list">
+          <div
+            v-for="item in voice.observations.value"
+            :key="item"
+            class="obs-float-item"
+            :class="{ picked: voice.pickedObservations.value.has(item) }"
+            @click="voice.toggleObservation(item)"
+          >
+            {{ item }}
           </div>
         </div>
       </div>

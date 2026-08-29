@@ -24,7 +24,7 @@ function submit() {
         <div class="login-logo">
           <el-icon :size="24"><Lock /></el-icon>
         </div>
-        <h1 class="login-title">惠每AI门诊工作站</h1>
+        <h1 class="login-title">AI 门诊工作站</h1>
         <p class="login-sub">北京大学国际医院 · 一期 MVP</p>
       </div>
 

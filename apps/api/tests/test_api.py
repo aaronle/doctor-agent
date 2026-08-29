@@ -263,3 +263,67 @@ def test_model_cannot_override_hard_rule_red_alert():
     assert conflicts == ["血钾危急值"]
     assert all(item["level"] == "高风险" for item in merged if item["name"] == "血钾危急值")
     assert len(alerts) == 1
+
+
+# ------------------------------------------------------------------ V4.3 对齐
+
+
+def test_voice_init_returns_full_interview_package(client):
+    """
+    V4.3 的问诊是「点一下自动播放脚本」，所以 init 必须一次给全：
+    对话脚本 + 追问清单 + 候选补充观察。少任何一样前端都播不起来。
+    """
+    body = client.get("/api/emr/voice/init/P006").json()
+    for field in ("greeting", "patient_name", "chief_complaint", "dialog", "questions", "observations"):
+        assert field in body, f"问诊开场包缺少 {field}"
+    assert len(body["dialog"]) > 0, "P006 应有演示对话脚本"
+    assert all({"role", "text"} <= set(turn) for turn in body["dialog"])
+    # 本地规则兜底也必须给出可用的追问清单
+    assert len(body["questions"]) >= 5
+
+
+def test_diagnosis_ranks_are_derived_not_reported():
+    """
+    名次与可能性由后端按置信度统一派生。让模型自己标注会出现
+    两个「首选」或名次与置信度矛盾的情况。
+    """
+    from app.agents.diagnosis import _decorate
+
+    result = _decorate(
+        [
+            {"name": "甲", "confidence": 90, "desc": "d1", "supporting": [], "opposing": ["未获得"], "missing": []},
+            {"name": "乙", "confidence": 70, "desc": "d2", "supporting": [], "opposing": ["未获得"], "missing": []},
+            {"name": "丙", "confidence": 40, "desc": "d3", "supporting": [], "opposing": ["未获得"], "missing": []},
+        ]
+    )
+    items = result["suspected_diagnoses"]
+    assert [d["rank_label"] for d in items] == ["首选", "次选", "备选"]
+    assert [d["rank_key"] for d in items] == ["is-first", "is-second", "is-alt"]
+    assert [d["likelihood"] for d in items] == ["高", "中", "低"]
+
+
+def test_each_candidate_lists_the_others_as_differentials():
+    """「需鉴别（N）」列的是同组其他候选，不含自己。"""
+    from app.agents.diagnosis import _decorate
+
+    items = _decorate(
+        [
+            {"name": "甲", "confidence": 90, "desc": "d1", "supporting": [], "opposing": ["未获得"], "missing": []},
+            {"name": "乙", "confidence": 70, "desc": "d2", "supporting": [], "opposing": ["未获得"], "missing": []},
+            {"name": "丙", "confidence": 40, "desc": "d3", "supporting": [], "opposing": ["未获得"], "missing": []},
+        ]
+    )["suspected_diagnoses"]
+
+    for item in items:
+        names = [d["name"] for d in item["differentials"]]
+        assert item["name"] not in names
+        assert len(names) == len(items) - 1
+
+
+def test_report_summary_carries_rank_fields_for_the_ui(client):
+    """界面按 rank_key 上徽标样式，聚合包必须把派生字段带出来。"""
+    body = client.get("/api/emr/report-summary/P001").json()
+    for item in body["suspected_diagnoses"]:
+        assert item["rank_key"] in {"is-first", "is-second", "is-alt"}
+        assert item["likelihood"] in {"高", "中", "低"}
+        assert isinstance(item["differentials"], list)

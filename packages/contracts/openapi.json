@@ -656,6 +656,7 @@
           "emr"
         ],
         "summary": "Voice Init",
+        "description": "问诊开场包。一次返回播放一整场问诊所需的全部内容。\n\n对齐 V4.3：点「语音问诊」后由前端按脚本自动播放对话，\n播放过程中对照 questions 逐条划掉、按需展开 observations。\n脚本是演示数据；questions 与 observations 是真实模型输出。",
         "operationId": "voice_init_api_emr_voice_init__patient_id__get",
         "parameters": [
           {

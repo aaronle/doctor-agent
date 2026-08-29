@@ -11,7 +11,7 @@ from .diagnosis import DiagnosisAgent
 from .record import RECORD_SECTIONS, SECTION_KEYS, SECTION_LABELS, RecordAgent, RecordFieldAgent
 from .risk import RiskAgent, hard_rule_alerts, merge_risks
 from .summary import SummaryAgent
-from .voice import VoiceSummaryAgent, VoiceTurnAgent
+from .voice import VoicePlanAgent, VoiceSummaryAgent
 
 summary_agent = SummaryAgent()
 record_agent = RecordAgent()
@@ -19,7 +19,7 @@ record_field_agent = RecordFieldAgent()
 diagnosis_agent = DiagnosisAgent()
 risk_agent = RiskAgent()
 comorbidity_agent = ComorbidityAgent()
-voice_turn_agent = VoiceTurnAgent()
+voice_plan_agent = VoicePlanAgent()
 voice_summary_agent = VoiceSummaryAgent()
 
 # 供健康接口与运行控制台展示的岗位清单
@@ -29,7 +29,7 @@ AGENT_REGISTRY: tuple[tuple[str, str, str], ...] = (
     ("diagnosis", "诊断智能体", diagnosis_agent.version),
     ("risk", "风险管理智能体", risk_agent.version),
     ("comorbidity", "共病管理智能体", comorbidity_agent.version),
-    ("voice", "语音问诊智能体", voice_turn_agent.version),
+    ("voice", "语音问诊智能体", voice_plan_agent.version),
 )
 
 
@@ -55,5 +55,5 @@ __all__ = [
     "risk_agent",
     "summary_agent",
     "voice_summary_agent",
-    "voice_turn_agent",
+    "voice_plan_agent",
 ]

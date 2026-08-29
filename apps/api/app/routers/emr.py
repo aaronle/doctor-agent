@@ -30,8 +30,8 @@ from ..agents import (
     record_field_agent,
     risk_agent,
     summary_agent,
+    voice_plan_agent,
     voice_summary_agent,
-    voice_turn_agent,
 )
 from .. import cache
 from ..agents.context import build_context, seed_items, seed_payload
@@ -365,14 +365,30 @@ class VoiceCompleteIn(BaseModel):
 
 
 @router.get("/voice/init/{patient_id}")
-def voice_init(patient_id: str, session: Session = Depends(get_session)) -> dict:
+async def voice_init(patient_id: str, session: Session = Depends(get_session)) -> dict:
+    """
+    问诊开场包。一次返回播放一整场问诊所需的全部内容。
+
+    对齐 V4.3：点「语音问诊」后由前端按脚本自动播放对话，
+    播放过程中对照 questions 逐条划掉、按需展开 observations。
+    脚本是演示数据；questions 与 observations 是真实模型输出。
+    """
     patient = _patient_or_404(session, patient_id)
+    ctx = build_context(session, patient)
+    outcome = await _run_isolated(voice_plan_agent, ctx)
+
     payload = patient.payload or {}
     return {
         "greeting": f"{patient.name}您好，我是{patient.doctor}。今天主要是哪里不舒服？",
         "patient_name": patient.name,
         "chief_complaint": patient.chief_complaint,
         "diagnoses": payload.get("diagnoses") or [],
+        # 演示对话脚本，供前端逐条播放
+        "dialog": seed_items(session, "dialog_script", patient_id),
+        "questions": outcome.data.get("questions", []),
+        "observations": outcome.data.get("observations", []),
+        "provider": outcome.provider,
+        "degraded": outcome.degraded,
     }
 
 
@@ -393,13 +409,16 @@ async def voice_turn(body: VoiceTurnIn, session: Session = Depends(get_session))
 
 async def _stream_voice_turn(ctx: dict, **kwargs) -> AsyncIterator[str]:
     """
-    先拿到结构化结果，再把追问逐字下发。
+    手动补问路径：医生自己输入患者所述时，给出下一句追问建议。
 
-    这里不用模型的原生流式：观察项要与追问一起产出，
-    分两次调用既慢又可能不一致。
+    主流程（脚本播放）不经过这里 —— 那条路的追问清单在 voice/init 一次拿全。
+    这个端点保留给「播放结束后医生继续追问」和无脚本患者的情形。
     """
-    outcome = await _run_isolated(voice_turn_agent, ctx, **kwargs)
-    prompt = outcome.data.get("prompt", "")
+    outcome = await _run_isolated(voice_plan_agent, ctx)
+    questions = outcome.data.get("questions") or []
+    asked = {str(m.get("text") or "") for m in (kwargs.get("conversation_history") or []) if isinstance(m, dict)}
+    remaining = [q for q in questions if q not in asked]
+    prompt = remaining[0] if remaining else "还有其他不舒服的地方吗？"
 
     for index in range(0, len(prompt), 3):
         yield _sse({"type": "prompt_token", "token": prompt[index : index + 3]})
