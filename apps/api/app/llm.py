@@ -136,10 +136,23 @@ class LlmClient:
 
             text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
             usage = data.get("usage") or {}
+
+            # 解析失败时重发请求，而不是去修补那串坏 JSON。
+            # 重问是安全的（模型换一次采样通常就正常了）；猜测性修补不是 ——
+            # 半截 JSON 补全后会变成一份看起来正常、实则残缺的临床结论。
+            try:
+                parsed = extract_json_object(text)
+            except LlmError as exc:
+                self._log(agent_key, target_model, attempt, len(payload), "bad-json", started)
+                if attempt < MAX_ATTEMPTS:
+                    await asyncio.sleep(BACKOFF_MS[attempt - 1] / 1000)
+                    continue
+                raise LlmError(f"模型连续返回不可解析的 JSON：{exc}") from exc
+
             elapsed_ms = int((time.monotonic() - started) * 1000)
             self._log(agent_key, target_model, attempt, len(payload), "ok", started)
             return LlmResult(
-                data=extract_json_object(text),
+                data=parsed,
                 model=target_model,
                 elapsed_ms=elapsed_ms,
                 prompt_tokens=int(usage.get("prompt_tokens") or 0),
