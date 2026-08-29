@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from ..agent_config import resolve
 from ..llm import ChatMessage, LlmError, get_llm_client
 from ..models import AgentRun
 from .context import project
@@ -83,7 +84,7 @@ class Agent:
         dept = ctx.get("dept") or "全科"
         return f"当前科室：{dept}。请使用该科室的常规术语与诊疗习惯，不要越出本科范围给出建议。"
 
-    def build_messages(self, ctx: dict, **kwargs: Any) -> list[ChatMessage]:
+    def build_messages(self, ctx: dict, *, role_prompt: str | None = None, **kwargs: Any) -> list[ChatMessage]:
         prompt_ctx = project(
             ctx,
             fields=self.context_fields,
@@ -94,7 +95,7 @@ class Agent:
         system = "\n\n".join(
             [
                 SAFETY_LAYER,
-                f"【岗位职责】\n{self.role_prompt}",
+                f"【岗位职责】\n{role_prompt or self.role_prompt}",
                 f"【专科背景】\n{self.specialty_prompt(ctx)}",
                 f"【输出 JSON Schema】\n{schema_text}",
             ]
@@ -109,7 +110,10 @@ class Agent:
 
     async def run(self, session: Session, ctx: dict, **kwargs: Any) -> AgentOutcome:
         client = get_llm_client()
-        patient_id = ctx.get("id", "")
+
+        # 运行时读已发布配置：Prompt 与模型档位都可能被控制台改过。
+        # 读不到已发布版本才回落代码默认值，所以首次部署无需先建配置。
+        config = resolve(session, self)
 
         if not client.configured:
             outcome = AgentOutcome(
@@ -118,12 +122,13 @@ class Agent:
                 degraded=True,
                 note="模型通道未配置，已降级为本地规则",
             )
-            self._record(session, ctx, outcome, status="degraded", error="unconfigured")
+            self._record(session, ctx, outcome, status="degraded", error="unconfigured", config=config)
             return outcome
 
         try:
             result = await client.complete_json(
-                self.build_messages(ctx, **kwargs),
+                self.build_messages(ctx, role_prompt=config.role_prompt, **kwargs),
+                model=config.model,
                 agent_key=self.key,
             )
             data = self.validate(result.data, ctx)
@@ -134,7 +139,7 @@ class Agent:
                 degraded=True,
                 note=f"模型不可用，已降级为本地规则：{exc}",
             )
-            self._record(session, ctx, outcome, status="degraded", error=str(exc))
+            self._record(session, ctx, outcome, status="degraded", error=str(exc), config=config)
             return outcome
 
         outcome = AgentOutcome(
@@ -148,6 +153,7 @@ class Agent:
             ctx,
             outcome,
             status="ok",
+            config=config,
             prompt_tokens=result.prompt_tokens,
             completion_tokens=result.completion_tokens,
             total_tokens=result.total_tokens,
@@ -162,6 +168,7 @@ class Agent:
         *,
         status: str,
         error: str = "",
+        config=None,
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
         total_tokens: int = 0,
@@ -174,6 +181,10 @@ class Agent:
             "context_hash": hashlib.sha256(
                 json.dumps(ctx, ensure_ascii=False, sort_keys=True).encode("utf-8")
             ).hexdigest()[:16],
+            # 记下这次跑的是哪一版配置，出问题能定位到具体版本而不是「某次改动」
+            "config_version": getattr(config, "version", self.version),
+            "config_source": getattr(config, "source", "code-default"),
+            "model_tier": getattr(config, "model_tier", "clinical_fast"),
         }
         session.add(
             AgentRun(

@@ -157,16 +157,34 @@ class Reminder(Base):
 
 
 class AgentVersion(Base):
+    """
+    Agent 配置版本。
+
+    配置从代码里提出来，运行时读**已发布**版本，代码里的类属性只作兜底。
+    这样调 Prompt、换模型档位、改阈值都不需要发版。
+
+    同一 agent_key 同时只能有一个 published 版本；发布不覆盖旧版本，
+    而是把旧版本置为 inactive 并新增一条 —— 历史可查、可回滚。
+    """
+
     __tablename__ = "agent_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     agent_key: Mapped[str] = mapped_column(String(32), index=True)
     version: Mapped[str] = mapped_column(String(32))
+    # 模型档位是稳定别名，不把具体模型名散落在业务代码里
+    model_tier: Mapped[str] = mapped_column(String(32), default="clinical_fast")
     model: Mapped[str] = mapped_column(String(64), default="")
+    # 岗位层 Prompt。平台安全层不在此列 —— 它只能随代码发布，管理员不可编辑
+    role_prompt: Mapped[str] = mapped_column(Text, default="")
+    params: Mapped[dict] = mapped_column(JSON, default=dict)
     prompt_bundle_version: Mapped[str] = mapped_column(String(32), default="")
     prompt_hash: Mapped[str] = mapped_column(String(64), default="")
-    status: Mapped[str] = mapped_column(String(16), default="published")
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    author: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AgentRun(Base):

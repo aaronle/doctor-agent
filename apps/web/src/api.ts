@@ -170,6 +170,68 @@ export interface ReportSummary {
   _meta: { degraded_agents: string[]; hard_rule_alerts: number; model_conflicts: string[]; cached: boolean }
 }
 
+export interface AgentSummary {
+  agent_key: string
+  name: string
+  tasks: string[]
+  code_version: string
+  running_version: string
+  config_source: 'published' | 'code-default'
+  model_tier: string
+  model: string
+  has_draft: boolean
+  published_at: string | null
+  runs_24h: number
+  success_rate: number | null
+  avg_elapsed_ms: number | null
+  tokens_24h: number
+}
+
+export interface AgentVersionRow {
+  id: number
+  version: string
+  status: 'draft' | 'published' | 'inactive'
+  model_tier: string
+  model: string
+  prompt_hash: string
+  note: string
+  author: string
+  created_at: string
+  published_at: string | null
+}
+
+export interface AgentDetail {
+  agent_key: string
+  name: string
+  tasks: string[]
+  /** 平台安全层。只读展示 —— 它只能随代码发布，管理员不可编辑。 */
+  safety_layer: string
+  safety_layer_editable: false
+  code_default_prompt: string
+  output_schema: Record<string, unknown>
+  context_fields: string[]
+  running: { version: string; source: string; model_tier: string; model: string; role_prompt: string; params: Record<string, unknown> }
+  draft: { id: number; model_tier: string; role_prompt: string; params: Record<string, unknown>; note: string } | null
+  versions: AgentVersionRow[]
+}
+
+export interface AgentRunLog {
+  id: number
+  agent_key: string
+  patient_id: string
+  status: string
+  provider: string
+  model: string
+  model_tier: string
+  config_version: string
+  config_source: string
+  elapsed_ms: number
+  total_tokens: number
+  context_hash: string
+  error: string
+  created_at: string
+}
+
 export interface RuntimeConfig {
   api_key: string
   base_url: string
@@ -183,6 +245,24 @@ export interface RuntimeConfig {
 
 export const api = {
   config: () => get<RuntimeConfig>('/api/config'),
+
+  // ---------------------------------------------------------------- 控制台
+  adminAgents: () =>
+    get<{ agents: AgentSummary[]; model_tiers: { tier: string; label: string; model: string }[]; prompt_bundle_version: string }>(
+      '/api/admin/agents',
+    ),
+  adminAgent: (key: string) => get<AgentDetail>(`/api/admin/agents/${key}`),
+  adminSaveDraft: (key: string, body: { model_tier: string; role_prompt: string; note: string }) =>
+    request<{ ok: boolean; draft_id: number; prompt_hash: string }>(`/api/admin/agents/${key}/draft`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  adminPublish: (key: string) => post<{ ok: boolean; version: string }>(`/api/admin/agents/${key}/publish`, {}),
+  adminRollback: (key: string, versionId: number) =>
+    post<{ ok: boolean; version: string }>(`/api/admin/agents/${key}/rollback/${versionId}`, {}),
+  adminDiscardDraft: (key: string) =>
+    request<{ ok: boolean }>(`/api/admin/agents/${key}/draft`, { method: 'DELETE' }),
+  adminRuns: (key = '') => get<{ runs: AgentRunLog[] }>(`/api/admin/runs${key ? `?agent_key=${key}` : ''}`),
   health: () => get<Record<string, unknown>>('/api/health'),
 
   patients: () => get<PatientListItem[]>('/api/his/patients'),

@@ -24,6 +24,7 @@ from .agents import agent_inventory
 from .config import get_ai_settings, get_settings
 from .database import SessionLocal, engine, init_database
 from .models import OperationLog
+from .routers import admin as admin_router
 from .routers import config as config_router
 from .routers import emr as emr_router
 from .routers import his as his_router
@@ -100,6 +101,7 @@ async def operation_log(request: Request, call_next):
 app.include_router(config_router.router)
 app.include_router(his_router.router)
 app.include_router(emr_router.router)
+app.include_router(admin_router.router)
 
 
 @app.get("/api/health")

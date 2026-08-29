@@ -528,3 +528,100 @@ def test_quality_endpoint_uses_the_real_interview_for_negation_check(client):
     ).json()
     assert "completeness" in body
     assert len(body["metrics"]) == 4
+
+
+# ------------------------------------------------------------------ Agent 控制台
+
+
+def test_console_lists_six_agents_with_model_tiers(client):
+    body = client.get("/api/admin/agents").json()
+    assert len(body["agents"]) == 6
+    assert {t["tier"] for t in body["model_tiers"]} == {"clinical_fast", "clinical_reasoning", "clinical_safety"}
+    # 未配置时应回落代码默认值，而不是报错或空白
+    assert all(a["config_source"] == "code-default" for a in body["agents"])
+
+
+def test_safety_layer_is_exposed_but_not_editable(client):
+    """
+    安全层只读展示 —— 让管理员看得到自己改不了什么，比藏起来更可信。
+    它若可编辑，「不得自行确诊」这类红线就成了摆设。
+    """
+    body = client.get("/api/admin/agents/summary").json()
+    assert body["safety_layer_editable"] is False
+    assert "不做确诊" in body["safety_layer"]
+    # 草稿接口不接受安全层字段，传了也不会生效
+    assert "safety_layer" not in body["draft"] if body["draft"] else True
+
+
+def test_draft_publish_rollback_lifecycle(client):
+    key = "record"
+    client.put(
+        f"/api/admin/agents/{key}/draft",
+        json={"model_tier": "clinical_fast", "role_prompt": "第一版岗位提示词。", "note": "v1"},
+    )
+    v1 = client.post(f"/api/admin/agents/{key}/publish").json()
+    assert v1["version"] == "v1"
+
+    client.put(
+        f"/api/admin/agents/{key}/draft",
+        json={"model_tier": "clinical_reasoning", "role_prompt": "第二版岗位提示词。", "note": "v2"},
+    )
+    v2 = client.post(f"/api/admin/agents/{key}/publish").json()
+    assert v2["version"] == "v2"
+
+    detail = client.get(f"/api/admin/agents/{key}").json()
+    assert detail["running"]["version"] == "v2"
+    # 发布不覆盖旧版本：历史仍在，只是降为 inactive
+    statuses = {v["version"]: v["status"] for v in detail["versions"]}
+    assert statuses["v1"] == "inactive" and statuses["v2"] == "published"
+
+    v1_id = next(v["id"] for v in detail["versions"] if v["version"] == "v1")
+    client.post(f"/api/admin/agents/{key}/rollback/{v1_id}")
+    after = client.get(f"/api/admin/agents/{key}").json()
+    assert after["running"]["version"] == "v1"
+    assert after["running"]["model_tier"] == "clinical_fast"
+
+
+def test_published_config_actually_drives_the_prompt(client):
+    """配置改了必须真的生效，否则控制台只是个好看的表单。"""
+    from app.agents import comorbidity_agent
+    from app.agent_config import resolve
+    from app.database import SessionLocal
+
+    client.put(
+        "/api/admin/agents/comorbidity/draft",
+        json={"model_tier": "clinical_fast", "role_prompt": "共病岗位·控制台改过的版本。", "note": "t"},
+    )
+    client.post("/api/admin/agents/comorbidity/publish")
+
+    session = SessionLocal()
+    try:
+        config = resolve(session, comorbidity_agent)
+        messages = comorbidity_agent.build_messages({"id": "P001", "dept": "内分泌科"}, role_prompt=config.role_prompt)
+    finally:
+        session.close()
+
+    system = messages[0].content
+    assert "控制台改过的版本" in system
+    # 安全层仍在最前，且不可被岗位层挤掉
+    assert system.index("不做确诊") < system.index("【岗位职责】")
+
+
+def test_draft_rejects_empty_prompt_and_unknown_tier(client):
+    assert client.put("/api/admin/agents/risk/draft", json={"model_tier": "clinical_fast", "role_prompt": "  "}).status_code == 400
+    assert client.put("/api/admin/agents/risk/draft", json={"model_tier": "不存在的档位", "role_prompt": "x"}).status_code == 400
+
+
+def test_publish_without_draft_is_rejected(client):
+    assert client.post("/api/admin/agents/voice/publish").status_code == 400
+
+
+def test_run_log_never_returns_record_content(client):
+    """运行日志不应成为病历副本：只给定位问题所需的摘要。"""
+    client.get("/api/emr/report-summary/P001")
+    runs = client.get("/api/admin/runs").json()["runs"]
+    assert runs
+    for row in runs:
+        assert "output" not in row
+        assert "input_digest" not in row
+        assert set(row) >= {"agent_key", "status", "model_tier", "config_version", "elapsed_ms", "context_hash"}
