@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { api, streamSse, type RiskItem } from '../api'
@@ -286,6 +287,22 @@ async function sendChat(preset?: string) {
   } finally {
     chatting.value = false
   }
+}
+
+// ---------------------------------------------------------------- 接诊流转
+
+/**
+ * 接诊下一位：按候诊队列顺序切到下一个患者，走到队尾回候诊列表。
+ * 与 V4.3 的同名按钮一致，是问诊结束后的主要去向。
+ */
+const router = useRouter()
+
+function nextPatient() {
+  const queue = ws.queue
+  const index = queue.findIndex((p) => p.id === ws.patientId)
+  const next = queue[index + 1]
+  if (next) router.push(`/outpatient/${next.id}`)
+  else router.push('/outpatient/list')
 }
 
 // ---------------------------------------------------------------- 语音问诊
@@ -890,12 +907,13 @@ onMounted(async () => {
             </div>
             <div class="chat-toolbar">
               <div class="tb-left">
-                <button class="tb-plus-btn" title="更多">＋</button>
+                <button class="tb-plus-btn" title="上传/提示词">＋</button>
+                <span class="tb-hint" />
               </div>
               <div class="tb-actions">
+                <button class="tb-action-btn" @click="nextPatient">接诊下一位</button>
                 <button class="tb-action-btn" @click="sendChat('请解读本次检查检验的异常结果')">报告解读</button>
-                <button class="tb-action-btn" @click="activeTab = '诊断管理'">鉴别诊断</button>
-                <button class="tb-action-btn" @click="generateRecord">生成病历</button>
+                <button class="tb-action-btn" @click="activeTab = '智慧诊疗'">鉴别诊断</button>
               </div>
             </div>
           </div>
@@ -919,8 +937,11 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- 补充观察：候选信息点，医生勾选后并入问诊小结 -->
-      <div v-if="voice.showObservations.value && voice.observations.value.length" class="obs-float" :style="obsStyle">
+      <!--
+        补充观察：随对话动态过滤后的「待观察」清单。
+        已经在对话里问到的条目会自动移出，剩下的才需要医生补问；勾选后并入问诊小结。
+      -->
+      <div v-if="voice.showObservations.value" class="obs-float" :style="obsStyle">
         <div class="obs-float-header">
           <span class="obs-float-title">补充观察</span>
           <el-button link size="small" class="obs-float-close" @click="voice.showObservations.value = false">✕</el-button>
@@ -934,6 +955,9 @@ onMounted(async () => {
             @click="voice.toggleObservation(item)"
           >
             {{ item }}
+          </div>
+          <div v-if="!voice.observations.value.length" class="obs-float-item mute">
+            {{ voice.messages.value.length ? '本次对话已覆盖全部候选观察项' : '待患者描述主诉后动态更新' }}
           </div>
         </div>
       </div>

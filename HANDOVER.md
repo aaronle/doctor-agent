@@ -36,11 +36,33 @@ AI_FAST_MODEL=claude-haiku-4-5-20251001
 AI_TEST_MODE=          # 置为 rules 时全部岗位走本地规则，不调模型
 ```
 
-发布门禁：
+发布门禁 —— 一条命令跑完测试、构建、契约导出与还原度比对：
 
 ```sh
-npm run test:all && npm run build
+npm run verify
 ```
+
+跑 `verify` 前要先起 `npm run dev`（还原度比对需要访问运行中的前端）。
+
+其他常用命令：
+
+```sh
+npm run fidelity   # 只跑还原度比对
+npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + CSS 拆分）
+```
+
+## 2.1 改动纪律（重要）
+
+界面、规格、测试三者必须在**同一个提交**里保持一致，不允许脱节：
+
+| 改了什么 | 必须同步改 |
+| --- | --- |
+| UI/UX | `docs/product/09-一期需求规划说明书.md` 对应功能段 + 该行为的测试 + 跑 `npm run fidelity` |
+| API 形状 | `docs/product/08-V4.3界面基准与后端API契约.md` + `apps/api/tests/test_api.py` + 重跑 `contracts:export` |
+| Agent 输出结构 | 规格里该岗位的输出约束 + 对应校验测试 |
+| 安全红线 | 规格第 7 节 + 一条能失败的测试（红线没有测试等于没有红线） |
+
+判断标准很简单：**如果一个人只读规格 Markdown 就能预期到界面的样子和行为，规格就是同步的。**
 
 ## 3. 一期范围与实现状态
 

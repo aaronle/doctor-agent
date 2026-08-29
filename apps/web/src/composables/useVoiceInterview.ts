@@ -1,4 +1,4 @@
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, getCurrentInstance, onUnmounted, ref } from 'vue'
 
 import { api, streamSse } from '../api'
 
@@ -32,7 +32,8 @@ export function useVoiceInterview(getPatientId: () => string) {
   const state = ref<VoiceState>('idle')
   const messages = ref<VoiceTurnMessage[]>([])
   const questions = ref<string[]>([])
-  const observations = ref<string[]>([])
+  /** 模型给的候选观察项全集，不随对话变化 */
+  const allObservations = ref<string[]>([])
   const pickedObservations = ref<Set<string>>(new Set())
   const showObservations = ref(false)
   const error = ref('')
@@ -57,6 +58,28 @@ export function useVoiceInterview(getPatientId: () => string) {
   )
   /** 当前该问的那一条，浮层里高亮显示 */
   const currentQuestion = computed(() => pendingQuestions.value.find((q) => !q.done) ?? null)
+
+  /** 已播出的对话全文，用于判断哪些观察项已经被问到 */
+  const spokenText = computed(() => messages.value.map((m) => m.text).join(''))
+
+  /**
+   * 「待观察」清单：从候选全集里剔掉对话中已经覆盖到的条目。
+   *
+   * 与 V4.3 同一套判定 —— 去掉「有无/是否」这类问法前缀后取前 3 个字，
+   * 在已说出的内容里做包含匹配。剩下的才是还需要医生补问的。
+   * 静态清单看起来一样，但医生分不清哪些已经问过，价值差很多。
+   */
+  const observations = computed(() =>
+    allObservations.value.filter((item) => {
+      const key = item.replace(/[有无是否]/g, '').slice(0, 3)
+      return key.length > 0 && !spokenText.value.includes(key)
+    }),
+  )
+
+  /** 已被对话覆盖、从待观察里移出的条目，供界面说明「已覆盖 N 项」 */
+  const coveredObservations = computed(() =>
+    allObservations.value.filter((item) => !observations.value.includes(item)),
+  )
 
   function stopTimer() {
     if (timer) {
@@ -97,7 +120,7 @@ export function useVoiceInterview(getPatientId: () => string) {
     try {
       const init = await api.voiceInit(patientId)
       questions.value = init.questions ?? []
-      observations.value = init.observations ?? []
+      allObservations.value = init.observations ?? []
       degraded.value = Boolean(init.degraded)
       if (degraded.value) {
         error.value = '模型通道不可用，追问清单为通用问法，未生成补充观察项。'
@@ -171,7 +194,7 @@ export function useVoiceInterview(getPatientId: () => string) {
             messages.value[index].text += String(event.token)
           } else if (event.type === 'prompt_done') {
             const extra = (event.observations as string[]) ?? []
-            observations.value = [...new Set([...observations.value, ...extra])]
+            allObservations.value = [...new Set([...allObservations.value, ...extra])]
           }
         },
       )
@@ -203,7 +226,9 @@ export function useVoiceInterview(getPatientId: () => string) {
     state.value = 'ended'
   }
 
-  onUnmounted(stopTimer)
+  // 只在组件 setup 里注册卸载钩子。composable 也会被测试直接调用，
+  // 那时没有组件实例，无条件注册只会打出一条无意义的告警。
+  if (getCurrentInstance()) onUnmounted(stopTimer)
 
   return {
     state,
@@ -214,6 +239,7 @@ export function useVoiceInterview(getPatientId: () => string) {
     doneQuestions,
     currentQuestion,
     observations,
+    coveredObservations,
     pickedObservations,
     showObservations,
     manualThinking,
