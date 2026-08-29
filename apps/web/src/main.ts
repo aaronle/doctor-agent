@@ -5,6 +5,9 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 import 'element-plus/dist/index.css'
 import './styles/base.css'
+// V4.3 在所有 scoped 规则之后还有一层不带作用域的 !important 覆盖，
+// 决定了表头等区域的最终观感。必须在 base.css 之后、组件样式之前引入。
+import './styles/app-overrides.css'
 
 import App from './App.vue'
 import { router } from './router'

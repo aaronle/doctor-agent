@@ -111,24 +111,30 @@ async function handleAlert(alert: RiskItem) {
 
 const generating = ref(false)
 const streamingField = ref('')
+/** 智能笔记：医生随手记的要点，作为 note_text 一并送进病历生成 */
+const smartNote = ref('')
 
 async function generateRecord() {
   if (!ws.patientId) return
   generating.value = true
   ws.draft = {}
   try {
-    await streamSse('/api/emr/copilot/chat', { patient_id: ws.patientId, messages: [], generate_record: true }, (event) => {
-      if (event.type === 'record_node_start') {
-        streamingField.value = String(event.node_id)
-        ws.draft = { ...ws.draft, [streamingField.value]: '' }
-      } else if (event.type === 'record_token') {
-        const key = String(event.node_id)
-        ws.draft = { ...ws.draft, [key]: (ws.draft[key] ?? '') + String(event.token) }
-      } else if (event.type === 'record_done') {
-        streamingField.value = ''
-        if (event.degraded) ElMessage.warning('模型不可用，病历为本地规则生成，请人工补全')
-      }
-    })
+    await streamSse(
+      '/api/emr/copilot/chat',
+      { patient_id: ws.patientId, messages: [], generate_record: true, note_text: smartNote.value },
+      (event) => {
+        if (event.type === 'record_node_start') {
+          streamingField.value = String(event.node_id)
+          ws.draft = { ...ws.draft, [streamingField.value]: '' }
+        } else if (event.type === 'record_token') {
+          const key = String(event.node_id)
+          ws.draft = { ...ws.draft, [key]: (ws.draft[key] ?? '') + String(event.token) }
+        } else if (event.type === 'record_done') {
+          streamingField.value = ''
+          if (event.degraded) ElMessage.warning('模型不可用，病历为本地规则生成，请人工补全')
+        }
+      },
+    )
   } catch (error) {
     ElMessage.error(`病历生成失败：${(error as Error).message}`)
   } finally {
@@ -370,6 +376,23 @@ onMounted(async () => {
                     </el-button>
                   </div>
                   <div class="rc-body">
+                    <!-- 智能笔记：医生随手记的要点，作为 note_text 参与病历生成。
+                         对应 V4.3 的 smart-note-row，是病历卡的第一行。 -->
+                    <div class="rc-row smart-note-row">
+                      <span class="rc-label">智能笔记</span>
+                      <div class="rc-field smart-note-field">
+                        <textarea v-model="smartNote" placeholder="随手记要点，AI 生成病历时会一并参考" />
+                      </div>
+                      <button
+                        class="rc-writeback-icon smart-note-search"
+                        title="按笔记内容重新生成病历"
+                        :disabled="generating"
+                        @click="generateRecord"
+                      >
+                        检
+                      </button>
+                    </div>
+
                     <div v-for="[key, label] in RECORD_SECTIONS" :key="key" class="rc-row">
                       <span class="rc-label">{{ label }}</span>
                       <div class="rc-field">

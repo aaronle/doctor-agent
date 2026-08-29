@@ -83,6 +83,32 @@ for (const block of blocks) {
   }
 }
 
+/**
+ * 从 global 桶里挑出「应用自有的无作用域覆盖」。
+ *
+ * V4.3 在所有 scoped 规则之后还有一层不带 data-v 的 !important 覆盖，
+ * 例如把 .his-header 从深色渐变改成白底。这层不属于任何组件作用域，
+ * 但决定了最终观感 —— 漏掉它，表头会停留在被覆盖前的深色版本。
+ */
+const APP_CLASSES = new Set(
+  Object.values(SCOPES).flatMap((name) => [...buckets[name].join('\n').matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1])),
+);
+
+// global 桶里混着两类噪声：Element Plus 自带规则，以及打包时混入的另一份
+// 文档的样式（body{padding:24px}、.section、.step、.patient 等）。
+// 它们的类名恰好也可能撞上应用类名，因此显式排除。
+const NOT_APP = new Set(['patient', 'time-select', 'time-select-item', 'section', 'step', 'item', 'tip', 'route', 'sub', 'loc', 'prec', 'foot']);
+
+const overrides = buckets.global.filter((block) => {
+  const selector = block.slice(0, block.indexOf('{'));
+  if (selector.trim().startsWith('@')) return false;
+  const classes = [...selector.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1]);
+  if (!classes.length) return false;
+  if (classes.some((c) => c.startsWith('el-') || NOT_APP.has(c))) return false;
+  return classes.some((c) => APP_CLASSES.has(c));
+});
+buckets['app-overrides'] = overrides;
+
 await mkdir(OUT_DIR, { recursive: true });
 for (const [name, rules] of Object.entries(buckets)) {
   const header =

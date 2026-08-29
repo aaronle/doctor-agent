@@ -3,7 +3,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/tencent-guangzhou/Dockerfile
-    image: doctor-agent:0.2.0-mvp
+    image: doctor-agent:0.3.0-mvp
     container_name: doctor-agent-mvp
     restart: unless-stopped
     env_file:
@@ -32,7 +32,7 @@ services:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
       interval: 30s
       timeout: 5s
       retries: 3

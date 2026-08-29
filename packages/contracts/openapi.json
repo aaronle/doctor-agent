@@ -2,40 +2,42 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Doctor Agent Product API",
-    "version": "0.1.0"
+    "version": "0.3.0-mvp"
   },
   "paths": {
-    "/api/v1/health": {
+    "/api/config": {
       "get": {
-        "summary": "Health",
-        "operationId": "health_api_v1_health_get",
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Config",
+        "operationId": "get_config_api_config_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
+                  "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Health Api V1 Health Get"
+                  "title": "Response Get Config Api Config Get"
                 }
               }
             }
           }
         }
-      }
-    },
-    "/api/v1/auth/login": {
-      "post": {
-        "summary": "Login",
-        "operationId": "login_api_v1_auth_login_post",
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Put Config",
+        "operationId": "put_config_api_config_put",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
+                "$ref": "#/components/schemas/ConfigIn"
               }
             }
           },
@@ -47,7 +49,9 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResponse"
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Put Config Api Config Put"
                 }
               }
             }
@@ -65,25 +69,113 @@
         }
       }
     },
-    "/api/v1/patients": {
+    "/api/his/patients": {
       "get": {
-        "summary": "Patients",
-        "operationId": "patients_api_v1_patients_get",
+        "tags": [
+          "his"
+        ],
+        "summary": "List Patients",
+        "operationId": "list_patients_api_his_patients_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Patients Api His Patients Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/his/patients/manage": {
+      "get": {
+        "tags": [
+          "his"
+        ],
+        "summary": "Manage Patients",
+        "operationId": "manage_patients_api_his_patients_manage_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Manage Patients Api His Patients Manage Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/his/patients/remind": {
+      "post": {
+        "tags": [
+          "his"
+        ],
+        "summary": "Remind Patients",
+        "operationId": "remind_patients_api_his_patients_remind_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemindIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Remind Patients Api His Patients Remind Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/his/patient/{patient_id}": {
+      "get": {
+        "tags": [
+          "his"
+        ],
+        "summary": "Get Patient",
+        "operationId": "get_patient_api_his_patient__patient_id__get",
         "parameters": [
           {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
+              "type": "string",
+              "title": "Patient Id"
             }
           }
         ],
@@ -95,7 +187,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Patients Api V1 Patients Get"
+                  "title": "Response Get Patient Api His Patient  Patient Id  Get"
                 }
               }
             }
@@ -113,10 +205,279 @@
         }
       }
     },
-    "/api/v1/patients/{patient_id}": {
+    "/api/his/patient/{patient_id}/diagnoses": {
       "get": {
-        "summary": "Patient",
-        "operationId": "patient_api_v1_patients__patient_id__get",
+        "tags": [
+          "his"
+        ],
+        "summary": "Get Diagnoses",
+        "operationId": "get_diagnoses_api_his_patient__patient_id__diagnoses_get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {},
+                  "title": "Response Get Diagnoses Api His Patient  Patient Id  Diagnoses Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/his/drugs": {
+      "get": {
+        "tags": [
+          "his"
+        ],
+        "summary": "List Drugs",
+        "operationId": "list_drugs_api_his_drugs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Drugs Api His Drugs Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/his/orders": {
+      "post": {
+        "tags": [
+          "his"
+        ],
+        "summary": "Create Order",
+        "operationId": "create_order_api_his_orders_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Order Api His Orders Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/his/exams": {
+      "post": {
+        "tags": [
+          "his"
+        ],
+        "summary": "Create Exam",
+        "operationId": "create_exam_api_his_exams_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExamIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Exam Api His Exams Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/his/referral": {
+      "post": {
+        "tags": [
+          "his"
+        ],
+        "summary": "Create Referral",
+        "operationId": "create_referral_api_his_referral_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferralIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Referral Api His Referral Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/his/admission": {
+      "post": {
+        "tags": [
+          "his"
+        ],
+        "summary": "Create Admission",
+        "operationId": "create_admission_api_his_admission_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdmissionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Admission Api His Admission Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/assessment-catalog": {
+      "get": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Assessment Catalog",
+        "description": "专项评估技能目录，五分类 33 项。\n\n这是 V4.3 的 20 个端点之外唯一新增的接口，因为原界面把它硬编码了。\n一期只做目录展示，单项能力的 Agent 化不在范围内。",
+        "operationId": "assessment_catalog_api_emr_assessment_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Assessment Catalog Api Emr Assessment Catalog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/report-summary/{patient_id}": {
+      "get": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Report Summary",
+        "operationId": "report_summary_api_emr_report_summary__patient_id__get",
         "parameters": [
           {
             "name": "patient_id",
@@ -128,19 +489,13 @@
             }
           },
           {
-            "name": "authorization",
-            "in": "header",
+            "name": "refresh",
+            "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
+              "type": "boolean",
+              "default": false,
+              "title": "Refresh"
             }
           }
         ],
@@ -152,7 +507,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Patient Api V1 Patients  Patient Id  Get"
+                  "title": "Response Report Summary Api Emr Report Summary  Patient Id  Get"
                 }
               }
             }
@@ -170,158 +525,23 @@
         }
       }
     },
-    "/api/v1/agent-tasks": {
+    "/api/emr/copilot/chat": {
       "post": {
-        "summary": "Create Task",
-        "operationId": "create_task_api_v1_agent_tasks_post",
-        "parameters": [
-          {
-            "name": "x-mock-scenario",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "success",
-              "title": "X-Mock-Scenario"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
+        "tags": [
+          "emr"
         ],
+        "summary": "Copilot Chat",
+        "operationId": "copilot_chat_api_emr_copilot_chat_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TaskRequestV1"
+                "$ref": "#/components/schemas/ChatIn"
               }
             }
-          }
+          },
+          "required": true
         },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/agent-tasks/{task_id}": {
-      "get": {
-        "summary": "Get Task",
-        "operationId": "get_task_api_v1_agent_tasks__task_id__get",
-        "parameters": [
-          {
-            "name": "task_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/agent-tasks/{task_id}/events": {
-      "get": {
-        "summary": "Task Events",
-        "operationId": "task_events_api_v1_agent_tasks__task_id__events_get",
-        "parameters": [
-          {
-            "name": "task_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -344,47 +564,110 @@
         }
       }
     },
-    "/api/v1/agent-tasks/{task_id}/actions": {
+    "/api/emr/generate-record-auto": {
       "post": {
-        "summary": "Task Action",
-        "operationId": "task_action_api_v1_agent_tasks__task_id__actions_post",
+        "tags": [
+          "emr"
+        ],
+        "summary": "Generate Record Auto",
+        "operationId": "generate_record_auto_api_emr_generate_record_auto_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAutoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Generate Record Auto Api Emr Generate Record Auto Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/generate-record-field": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Generate Record Field",
+        "operationId": "generate_record_field_api_emr_generate_record_field_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordFieldIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Generate Record Field Api Emr Generate Record Field Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/voice/init/{patient_id}": {
+      "get": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Voice Init",
+        "operationId": "voice_init_api_emr_voice_init__patient_id__get",
         "parameters": [
           {
-            "name": "task_id",
+            "name": "patient_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Task Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
+              "title": "Patient Id"
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResultActionV1"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -393,7 +676,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Task Action Api V1 Agent Tasks  Task Id  Actions Post"
+                  "title": "Response Voice Init Api Emr Voice Init  Patient Id  Get"
                 }
               }
             }
@@ -411,37 +694,61 @@
         }
       }
     },
-    "/api/v1/write-back-requests": {
+    "/api/emr/voice/turn": {
       "post": {
-        "summary": "Write Back",
-        "operationId": "write_back_api_v1_write_back_requests_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
+        "tags": [
+          "emr"
         ],
+        "summary": "Voice Turn",
+        "operationId": "voice_turn_api_emr_voice_turn_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/WriteBackRequest"
+                "$ref": "#/components/schemas/VoiceTurnIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
+        }
+      }
+    },
+    "/api/emr/voice/complete": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Voice Complete",
+        "operationId": "voice_complete_api_emr_voice_complete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceCompleteIn"
+              }
+            }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -449,7 +756,9 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WriteBackResponse"
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Voice Complete Api Emr Voice Complete Post"
                 }
               }
             }
@@ -467,41 +776,21 @@
         }
       }
     },
-    "/api/v1/audit-events": {
+    "/api/emr/voice/history/{patient_id}": {
       "get": {
-        "summary": "Audit Events",
-        "operationId": "audit_events_api_v1_audit_events_get",
+        "tags": [
+          "emr"
+        ],
+        "summary": "Voice History",
+        "operationId": "voice_history_api_emr_voice_history__patient_id__get",
         "parameters": [
           {
             "name": "patient_id",
-            "in": "query",
-            "required": false,
+            "in": "path",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "string",
               "title": "Patient Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
             }
           }
         ],
@@ -513,7 +802,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Audit Events Api V1 Audit Events Get"
+                  "title": "Response Voice History Api Emr Voice History  Patient Id  Get"
                 }
               }
             }
@@ -524,6 +813,113 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/comorbidity/check": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Comorbidity Check",
+        "operationId": "comorbidity_check_api_emr_comorbidity_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComorbidityIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Comorbidity Check Api Emr Comorbidity Check Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/comorbidity/consultation": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Comorbidity Consultation",
+        "operationId": "comorbidity_consultation_api_emr_comorbidity_consultation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsultationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Comorbidity Consultation Api Emr Comorbidity Consultation Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "description": "健康指纹。刻意不回传任何密钥或其片段。",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Api Health Get"
                 }
               }
             }
@@ -534,142 +930,130 @@
   },
   "components": {
     "schemas": {
-      "Actor": {
+      "AdmissionIn": {
         "properties": {
-          "user_id": {
+          "patient_id": {
             "type": "string",
-            "title": "User Id"
+            "title": "Patient Id"
           },
-          "role": {
+          "patient_name": {
             "type": "string",
-            "title": "Role",
-            "default": "outpatient_doctor"
+            "title": "Patient Name",
+            "default": ""
           },
-          "organization_id": {
+          "target_dept": {
             "type": "string",
-            "title": "Organization Id",
-            "default": "pkuih"
-          },
-          "department_id": {
-            "type": "string",
-            "title": "Department Id"
+            "title": "Target Dept",
+            "default": ""
           }
         },
+        "additionalProperties": true,
         "type": "object",
         "required": [
-          "user_id",
-          "department_id"
+          "patient_id"
         ],
-        "title": "Actor"
+        "title": "AdmissionIn"
       },
-      "CardViewModelV1": {
+      "ChatIn": {
         "properties": {
-          "schema_version": {
+          "patient_id": {
             "type": "string",
-            "const": "card_view_model_v1",
-            "title": "Schema Version",
-            "default": "card_view_model_v1"
+            "title": "Patient Id"
           },
-          "card_id": {
-            "type": "string",
-            "title": "Card Id"
-          },
-          "task_id": {
-            "type": "string",
-            "title": "Task Id"
-          },
-          "component": {
-            "type": "string",
-            "title": "Component"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "badges": {
+          "messages": {
             "items": {
               "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
-            "title": "Badges"
+            "title": "Messages"
           },
-          "meta": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object",
-            "title": "Meta"
+          "generate_record": {
+            "type": "boolean",
+            "title": "Generate Record",
+            "default": false
           },
-          "sections": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Sections"
-          },
-          "evidence_actions": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Evidence Actions"
-          },
-          "primary_actions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Primary Actions"
-          },
-          "secondary_actions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Secondary Actions"
+          "note_text": {
+            "type": "string",
+            "title": "Note Text",
+            "default": ""
           }
         },
         "type": "object",
         "required": [
-          "card_id",
-          "task_id",
-          "component",
-          "title",
-          "status",
-          "badges",
-          "meta",
-          "sections",
-          "evidence_actions",
-          "primary_actions",
-          "secondary_actions"
+          "patient_id"
         ],
-        "title": "CardViewModelV1"
+        "title": "ChatIn"
       },
-      "ContextRef": {
+      "ComorbidityIn": {
         "properties": {
-          "context_version": {
+          "patient_id": {
             "type": "string",
-            "title": "Context Version"
-          },
-          "data_cutoff_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Data Cutoff At"
+            "title": "Patient Id"
           }
         },
         "type": "object",
         "required": [
-          "context_version",
-          "data_cutoff_at"
+          "patient_id"
         ],
-        "title": "ContextRef"
+        "title": "ComorbidityIn"
+      },
+      "ConfigIn": {
+        "properties": {},
+        "additionalProperties": true,
+        "type": "object",
+        "title": "ConfigIn"
+      },
+      "ConsultationIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "focus_nutrition": {
+            "type": "boolean",
+            "title": "Focus Nutrition",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "ConsultationIn"
+      },
+      "ExamIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": ""
+          },
+          "route": {
+            "type": "string",
+            "title": "Route",
+            "default": ""
+          },
+          "freq": {
+            "type": "string",
+            "title": "Freq",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "name"
+        ],
+        "title": "ExamIn"
       },
       "HTTPValidationError": {
         "properties": {
@@ -684,485 +1068,159 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "InteractionContext": {
-        "properties": {
-          "supplemental_observations": {
-            "items": {
-              "$ref": "#/components/schemas/SupplementalObservation"
-            },
-            "type": "array",
-            "maxItems": 30,
-            "title": "Supplemental Observations"
-          }
-        },
-        "type": "object",
-        "title": "InteractionContext"
-      },
-      "LoginRequest": {
-        "properties": {
-          "username": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Username"
-          },
-          "password": {
-            "type": "string",
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Password"
-          }
-        },
-        "type": "object",
-        "required": [
-          "username",
-          "password"
-        ],
-        "title": "LoginRequest"
-      },
-      "LoginResponse": {
-        "properties": {
-          "access_token": {
-            "type": "string",
-            "title": "Access Token"
-          },
-          "token_type": {
-            "type": "string",
-            "const": "bearer",
-            "title": "Token Type",
-            "default": "bearer"
-          },
-          "doctor": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object",
-            "title": "Doctor"
-          },
-          "runtime_mode": {
-            "type": "string",
-            "title": "Runtime Mode"
-          }
-        },
-        "type": "object",
-        "required": [
-          "access_token",
-          "doctor",
-          "runtime_mode"
-        ],
-        "title": "LoginResponse"
-      },
-      "ResultActionV1": {
-        "properties": {
-          "schema_version": {
-            "type": "string",
-            "const": "agent_result_action_v1",
-            "title": "Schema Version",
-            "default": "agent_result_action_v1"
-          },
-          "result_version": {
-            "type": "integer",
-            "title": "Result Version"
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "accept",
-              "partial_accept",
-              "edit",
-              "reject",
-              "report_error",
-              "retry",
-              "acknowledge",
-              "start_action",
-              "resolve",
-              "false_positive",
-              "dismiss_with_reason"
-            ],
-            "title": "Action"
-          },
-          "selected_paths": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Selected Paths"
-          },
-          "edited_content": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Edited Content"
-          },
-          "reason_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason Code"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "type": "object",
-        "required": [
-          "result_version",
-          "action"
-        ],
-        "title": "ResultActionV1"
-      },
-      "SemanticResultV1": {
-        "properties": {
-          "schema_version": {
-            "type": "string",
-            "const": "semantic_result_v1",
-            "title": "Schema Version",
-            "default": "semantic_result_v1"
-          },
-          "task_id": {
-            "type": "string",
-            "title": "Task Id"
-          },
-          "task_type": {
-            "type": "string",
-            "enum": [
-              "voice_interview",
-              "condition_summary",
-              "record_generation",
-              "differential_diagnosis",
-              "diagnosis_management",
-              "risk_management",
-              "comorbidity_management"
-            ],
-            "title": "Task Type"
-          },
-          "result_type": {
-            "type": "string",
-            "title": "Result Type"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ready",
-              "degraded",
-              "needs_clarification"
-            ],
-            "title": "Status"
-          },
-          "subject": {
-            "$ref": "#/components/schemas/Subject"
-          },
-          "generated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Generated At"
-          },
-          "data_cutoff_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Data Cutoff At"
-          },
-          "runtime": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object",
-            "title": "Runtime"
-          },
-          "content": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Content"
-          },
-          "evidence_refs": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Evidence Refs"
-          },
-          "missing_data": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Missing Data"
-          },
-          "conflicts": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Conflicts"
-          },
-          "safety": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Safety"
-          },
-          "uncertainties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Uncertainties"
-          },
-          "allowed_actions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Allowed Actions"
-          },
-          "trace_id": {
-            "type": "string",
-            "title": "Trace Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "task_id",
-          "task_type",
-          "result_type",
-          "status",
-          "subject",
-          "generated_at",
-          "data_cutoff_at",
-          "runtime",
-          "content",
-          "safety",
-          "allowed_actions",
-          "trace_id"
-        ],
-        "title": "SemanticResultV1"
-      },
-      "Subject": {
+      "OrderIn": {
         "properties": {
           "patient_id": {
             "type": "string",
             "title": "Patient Id"
           },
-          "encounter_id": {
+          "drug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drug"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "dose": {
             "type": "string",
-            "title": "Encounter Id"
+            "title": "Dose",
+            "default": ""
+          },
+          "freq": {
+            "type": "string",
+            "title": "Freq",
+            "default": ""
+          },
+          "route": {
+            "type": "string",
+            "title": "Route",
+            "default": ""
+          },
+          "days": {
+            "type": "string",
+            "title": "Days",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "OrderIn"
+      },
+      "RecordAutoIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "note_text": {
+            "type": "string",
+            "title": "Note Text",
+            "default": ""
+          },
+          "dialog": {
+            "items": {},
+            "type": "array",
+            "title": "Dialog"
+          },
+          "labs": {
+            "items": {},
+            "type": "array",
+            "title": "Labs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "RecordAutoIn"
+      },
+      "RecordFieldIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "note_text": {
+            "type": "string",
+            "title": "Note Text",
+            "default": ""
           }
         },
         "type": "object",
         "required": [
           "patient_id",
-          "encounter_id"
+          "field"
         ],
-        "title": "Subject"
+        "title": "RecordFieldIn"
       },
-      "SupplementalObservation": {
+      "ReferralIn": {
         "properties": {
-          "observation_id": {
+          "patient_id": {
             "type": "string",
-            "title": "Observation Id"
+            "title": "Patient Id"
           },
-          "text": {
+          "target_dept": {
             "type": "string",
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Text"
+            "title": "Target Dept",
+            "default": ""
           },
-          "source": {
+          "reason": {
             "type": "string",
-            "enum": [
-              "doctor_selected",
-              "doctor_entered"
-            ],
-            "title": "Source",
-            "default": "doctor_selected"
-          },
-          "occurred_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Occurred At"
+            "title": "Reason",
+            "default": ""
           }
         },
+        "additionalProperties": true,
         "type": "object",
         "required": [
-          "observation_id",
-          "text",
-          "occurred_at"
+          "patient_id"
         ],
-        "title": "SupplementalObservation"
+        "title": "ReferralIn"
       },
-      "TaskRequestV1": {
+      "RemindIn": {
         "properties": {
-          "schema_version": {
-            "type": "string",
-            "const": "task_request_v1",
-            "title": "Schema Version",
-            "default": "task_request_v1"
+          "patient_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Patient Ids"
           },
-          "request_id": {
-            "type": "string",
-            "title": "Request Id"
-          },
-          "idempotency_key": {
-            "type": "string",
-            "title": "Idempotency Key"
-          },
-          "task_type": {
-            "type": "string",
-            "enum": [
-              "voice_interview",
-              "condition_summary",
-              "record_generation",
-              "differential_diagnosis",
-              "diagnosis_management",
-              "risk_management",
-              "comorbidity_management"
-            ],
-            "title": "Task Type"
-          },
-          "runtime_mode": {
-            "type": "string",
-            "enum": [
-              "mock",
-              "agentscope"
-            ],
-            "title": "Runtime Mode",
-            "default": "mock"
-          },
-          "actor": {
-            "$ref": "#/components/schemas/Actor"
-          },
-          "subject": {
-            "$ref": "#/components/schemas/Subject"
-          },
-          "trigger": {
-            "$ref": "#/components/schemas/Trigger"
-          },
-          "context_ref": {
-            "$ref": "#/components/schemas/ContextRef"
-          },
-          "interaction_context": {
-            "$ref": "#/components/schemas/InteractionContext"
-          },
-          "expected_result_type": {
-            "type": "string",
-            "title": "Expected Result Type"
-          },
-          "locale": {
-            "type": "string",
-            "const": "zh-CN",
-            "title": "Locale",
-            "default": "zh-CN"
-          },
-          "trace_id": {
-            "type": "string",
-            "title": "Trace Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "request_id",
-          "idempotency_key",
-          "task_type",
-          "actor",
-          "subject",
-          "trigger",
-          "context_ref",
-          "expected_result_type",
-          "trace_id"
-        ],
-        "title": "TaskRequestV1"
-      },
-      "TaskResponse": {
-        "properties": {
-          "task_id": {
-            "type": "string",
-            "title": "Task Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "event_url": {
-            "type": "string",
-            "title": "Event Url"
-          },
-          "result_version": {
-            "type": "integer",
-            "title": "Result Version"
-          },
-          "result": {
+          "patient_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SemanticResultV1"
+                "type": "string"
               },
               {
                 "type": "null"
               }
-            ]
-          },
-          "card": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CardViewModelV1"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            ],
+            "title": "Patient Id"
           }
         },
         "type": "object",
-        "required": [
-          "task_id",
-          "status",
-          "event_url",
-          "result_version"
-        ],
-        "title": "TaskResponse"
-      },
-      "Trigger": {
-        "properties": {
-          "source": {
-            "type": "string",
-            "title": "Source",
-            "default": "user_action"
-          },
-          "event": {
-            "type": "string",
-            "title": "Event"
-          },
-          "occurred_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Occurred At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "event",
-          "occurred_at"
-        ],
-        "title": "Trigger"
+        "title": "RemindIn"
       },
       "ValidationError": {
         "properties": {
@@ -1197,78 +1255,56 @@
         ],
         "title": "ValidationError"
       },
-      "WriteBackRequest": {
+      "VoiceCompleteIn": {
         "properties": {
-          "task_id": {
+          "patient_id": {
             "type": "string",
-            "title": "Task Id"
+            "title": "Patient Id"
           },
-          "result_version": {
-            "type": "integer",
-            "title": "Result Version"
-          },
-          "idempotency_key": {
+          "conversation_summary": {
             "type": "string",
-            "title": "Idempotency Key"
+            "title": "Conversation Summary",
+            "default": ""
           },
-          "target": {
-            "type": "string",
-            "enum": [
-              "record",
-              "diagnosis"
-            ],
-            "title": "Target"
-          },
-          "confirmed_by_doctor": {
-            "type": "boolean",
-            "title": "Confirmed By Doctor"
+          "messages": {
+            "items": {},
+            "type": "array",
+            "title": "Messages"
           }
         },
         "type": "object",
         "required": [
-          "task_id",
-          "result_version",
-          "idempotency_key",
-          "target",
-          "confirmed_by_doctor"
+          "patient_id"
         ],
-        "title": "WriteBackRequest"
+        "title": "VoiceCompleteIn"
       },
-      "WriteBackResponse": {
+      "VoiceTurnIn": {
         "properties": {
-          "receipt_id": {
+          "patient_id": {
             "type": "string",
-            "title": "Receipt Id"
+            "title": "Patient Id"
           },
-          "mode": {
+          "patient_text": {
             "type": "string",
-            "const": "mock",
-            "title": "Mode"
+            "title": "Patient Text",
+            "default": ""
           },
-          "status": {
-            "type": "string",
-            "const": "simulated",
-            "title": "Status"
+          "turn_index": {
+            "type": "integer",
+            "title": "Turn Index",
+            "default": 0
           },
-          "task_id": {
-            "type": "string",
-            "title": "Task Id"
-          },
-          "occurred_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Occurred At"
+          "conversation_history": {
+            "items": {},
+            "type": "array",
+            "title": "Conversation History"
           }
         },
         "type": "object",
         "required": [
-          "receipt_id",
-          "mode",
-          "status",
-          "task_id",
-          "occurred_at"
+          "patient_id"
         ],
-        "title": "WriteBackResponse"
+        "title": "VoiceTurnIn"
       }
     }
   }

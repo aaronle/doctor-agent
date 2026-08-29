@@ -204,6 +204,8 @@ class ChatIn(BaseModel):
     patient_id: str
     messages: list[dict] = Field(default_factory=list)
     generate_record: bool = False
+    # 界面「智能笔记」里医生随手记的要点，生成病历时一并参考
+    note_text: str = ""
 
 
 @router.post("/copilot/chat")
@@ -212,7 +214,7 @@ async def copilot_chat(body: ChatIn, session: Session = Depends(get_session)) ->
     ctx = build_context(session, patient, include_dialog=True)
 
     if body.generate_record:
-        return StreamingResponse(_stream_record(ctx, body.patient_id), headers=SSE_HEADERS)
+        return StreamingResponse(_stream_record(ctx, body.patient_id, body.note_text), headers=SSE_HEADERS)
     return StreamingResponse(_stream_chat(ctx, body.messages), headers=SSE_HEADERS)
 
 
@@ -245,7 +247,7 @@ async def _stream_chat(ctx: dict, messages: list[dict]) -> AsyncIterator[str]:
         yield _sse({"type": "token", "token": f"（模型暂时不可用：{exc}）"})
 
 
-async def _stream_record(ctx: dict, patient_id: str) -> AsyncIterator[str]:
+async def _stream_record(ctx: dict, patient_id: str, note_text: str = "") -> AsyncIterator[str]:
     """
     病历生成：结构化流。
 
@@ -254,7 +256,7 @@ async def _stream_record(ctx: dict, patient_id: str) -> AsyncIterator[str]:
     """
     session = SessionLocal()
     try:
-        outcome = await record_agent.run(session, ctx)
+        outcome = await record_agent.run(session, ctx, note_text=note_text)
         fields = outcome.data.get("fields", {})
 
         version = 1 + (
