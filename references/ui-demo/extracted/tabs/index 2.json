@@ -1,0 +1,50 @@
+[
+  {
+    "tab": "01-智慧诊疗",
+    "classes": 83,
+    "icons": 0,
+    "colorRules": 109
+  },
+  {
+    "tab": "02-预警评估",
+    "classes": 9,
+    "icons": 1,
+    "colorRules": 10
+  },
+  {
+    "tab": "03-病历管理",
+    "classes": 33,
+    "icons": 5,
+    "colorRules": 30
+  },
+  {
+    "tab": "04-诊断管理",
+    "classes": 22,
+    "icons": 1,
+    "colorRules": 41
+  },
+  {
+    "tab": "05-医嘱管理",
+    "classes": 24,
+    "icons": 1,
+    "colorRules": 15
+  },
+  {
+    "tab": "06-共病管理",
+    "classes": 17,
+    "icons": 0,
+    "colorRules": 10
+  },
+  {
+    "tab": "07-健康档案",
+    "classes": 29,
+    "icons": 0,
+    "colorRules": 35
+  },
+  {
+    "tab": "08-时间轴",
+    "classes": 30,
+    "icons": 3,
+    "colorRules": 36
+  }
+]

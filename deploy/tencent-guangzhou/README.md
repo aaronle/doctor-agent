@@ -27,6 +27,43 @@ Langfuse，且不允许使用真实患者数据。
 `.env.runtime` 以 `env.runtime.example` 为模板，权限必须为 `600`，其中包含
 `AI_API_KEY`。该文件不进 Git、不进日志、不下发前端、不出现在健康接口。
 
+## 部署前必读：这台机器的三个坑
+
+首次部署实测踩到，写下来避免重犯。
+
+**1. Docker Hub 拉不动，用腾讯云内网镜像源**
+
+`registry-1.docker.io` 超时。可用源是 `mirror.ccs.tencentyun.com`（同机既有镜像
+就是从它拉的）。基础镜像先拉再打标签：
+
+```sh
+docker pull mirror.ccs.tencentyun.com/library/python:3.12-slim
+docker tag  mirror.ccs.tencentyun.com/library/python:3.12-slim python:3.12-slim
+docker pull mirror.ccs.tencentyun.com/library/node:22-bookworm-slim
+docker tag  mirror.ccs.tencentyun.com/library/node:22-bookworm-slim node:22-bookworm-slim
+```
+
+pypi 与 npm registry 都直连可达，构建期不用换源。
+
+**2. 宿主机 curl 访问模型网关会被 TLS reset，但容器内正常**
+
+```sh
+curl https://www.meatdc.com/v1/models          # 宿主机：Connection reset by peer
+docker run --rm python:3.12-slim python -c ... # 容器内：HTTP 401，269ms
+```
+
+差别在 TLS 客户端指纹，不在网络路由。**用宿主机 curl 判断出网会得出错误结论** ——
+必须用真实技术栈（容器 + httpx）验证。同机 aits-app 用的是同一个网关。
+
+**3. `cap_drop: ALL` 与数据目录属主必须配套**
+
+容器默认以 root 运行，平时靠 `CAP_DAC_OVERRIDE` 越权写入非自己所有的目录。
+`cap_drop: ALL` 摘掉该能力后，root 反而写不进 `/opt/doctor-agent/data`，
+SQLite 报 `unable to open database file`。
+
+正解是让容器以数据目录属主的 uid 运行（compose 里的 `user: "1000:1000"`），
+并把目录 chown 成同一 uid —— 比 chmod 777 或加回 CAP_DAC_OVERRIDE 都干净。
+
 ## 候选验证
 
 ```sh
@@ -62,7 +99,9 @@ curl -fsS -o /dev/null -w '%{http_code} %{time_total}s\n' https://www.meatdc.com
 
 ## 域名和 HTTPS
 
-1. 在 DNSPod 新建 `da.aaronhealth.cn -> 81.71.155.220` A 记录（**尚未创建**）。
+1. 在 DNSPod 新建 `da.aaronhealth.cn -> 81.71.155.220` A 记录。
+   **这一步需要人工在 DNSPod 控制台完成** —— 工作区与服务器上都没有 DNSPod
+   API 凭据，自动化脚本加不了记录。加完后 certbot 才能签发证书。
 2. 将 `nginx-da.aaronhealth.cn.conf.example` 安装为宿主机 Nginx 站点。
 3. 执行 `nginx -t` 后重载 Nginx。
 4. 用 Certbot 为 `da.aaronhealth.cn` 签发独立证书。

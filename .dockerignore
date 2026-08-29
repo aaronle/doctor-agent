@@ -22,4 +22,9 @@ docs/implementation
 docs/testing/*.md
 docs/AI-HIS*
 design
+
+# references 整体排除：V4.3 原件 2MB、抽取产物近 200MB，镜像里都用不上。
+# 但临床种子数据例外 —— app/seed.py 启动时从这里导入，排掉会导致建库后无数据。
 references
+!references/ui-demo/extracted/fixtures
+!references/ui-demo/extracted/fixtures/**

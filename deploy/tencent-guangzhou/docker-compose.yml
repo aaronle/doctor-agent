@@ -19,6 +19,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # 必须与 /opt/doctor-agent/data 的属主一致。
+    # 容器默认以 root 运行，平时靠 CAP_DAC_OVERRIDE 越权写入非自己所有的目录；
+    # 但这里 cap_drop: ALL 把该能力摘掉了，root 反而写不进去 —— SQLite 会报
+    # "unable to open database file"。以数据目录属主的 uid 运行是正解，
+    # 比 chmod 777 或加回 CAP_DAC_OVERRIDE 都干净。
+    user: "1000:1000"
     mem_limit: 512m
     cpus: 1.0
     logging:
