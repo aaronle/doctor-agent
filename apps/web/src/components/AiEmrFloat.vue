@@ -124,6 +124,24 @@ function likelihoodClass(likelihood: string) {
   return 'low'
 }
 
+/**
+ * 聚合结果就绪后，默认勾选置信度最高的一条并标为主诊断。
+ *
+ * 与 V4.3 一致：绝大多数情况下医生就是采纳首选，预勾能省一次点击。
+ * 这只是界面预选 —— 回写仍要医生显式确认，且红色风险未闭环照样阻断，
+ * 所以预选不会让任何东西被自动写出去。
+ */
+watch(
+  () => summary.value?.suspected_diagnoses,
+  (list) => {
+    if (!list?.length || checkedDiagnoses.value.size) return
+    const top = list[0]
+    checkedDiagnoses.value = new Set([top.name])
+    primaryDiagnosis.value = top.name
+  },
+  { immediate: true },
+)
+
 /** 回写前置条件：至少一条诊断、必须有主诊断、红色风险已闭环。 */
 const writeBackReason = computed(() => {
   if (!checkedDiagnoses.value.size) return '请先勾选要纳入的诊断'
@@ -334,6 +352,186 @@ async function requestNutritionConsult() {
   }
 }
 
+// ---------------------------------------------------------------- 病历卡体征
+
+/** 病历卡的体征行与左侧 HIS 表单同源，只读展示，不重复维护一份数据 */
+const cardVitals = computed(() => {
+  const v = (patient.value?.vitals ?? {}) as Record<string, string | number>
+  const bp = String(v.bp ?? '').match(/(\d+)\s*\/\s*(\d+)/)
+  return [
+    { label: '身高', value: v.height ?? '', unit: 'CM', isBp: false, systolic: '', diastolic: '' },
+    { label: '体重', value: v.weight ?? '', unit: 'KG', isBp: false, systolic: '', diastolic: '' },
+    { label: 'BMI', value: v.bmi ?? '', unit: '', isBp: false, systolic: '', diastolic: '' },
+    { label: '体温', value: v.temp ?? '', unit: '℃', isBp: false, systolic: '', diastolic: '' },
+    { label: '脉搏', value: v.hr ?? '', unit: '次/分', isBp: false, systolic: '', diastolic: '' },
+    { label: '呼吸', value: v.breath ?? '', unit: '次/分', isBp: false, systolic: '', diastolic: '' },
+    { label: '血压', value: '', unit: 'mmHg', isBp: true, systolic: bp?.[1] ?? '', diastolic: bp?.[2] ?? '' },
+    { label: '心率', value: v.hr ?? '', unit: '次/分', isBp: false, systolic: '', diastolic: '' },
+  ]
+})
+
+// ---------------------------------------------------------------- 随访计划
+
+const planningFollowUp = ref(false)
+
+/**
+ * 生成随访计划：让智能体按本次时间轴与待办产出随访安排，
+ * 结果进对话区供医生审阅 —— 不直接落库，与其他 AI 产出一致。
+ */
+async function generateFollowUpPlan() {
+  planningFollowUp.value = true
+  try {
+    await sendChat('请根据本次就诊的时间轴与待办事项，给出随访计划：复查项目、时间间隔与需要观察的指标。')
+    activeTab.value = '智慧诊疗'
+    ElMessage.success('随访计划已生成在医生智能体对话区，确认后可写入病历')
+  } finally {
+    planningFollowUp.value = false
+  }
+}
+
+// ---------------------------------------------------------------- 病历质控
+
+interface QualityGap { text: string; level: string; status: string }
+interface QualityMetric { name: string; value: number; basis: string }
+interface RecordQuality { completeness: number; metrics: QualityMetric[]; gaps: QualityGap[] }
+
+const GAP_PREVIEW = 4
+const quality = ref<RecordQuality | null>(null)
+const showAllGaps = ref(false)
+
+const visibleGaps = computed(() => {
+  const gaps = quality.value?.gaps ?? []
+  return showAllGaps.value ? gaps : gaps.slice(0, GAP_PREVIEW)
+})
+
+/**
+ * 质控由后端的确定性规则算，不让模型给自己的输出打分。
+ * 病历一变就重算 —— 医生边改边看得到完整度与遗漏的变化。
+ */
+async function refreshQuality() {
+  if (!ws.patientId) return
+  const fields = Object.fromEntries(
+    RECORD_SECTIONS.map(([key]) => [key, ws.draft[key] ?? ws.record[key] ?? '']),
+  )
+  try {
+    quality.value = await api.recordQuality(ws.patientId, fields)
+  } catch {
+    quality.value = null
+  }
+}
+
+function showQualityDetail() {
+  const metrics = quality.value?.metrics ?? []
+  ElMessageBox.alert(
+    metrics.map((m) => `${m.name}：${m.value}%\n　　依据：${m.basis}`).join('\n\n') || '暂无质控数据',
+    '质控详情',
+    { confirmButtonText: '知道了' },
+  )
+}
+
+watch(
+  () => [ws.patientId, ws.record, ws.draft],
+  () => void refreshQuality(),
+  { deep: true, immediate: true },
+)
+
+// ---------------------------------------------------------------- 时间轴
+
+interface TimelineEvent {
+  time?: string
+  type?: string
+  category?: string
+  action?: string
+  detail?: string
+  result?: string
+  analysisHint?: string
+}
+
+/** 异常判定沿用原件：detail 或 result 里带箭头或「异常」二字 */
+function isAbnormalEvent(event: TimelineEvent) {
+  const text = `${event.detail ?? ''}${event.result ?? ''}`
+  return /[↑↓]|异常/.test(text)
+}
+
+function showTimelineAnalysis(event: TimelineEvent) {
+  ElMessageBox.alert(event.analysisHint ?? '', `AI 分析 · ${event.action ?? ''}`, {
+    confirmButtonText: '知道了',
+    type: isAbnormalEvent(event) ? 'warning' : 'info',
+  })
+}
+
+// ---------------------------------------------------------------- 健康档案
+
+const ARCHIVE_FILTERS = ['全部', '门诊', '住院', '急诊'] as const
+const archiveFilter = ref<(typeof ARCHIVE_FILTERS)[number]>('全部')
+const expandedVisits = ref<Set<string>>(new Set())
+
+interface VisitRecord {
+  id: string
+  datetime?: string
+  date?: string
+  visit_type: string
+  dept: string
+  diagnosis: string
+  icd?: string
+  record_id?: string
+  chief_complaint?: string
+  course?: string
+  exam_points?: string
+  plan?: string
+  labs?: { name: string; value: string; unit?: string; ref?: string; abnormal?: string }[]
+  exams?: { name: string; result: string }[]
+}
+
+interface HealthArchive {
+  primary_disease?: string
+  diagnosis_date?: string
+  diagnoses?: string[]
+  treatments?: string[]
+}
+
+const archive = computed(() => (patient.value?.health_archive ?? {}) as HealthArchive)
+const visits = computed(() => ((patient.value?.visit_history ?? []) as VisitRecord[]))
+
+const visibleVisits = computed(() =>
+  archiveFilter.value === '全部'
+    ? visits.value
+    : visits.value.filter((v) => v.visit_type === archiveFilter.value),
+)
+
+/** 概览里的「8 次展示 · 住 1 / 门 6 / 急 1」 */
+const visitSummary = computed(() => {
+  const all = visits.value
+  if (!all.length) return '—'
+  const count = (type: string) => all.filter((v) => v.visit_type === type).length
+  return `${all.length} 次展示 · 住 ${count('住院')} / 门 ${count('门诊')} / 急 ${count('急诊')}`
+})
+
+/** 概览里的「1917 天（2021-03-18 ~ 2026-06-17）」 */
+const visitSpan = computed(() => {
+  const dates = visits.value
+    .map((v) => (v.datetime || v.date || '').slice(0, 10))
+    .filter(Boolean)
+    .sort()
+  if (dates.length < 2) return dates[0] ?? '—'
+  const first = dates[0]
+  const last = dates[dates.length - 1]
+  const days = Math.round((Date.parse(last) - Date.parse(first)) / 86400000)
+  return `${days} 天（${first} ~ ${last}）`
+})
+
+function visitTypeClass(type: string) {
+  if (type === '住院') return 'inpatient'
+  if (type === '急诊') return 'emergency'
+  return 'outpatient'
+}
+
+function toggleVisit(id: string) {
+  const next = new Set(expandedVisits.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  expandedVisits.value = next
+}
+
 // ---------------------------------------------------------------- 专项评估目录
 
 const catalog = ref<{ name: string; count: number; items: { name: string; level: string; desc: string }[] }[]>([])
@@ -343,6 +541,75 @@ function toggleCategory(name: string) {
   const next = new Set(expandedCategories.value)
   next.has(name) ? next.delete(name) : next.add(name)
   expandedCategories.value = next
+}
+
+// ---------------------------------------------------------------- 专项评估展开
+
+const expandedSkills = ref<Set<string>>(new Set())
+
+function toggleSkill(name: string) {
+  const next = new Set(expandedSkills.value)
+  next.has(name) ? next.delete(name) : next.add(name)
+  expandedSkills.value = next
+}
+
+// ---------------------------------------------------------------- 共病操作
+
+const remindingPatient = ref(false)
+
+async function remindPatient() {
+  remindingPatient.value = true
+  try {
+    const result = await api.remind([ws.patientId])
+    ElMessage.success(result.message)
+  } catch (error) {
+    ElMessage.error(`提醒失败：${(error as Error).message}`)
+  } finally {
+    remindingPatient.value = false
+  }
+}
+
+/** 发起共病会诊：非营养专项，走全科协同 */
+async function requestComorbidityConsult() {
+  requestingConsult.value = true
+  try {
+    const result = await api.comorbidityConsultation(ws.patientId, false)
+    ElMessage.success(result.message)
+  } catch (error) {
+    ElMessage.error(`会诊申请失败：${(error as Error).message}`)
+  } finally {
+    requestingConsult.value = false
+  }
+}
+
+// ---------------------------------------------------------------- 手动新增诊断
+
+async function addManualDiagnosis() {
+  try {
+    const { value } = await ElMessageBox.prompt('输入诊断名称，将并入待勾选列表', '新增诊断', {
+      inputPlaceholder: '如：糖尿病周围神经病变',
+      inputValidator: (v: string) => (v?.trim() ? true : '诊断名称不能为空'),
+    })
+    const name = String(value).trim()
+    if (!summary.value) return
+    // 医生手写的诊断没有模型证据，置信度留空并标注来源，不伪装成 AI 推断
+    summary.value.suspected_diagnoses = [
+      ...summary.value.suspected_diagnoses,
+      {
+        name,
+        confidence: 0,
+        icd: '',
+        desc: '医生手动新增，未经模型评估。',
+        rank_label: '备选',
+        rank_key: 'is-alt',
+        likelihood: '低',
+        differentials: [],
+      },
+    ]
+    checkedDiagnoses.value = new Set([...checkedDiagnoses.value, name])
+  } catch {
+    // 取消
+  }
 }
 
 // ---------------------------------------------------------------- 对话
@@ -722,13 +989,35 @@ onMounted(async () => {
                       <button class="rc-writeback-icon" title="清空检索结果" @click="noteHits = []">清</button>
                     </div>
 
-                    <div v-for="[key, label] in RECORD_SECTIONS" :key="key" class="rc-row">
-                      <span class="rc-label">{{ label }}</span>
-                      <div class="rc-field">
-                        <textarea :value="ws.draft[key] ?? ws.record[key] ?? ''" readonly rows="2" />
+                    <template v-for="[key, label] in RECORD_SECTIONS" :key="key">
+                      <div class="rc-row" :class="{ 'rc-row-single': key === 'chief_complaint' }">
+                        <span class="rc-label">{{ label }}</span>
+                        <div class="rc-field">
+                          <textarea :value="ws.draft[key] ?? ws.record[key] ?? ''" readonly rows="2" />
+                        </div>
+                        <button class="rc-writeback-icon" title="回写至 HIS" @click="acceptField(key)">回</button>
                       </div>
-                      <button class="rc-writeback-icon" :title="`写回${label}`" @click="acceptField(key)">回</button>
-                    </div>
+
+                      <!-- 体征行紧跟个人史之后，与左侧 HIS 表单同源，只读展示 -->
+                      <div v-if="key === 'personal_history'" class="rc-row rc-vitals-row">
+                        <span class="rc-label">体征</span>
+                        <div class="rc-field rc-vitals-field">
+                          <div v-for="v in cardVitals" :key="v.label" class="rc-vital" :class="{ 'rc-vital-bp': v.isBp }">
+                            <span class="rc-vk">{{ v.label }}</span>
+                            <template v-if="v.isBp">
+                              <input class="rc-bp" :value="v.systolic" readonly />
+                              <span class="rc-slash">/</span>
+                              <input class="rc-bp" :value="v.diastolic" readonly />
+                            </template>
+                            <template v-else>
+                              <input :value="v.value" readonly />
+                              <span v-if="v.unit" class="rc-vu">{{ v.unit }}</span>
+                            </template>
+                          </div>
+                        </div>
+                        <button class="rc-writeback-icon" title="回写至 HIS" @click="acceptField('physical_exam')">回</button>
+                      </div>
+                    </template>
                   </div>
                 </div>
 
@@ -737,17 +1026,23 @@ onMounted(async () => {
                   <div class="ka-categories">
                     <div v-for="category in catalog" :key="category.name" class="ka-category">
                       <div class="ka-cat-header" @click="toggleCategory(category.name)">
-                        <div class="ka-cat-title">{{ category.name }}</div>
+                        <div class="ka-cat-title"><span class="ka-cat-name">{{ category.name }}</span></div>
                         <span class="ka-cat-count">{{ category.count }}项</span>
                         <span class="ka-cat-arrow" :class="{ expanded: expandedCategories.has(category.name) }">›</span>
                       </div>
                       <div v-if="expandedCategories.has(category.name)" class="ka-list">
-                        <div v-for="item in category.items" :key="item.name" class="ka-card" :class="`ka-card-${item.level}`">
+                        <div
+                          v-for="item in category.items"
+                          :key="item.name"
+                          class="ka-card"
+                          :class="[`ka-card-${item.level}`, { collapsed: !expandedSkills.has(item.name) }]"
+                        >
                           <div class="ka-card-body">
-                            <div class="ka-card-title-row">
+                            <div class="ka-card-title-row" title="展开/收起说明" @click="toggleSkill(item.name)">
                               <div class="ka-card-name">{{ item.name }}</div>
+                              <span class="ka-card-toggle" :class="{ expanded: expandedSkills.has(item.name) }">›</span>
                             </div>
-                            <div class="ka-card-detail-row">
+                            <div v-if="expandedSkills.has(item.name)" class="ka-card-detail-row" title="查看预警评估">
                               <div class="ka-card-detail"><div class="ka-card-assessment">{{ item.desc }}</div></div>
                             </div>
                           </div>
@@ -789,17 +1084,17 @@ onMounted(async () => {
           </div>
 
           <!-- ---------------- 病历管理 ---------------- -->
-          <div v-show="activeTab === '病历管理'" class="tips-tab-pane">
+          <div v-show="activeTab === '病历管理'" class="tips-tab-pane record-pane">
             <div class="record-layout">
               <div class="record-main">
                 <div class="btab-writeback-bar">
                   <el-button type="success" size="small" class="writeback-primary-btn" @click="ws.acceptAllDraft()">
                     ✔ 确认并回写到病历
                   </el-button>
-                  <span class="record-complete-badge">病历完整度 {{ recordCompleteness }}%</span>
+                  <span class="record-complete-badge">病历完整度 {{ quality?.completeness ?? 0 }}%</span>
                   <span class="writeback-hint">AI 草稿需确认后才进入正式病历</span>
                 </div>
-                <div v-for="[key, label] in RECORD_SECTIONS" :key="key" class="record-node">
+                <div v-for="[key, label] in RECORD_SECTIONS" :key="key" class="record-node" :data-record-node="key">
                   <div class="node-header">
                     <span class="node-title">{{ label }}</span>
                     <el-button type="primary" size="small" link class="node-writeback-btn" @click="acceptField(key)">
@@ -809,13 +1104,62 @@ onMounted(async () => {
                   <div class="node-content">{{ ws.draft[key] ?? ws.record[key] ?? '未采集' }}</div>
                 </div>
               </div>
+
+              <aside class="record-qc-side">
+                <div class="rc-side-card rc-risk-card">
+                  <div class="rc-side-head warn">
+                    <span class="rc-side-icon">⚠</span>
+                    <span class="rc-side-title">病历风险与遗漏</span>
+                  </div>
+                  <div class="rc-risk-list">
+                    <div v-for="(gap, i) in visibleGaps" :key="i" class="rc-risk-row">
+                      <span class="rc-risk-dot" :class="gap.level === 'danger' ? 'warn' : gap.level" />
+                      <span class="rc-risk-text">{{ gap.text }}</span>
+                      <span class="rc-risk-status" :class="gap.level === 'danger' ? 'warn' : gap.level">
+                        {{ gap.status }}
+                      </span>
+                    </div>
+                    <div v-if="!quality?.gaps?.length" class="rc-risk-row">
+                      <span class="rc-risk-dot ok" />
+                      <span class="rc-risk-text">未发现明显遗漏</span>
+                      <span class="rc-risk-status ok">已确认</span>
+                    </div>
+                  </div>
+                  <button type="button" class="rc-side-more" @click="showAllGaps = !showAllGaps">
+                    {{ showAllGaps ? '收起' : `查看全部 ${quality?.gaps?.length ?? 0} 处遗漏` }} <span>›</span>
+                  </button>
+                </div>
+
+                <div class="rc-side-card rc-qc-card">
+                  <div class="rc-side-head ok">
+                    <span class="rc-side-icon">✓</span>
+                    <span class="rc-side-title">质控与完整性</span>
+                  </div>
+                  <div class="rc-qc-list">
+                    <div v-for="metric in quality?.metrics ?? []" :key="metric.name" class="rc-qc-row" :title="metric.basis">
+                      <span class="rc-qc-check">✓</span>
+                      <span class="rc-qc-name">{{ metric.name }}</span>
+                      <span class="rc-qc-pill">{{ metric.value }}%</span>
+                    </div>
+                    <div v-if="!quality" class="rc-qc-row">
+                      <span class="rc-qc-name">质控计算中…</span>
+                    </div>
+                  </div>
+                  <button type="button" class="rc-side-more ok" @click="showQualityDetail">查看质控详情 <span>›</span></button>
+                </div>
+              </aside>
             </div>
           </div>
 
           <!-- ---------------- 诊断管理 ---------------- -->
           <div v-show="activeTab === '诊断管理'" class="tips-tab-pane">
             <div class="tab-section">
-              <div class="tab-section-title">疑似诊断</div>
+              <div class="tab-section-title">
+                疑似诊断
+                <el-button type="primary" size="small" link class="diag-add-link" @click="addManualDiagnosis">
+                  + 新增诊断
+                </el-button>
+              </div>
               <p class="susp-hint">勾选拟纳入诊断；点击右侧 <strong>主</strong> 标记指定主诊断</p>
               <div class="suspected-list">
                 <div
@@ -968,22 +1312,133 @@ onMounted(async () => {
               <p v-if="summary?.comorbidity?.recommendation" class="risk-summary">
                 <strong>协同管理建议：</strong>{{ summary.comorbidity.recommendation }}
               </p>
+
+              <div v-if="summary?.comorbidity?.detected" class="comorbidity-actions-bar">
+                <el-button type="warning" :loading="remindingPatient" @click="remindPatient">提醒患者</el-button>
+                <el-button type="primary" :loading="requestingConsult" @click="requestComorbidityConsult">
+                  发起共病会诊
+                </el-button>
+              </div>
             </div>
           </div>
 
           <!-- ---------------- 健康档案 ---------------- -->
           <div v-show="activeTab === '健康档案'" class="tips-tab-pane">
-            <div class="tab-section">
-              <div class="tab-section-title">健康档案</div>
-              <div class="rc-body">
-                <div v-for="(value, key) in (patient?.health_archive ?? {})" :key="key" class="rc-row rc-row-single">
-                  <span class="rc-label">{{ key }}</span>
-                  <div class="rc-field">{{ value }}</div>
+            <div class="tab-section archive-panel">
+              <div class="archive-overview">
+                <div class="ao-title">疾病与就诊概览</div>
+                <div class="ao-row">
+                  <span class="ao-k">主病</span>
+                  <span class="ao-v strong">{{ archive.primary_disease || '—' }}</span>
+                </div>
+                <div class="ao-row">
+                  <span class="ao-k">诊断日</span>
+                  <span class="ao-v">{{ archive.diagnosis_date || '—' }}</span>
+                </div>
+                <div class="ao-row">
+                  <span class="ao-k">诊断</span>
+                  <span class="ao-v">{{ (archive.diagnoses ?? []).join('、') || '—' }}</span>
+                </div>
+                <div class="ao-row">
+                  <span class="ao-k">就诊</span>
+                  <span class="ao-v">{{ visitSummary }}</span>
+                </div>
+                <div class="ao-row">
+                  <span class="ao-k">跨度</span>
+                  <span class="ao-v">{{ visitSpan }}</span>
+                </div>
+                <div class="ao-row">
+                  <span class="ao-k">评估</span>
+                  <span class="ao-v">{{ (archive.treatments ?? []).join('、') || '—' }}</span>
                 </div>
               </div>
-              <div class="tab-section-title">既往就诊</div>
-              <div v-for="(visit, index) in summary?.visit_history ?? []" :key="index" class="record-node">
-                <div class="node-content">{{ JSON.stringify(visit).replace(/[{}"]/g, ' ') }}</div>
+
+              <div class="archive-toolbar">
+                <div class="archive-head">
+                  <div class="tab-section-title">全周期时间轴</div>
+                  <span class="archive-muted">覆盖门诊 / 住院 / 急诊健康数据</span>
+                </div>
+                <div class="archive-filters">
+                  <button
+                    v-for="type in ARCHIVE_FILTERS"
+                    :key="type"
+                    type="button"
+                    class="af-chip"
+                    :class="{ active: archiveFilter === type }"
+                    @click="archiveFilter = type"
+                  >
+                    {{ type }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="visit-list">
+                <div
+                  v-for="visit in visibleVisits"
+                  :key="visit.id"
+                  class="visit-card"
+                  :class="{ expanded: expandedVisits.has(visit.id) }"
+                  @click="toggleVisit(visit.id)"
+                >
+                  <div class="vc-row">
+                    <span class="vc-type" :class="visitTypeClass(visit.visit_type)">{{ visit.visit_type }}</span>
+                    <span class="vc-time">{{ visit.datetime || visit.date }}</span>
+                    <span class="vc-dept">{{ visit.dept }}</span>
+                    <span class="vc-toggle" :class="{ expanded: expandedVisits.has(visit.id) }">›</span>
+                  </div>
+                  <div class="vc-meta">
+                    <span>主诊 {{ visit.diagnosis }}<template v-if="visit.icd"> ({{ visit.icd }})</template></span>
+                    <span v-if="visit.record_id" class="vc-rid">· record {{ visit.record_id }}</span>
+                  </div>
+                  <div class="vc-cc">{{ visit.chief_complaint }}</div>
+
+                  <div v-if="expandedVisits.has(visit.id)" class="vc-detail" @click.stop>
+                    <div v-if="visit.course" class="vc-detail-row">
+                      <span class="vc-detail-label">病程：</span><span class="vc-detail-content">{{ visit.course }}</span>
+                    </div>
+                    <div v-if="visit.exam_points" class="vc-detail-row">
+                      <span class="vc-detail-label">检查要点：</span><span class="vc-detail-content">{{ visit.exam_points }}</span>
+                    </div>
+                    <div v-if="visit.plan" class="vc-detail-row">
+                      <span class="vc-detail-label">处置计划：</span><span class="vc-detail-content">{{ visit.plan }}</span>
+                    </div>
+
+                    <div v-if="visit.labs?.length" class="vd-block">
+                      <div class="vd-title">检验</div>
+                      <table class="vd-table labs">
+                        <thead>
+                          <tr><th>项目</th><th>结果</th><th>参考</th></tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(lab, i) in visit.labs" :key="i">
+                            <td>{{ lab.name }}</td>
+                            <td :class="{ abnormal: !!lab.abnormal }">
+                              {{ lab.value }}{{ lab.unit ?? '' }}<template v-if="lab.abnormal"> {{ lab.abnormal }}</template>
+                            </td>
+                            <td>{{ lab.ref ?? '—' }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div v-if="visit.exams?.length" class="vd-block">
+                      <div class="vd-title">检查</div>
+                      <table class="vd-table">
+                        <thead>
+                          <tr><th>项目</th><th>结果</th></tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(exam, i) in visit.exams" :key="i">
+                            <td>{{ exam.name }}</td>
+                            <td>{{ exam.result }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="!visibleVisits.length" class="diag-empty">该筛选下暂无就诊记录</div>
               </div>
             </div>
           </div>
@@ -996,19 +1451,53 @@ onMounted(async () => {
                 <div v-for="(event, index) in summary?.timeline ?? []" :key="index" class="timeline-group">
                   <div class="tl-time-tag">{{ event.time }}</div>
                   <div class="tl-group-card">
-                    <div class="tl-group-header"><span class="tl-group-action">{{ event.action }}</span></div>
-                    <div class="tl-sub-section" :class="event.actor === 'AI' ? 'ai' : event.actor === '医生' ? 'doctor' : 'system'">
-                      <div class="tl-sub-label">{{ event.actor ?? '系统' }}</div>
+                    <div class="tl-group-header">
+                      <span class="tl-group-action">{{ event.action }}</span>
+                    </div>
+                    <div class="tl-sub-section" :class="event.type">
+                      <div v-if="event.type !== 'system'" class="tl-sub-label">
+                        {{ event.type === 'ai' ? 'AI' : '医生' }}
+                      </div>
                       <div class="tl-sub-item-wrap">
-                        <div class="tl-sub-item">
-                          <span class="tl-sub-action">{{ event.action }}</span>
-                          <span class="tl-sub-detail">{{ event.detail }}</span>
+                        <div
+                          class="tl-sub-item"
+                          :class="{ 'tl-lab-exam': !!event.category, 'tl-abnormal': isAbnormalEvent(event) }"
+                        >
+                          <div class="tl-sub-main">
+                            <span v-if="event.category" class="tl-cat-tag" :class="event.category">
+                              {{ event.category === 'lab' ? '检验' : '检查' }}
+                            </span>
+                            <span class="tl-sub-action">{{ event.action }}</span>
+                            <span v-if="isAbnormalEvent(event)" class="tl-abnormal-tag">异常</span>
+                            <span class="tl-sub-detail" :class="{ 'tl-detail-abnormal': isAbnormalEvent(event) }">
+                              {{ event.detail }}
+                            </span>
+                            <el-button
+                              v-if="event.analysisHint"
+                              type="primary"
+                              size="small"
+                              link
+                              class="tl-ai-btn"
+                              @click="showTimelineAnalysis(event)"
+                            >
+                              AI 分析
+                            </el-button>
+                          </div>
+                          <div v-if="event.result" class="tl-result-body" :class="{ abnormal: isAbnormalEvent(event) }">
+                            {{ event.result }}
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div v-if="!summary?.timeline?.length" class="diag-empty">暂无时间轴事件</div>
+              </div>
+
+              <div v-if="summary?.timeline?.length" class="timeline-actions">
+                <el-button type="primary" size="small" plain :loading="planningFollowUp" @click="generateFollowUpPlan">
+                  生成随访计划并标记完成
+                </el-button>
               </div>
             </div>
           </div>

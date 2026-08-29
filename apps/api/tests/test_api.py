@@ -453,3 +453,78 @@ def test_report_summary_carries_the_interview_transcript(client):
     """聚合包里的 dialog_script 也要换成真实问诊，界面时间轴与病历才对得上。"""
     body = client.get("/api/emr/report-summary/P005?refresh=true").json()
     assert any("体重又掉了两斤" in turn.get("text", "") for turn in body["dialog_script"])
+
+
+# ------------------------------------------------------------------ 病历质控
+
+
+def test_quality_metrics_are_deterministic_not_model_scored():
+    """
+    四项指标必须由规则算出。让模型给自己的输出打分，分数只会好看不会有用，
+    所以这里连模型都不碰 —— 同样输入必然同样输出。
+    """
+    from app.record_quality import evaluate
+
+    fields = {
+        "chief_complaint": "血糖控制不佳2周",
+        "present_illness": "近2周口渴多饮加重",
+        "past_history": "2型糖尿病5年",
+        "personal_history": "未采集",
+        "physical_exam": "血压142/88 mmHg",
+        "auxiliary_exam": "空腹血糖8.5",
+        "preliminary_diagnosis": "2型糖尿病",
+    }
+    first = evaluate(fields)
+    second = evaluate(fields)
+    assert first == second
+    assert [m["name"] for m in first["metrics"]] == ["结构完整性", "信息完整性", "逻辑一致性", "用语规范性"]
+
+
+def test_quality_flags_unverified_negation_as_red_line():
+    """
+    未经问诊的「否认」是 F03 红线：写「否认」意味着医生问过而患者否认，
+    凭空出现就是伪造问诊记录。质控要把它标成须核实，而不是普通遗漏。
+    """
+    from app.record_quality import evaluate
+
+    result = evaluate(
+        {"past_history": "2型糖尿病5年。否认药物过敏史。"},
+        dialog_text="医生：血糖怎么样？患者：不太好。",
+    )
+    red = [g for g in result["gaps"] if g["level"] == "danger"]
+    assert red, "未经问诊的否认必须被标出"
+    assert "否认" in red[0]["text"]
+    assert red[0]["status"] == "须核实"
+
+
+def test_quality_accepts_negation_that_was_actually_asked():
+    """问过再写「否认」是规范记录，不该误报。"""
+    from app.record_quality import evaluate
+
+    result = evaluate(
+        {"past_history": "否认药物过敏史。"},
+        dialog_text="医生：有没有药物过敏？患者：没有，否认过敏。",
+    )
+    assert not [g for g in result["gaps"] if g["level"] == "danger"]
+
+
+def test_quality_completeness_ignores_uncollected_sections():
+    from app.record_quality import evaluate
+
+    filled = evaluate({k: "有内容" for k in ("chief_complaint", "present_illness", "past_history",
+                                            "personal_history", "physical_exam", "auxiliary_exam",
+                                            "preliminary_diagnosis")})
+    assert filled["completeness"] == 100
+
+    partial = evaluate({"chief_complaint": "有内容", "present_illness": "未采集"})
+    assert partial["completeness"] < 100
+    assert any("尚未采集" in g["text"] for g in partial["gaps"])
+
+
+def test_quality_endpoint_uses_the_real_interview_for_negation_check(client):
+    body = client.post(
+        "/api/emr/record/quality",
+        json={"patient_id": "P001", "fields": {"past_history": "否认药物过敏史。"}},
+    ).json()
+    assert "completeness" in body
+    assert len(body["metrics"]) == 4

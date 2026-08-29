@@ -650,6 +650,50 @@
         }
       }
     },
+    "/api/emr/record/quality": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Record Quality",
+        "description": "病历质控与完整性。四项指标全部由确定性规则算，不交给模型 ——\n让模型给自己的输出打分，分数只会好看，不会有用。\n\n其中「用语规范性」检查的是未经问诊的否定表述，兼作 F03 红线的运行时监控。",
+        "operationId": "record_quality_api_emr_record_quality_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordQualityIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Record Quality Api Emr Record Quality Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/emr/voice/init/{patient_id}": {
       "get": {
         "tags": [
@@ -1294,6 +1338,26 @@
           "field"
         ],
         "title": "RecordFieldIn"
+      },
+      "RecordQualityIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "RecordQualityIn"
       },
       "ReferralIn": {
         "properties": {

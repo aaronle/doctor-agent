@@ -41,6 +41,7 @@ from ..audit import next_id, record_audit
 from ..database import SessionLocal, get_session
 from ..llm import ChatMessage, LlmError, get_llm_client
 from ..models import Patient, RecordDraft, Referral, VoiceSession
+from ..record_quality import evaluate
 
 router = APIRouter(prefix="/api/emr", tags=["emr"])
 
@@ -348,6 +349,28 @@ async def generate_record_field(body: RecordFieldIn, session: Session = Depends(
         "provider": outcome.provider,
         "degraded": outcome.degraded,
     }
+
+
+# ------------------------------------------------------------------ 病历质控
+
+
+class RecordQualityIn(BaseModel):
+    patient_id: str
+    fields: dict[str, str] = Field(default_factory=dict)
+
+
+@router.post("/record/quality")
+def record_quality(body: RecordQualityIn, session: Session = Depends(get_session)) -> dict:
+    """
+    病历质控与完整性。四项指标全部由确定性规则算，不交给模型 ——
+    让模型给自己的输出打分，分数只会好看，不会有用。
+
+    其中「用语规范性」检查的是未经问诊的否定表述，兼作 F03 红线的运行时监控。
+    """
+    patient = _patient_or_404(session, body.patient_id)
+    dialog = latest_dialog(session, patient.id)
+    dialog_text = "".join(str(turn.get("text") or "") for turn in dialog if isinstance(turn, dict))
+    return evaluate(body.fields, dialog_text=dialog_text)
 
 
 # ------------------------------------------------------------------ 语音问诊

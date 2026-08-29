@@ -56,6 +56,36 @@ const PAGES = [
       '.risk-alert-section', '.ra-title', '.ra-card', '.ra-card-name', '.ra-card-suggestion', '.ra-view-btn',
     ],
   },
+  // 八个 AI 标签页逐页比对。类名齐不等于样式对 —— 早先健康档案与病历质控
+  // 就是「结构看着有、其实整块没做」，只有逐页取样才能发现。
+  ...[
+    ['智慧诊疗', ['.condition-overview-card', '.coc-title', '.dd-card', '.record-card', '.rc-label', '.ka-cat-name', '.ka-card', '.rc-vital', '.rc-vk']],
+    ['预警评估', ['.risk-assess-block', '.risk-card', '.risk-card-header', '.risk-name', '.risk-summary']],
+    ['病历管理', ['.record-layout', '.record-main', '.record-node', '.node-title', '.node-content', '.record-qc-side', '.rc-side-card', '.rc-side-head', '.rc-side-title', '.rc-risk-row', '.rc-risk-text', '.rc-qc-row', '.rc-qc-name', '.rc-qc-pill', '.rc-side-more']],
+    ['诊断管理', ['.suspected-list', '.suspected-item', '.susp-name', '.susp-conf', '.susp-icd', '.susp-desc', '.primary-mark-btn', '.diag-selection-actions']],
+    ['医嘱管理', ['.treat-panel', '.treat-section-title', '.treat-card', '.treat-drug', '.treat-spec', '.treat-basis', '.exam-rec-order', '.ero-name']],
+    ['共病管理', ['.comorbidity-overview', '.comorbidity-condition-card', '.condition-name', '.condition-analysis', '.condition-dept', '.comorbidity-actions-bar']],
+    ['健康档案', ['.archive-panel', '.archive-overview', '.ao-title', '.ao-k', '.ao-v', '.archive-toolbar', '.archive-muted', '.af-chip', '.visit-list', '.visit-card', '.vc-type', '.vc-time', '.vc-dept', '.vc-meta', '.vc-cc']],
+    ['时间轴', ['.timeline-list', '.timeline-group', '.tl-time-tag', '.tl-group-card', '.tl-group-action', '.tl-sub-label', '.tl-sub-action', '.tl-sub-detail', '.tl-cat-tag', '.timeline-actions']],
+  ].map(([tab, selectors]) => ({
+    name: `标签页 · ${tab}`,
+    hash: '#/outpatient/P001',
+    path: '/outpatient/P001',
+    prepare: async (page) => {
+      await page.locator('.ttab').filter({ hasText: tab }).first().click();
+      await page.waitForTimeout(700);
+      // 专项评估与就诊卡默认折叠，展开第一个才能取到内部元素
+      for (const sel of ['.ka-cat-header', '.visit-card']) {
+        const el = page.locator(sel).first();
+        if (await el.isVisible().catch(() => false)) {
+          await el.click();
+          await page.waitForTimeout(400);
+        }
+      }
+    },
+    selectors,
+  })),
+
   {
     name: '语音问诊播放中',
     hash: '#/outpatient/P006',

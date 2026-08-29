@@ -166,7 +166,7 @@ export interface ReportSummary {
     conditions: ComorbidityCondition[]
     nutrition?: { triggered: boolean; score: number; threshold: number; message: string }
   }
-  timeline: { time?: string; action?: string; detail?: string; actor?: string }[]
+  timeline: { time?: string; type?: string; category?: string; action?: string; detail?: string; result?: string; analysisHint?: string }[]
   _meta: { degraded_agents: string[]; hard_rule_alerts: number; model_conflicts: string[]; cached: boolean }
 }
 
@@ -227,6 +227,13 @@ export const api = {
       provider: string
       degraded: boolean
     }>(`/api/emr/voice/init/${id}`),
+  /** 病历质控。四项指标由后端确定性规则算，不让模型给自己打分。 */
+  recordQuality: (patientId: string, fields: Record<string, string>) =>
+    post<{ completeness: number; metrics: { name: string; value: number; basis: string }[]; gaps: { text: string; level: string; status: string }[] }>(
+      '/api/emr/record/quality',
+      { patient_id: patientId, fields },
+    ),
+
   /** 语义覆盖判定：判断追问清单里哪些已在对话中得到回答 */
   voiceCoverage: (patientId: string, openQuestions: string[], transcript: { role: string; text: string }[]) =>
     post<{ covered: { index: number; evidence: string }[]; provider: string; degraded: boolean }>(
