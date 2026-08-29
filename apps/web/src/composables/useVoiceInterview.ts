@@ -302,27 +302,42 @@ export function useVoiceInterview(getPatientId: () => string) {
 
   const finishing = ref(false)
 
-  /** 医生点「结束问诊」：生成问诊小结并收尾。这是本功能唯一的结束入口。 */
+  /**
+   * 把当前问诊记录落库，**不改变状态**。
+   *
+   * 「生成」「更新」都需要先落库（下游上下文读的是持久化后的问诊记录），
+   * 但它们不该顺手把问诊结束掉 —— 结束只能由医生点「结束问诊」。
+   * 早先把落库和结束写在同一个函数里，点一下「更新」问诊就悄悄结束了。
+   */
+  async function persist() {
+    const patientId = getPatientId()
+    if (!patientId || !messages.value.length) return
+    try {
+      await api.voiceComplete({
+        patient_id: patientId,
+        conversation_summary: [
+          ...messages.value.map((m) => `${m.role === 'doctor' ? '医生' : '患者'}：${m.text}`),
+          ...(pickedObservations.value.size ? [`补充观察：${[...pickedObservations.value].join('；')}`] : []),
+        ].join('\n'),
+        messages: messages.value,
+      })
+    } catch (exc) {
+      error.value = `问诊记录落库失败：${(exc as Error).message}`
+      throw exc
+    }
+  }
+
+  /** 医生点「结束问诊」：落库 + 收尾。这是唯一的结束入口。 */
   async function finish() {
     stopTimer()
     finishing.value = true
-    const patientId = getPatientId()
-
-    if (patientId && messages.value.length) {
-      try {
-        await api.voiceComplete({
-          patient_id: patientId,
-          conversation_summary: [
-            ...messages.value.map((m) => `${m.role === 'doctor' ? '医生' : '患者'}：${m.text}`),
-            ...(pickedObservations.value.size ? [`补充观察：${[...pickedObservations.value].join('；')}`] : []),
-          ].join('\n'),
-          messages: messages.value,
-        })
-      } catch (exc) {
-        error.value = `问诊小结生成失败：${(exc as Error).message}`
-      }
+    try {
+      await persist()
+    } catch {
+      // 落库失败已写进 error，仍然收尾，避免卡在进行中
     }
     state.value = 'ended'
+    finishing.value = false
   }
 
   // 只在组件 setup 里注册卸载钩子。composable 也会被测试直接调用，
@@ -352,6 +367,7 @@ export function useVoiceInterview(getPatientId: () => string) {
     pause,
     resume,
     restart,
+    persist,
     finish,
     toggleObservation,
     askManual,

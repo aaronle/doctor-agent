@@ -393,42 +393,63 @@ async function sendChat(preset?: string) {
   }
 }
 
-// ---------------------------------------------------------------- 一键生成
-
-const generatingAll = ref(false)
-const generateStep = ref('')
+// ---------------------------------------------------------------- 生成与更新
 
 /**
- * 「生成」：把本次问诊的内容灌进下游全部 AI 产出。
+ * 「生成」与「更新」是两种不同性质的动作，刻意分开：
  *
- * 为什么必须有这个动作：病情概况、鉴别诊断、风险、共病都是**打开工作站时**
- * 算好的，也就是在问诊之前。医生问出来的新信息不会自动回流到那些面板 ——
- * 不点这一下，问诊就白做了。
+ *   生成 → 起草一份新东西（病历七段），走 copilot/chat，约 10 秒
+ *   更新 → 把已有分析按新信息重算（概况/诊断/风险/共病），走 report-summary，约 20 秒
  *
- * 步骤：先把问诊记录落库（后续上下文装配会优先取它而不是演示脚本），
- * 再强制刷新聚合分析，最后重新起草病历。
+ * 合成一个按钮的话，医生只改了智能笔记也要等 20 秒的重算；分开之后各付各的时间。
  */
-async function generateAll() {
-  if (!ws.patientId || generatingAll.value) return
-  generatingAll.value = true
+
+const updatingAnalysis = ref(false)
+const actionStep = ref('')
+
+/**
+ * 两个动作的共同前置：把问诊记录落库。
+ *
+ * 下游的上下文装配（latest_dialog）读的是持久化后的问诊记录 ——
+ * 不先落库，医生刚问出来的内容就进不了病历与分析。
+ */
+async function persistInterview() {
+  if (!voice.messages.value.length) return
+  actionStep.value = '落库问诊记录…'
+  // 只落库，不结束 —— 结束是医生点「结束问诊」的事
+  await voice.persist()
+}
+
+/** 生成：按本次问诊重新起草病历七段 */
+async function generateFromInterview() {
+  if (!ws.patientId || generating.value) return
   try {
-    if (voice.messages.value.length && voice.state.value !== 'ended') {
-      generateStep.value = '落库问诊记录…'
-      await voice.finish()
-    }
-
-    generateStep.value = '重新分析病情、诊断与风险…'
-    await ws.loadSummary(true)
-
-    generateStep.value = '起草病历…'
+    await persistInterview()
+    actionStep.value = '起草病历…'
     await generateRecord()
-
-    ElMessage.success('已按本次问诊内容重新生成病历与分析')
+    ElMessage.success('病历已按本次问诊重新起草，确认后写入')
   } catch (error) {
     ElMessage.error(`生成失败：${(error as Error).message}`)
   } finally {
-    generatingAll.value = false
-    generateStep.value = ''
+    actionStep.value = ''
+  }
+}
+
+/** 更新：按本次问诊重算病情概况、鉴别诊断、风险与共病 */
+async function updateAnalysis() {
+  if (!ws.patientId || updatingAnalysis.value) return
+  updatingAnalysis.value = true
+  try {
+    await persistInterview()
+    actionStep.value = '重新分析病情、诊断与风险…'
+    await ws.loadSummary(true)
+    if (ws.summaryError) throw new Error(ws.summaryError)
+    ElMessage.success('病情概况、鉴别诊断与风险已按本次问诊更新')
+  } catch (error) {
+    ElMessage.error(`更新失败：${(error as Error).message}`)
+  } finally {
+    updatingAnalysis.value = false
+    actionStep.value = ''
   }
 }
 
@@ -667,7 +688,14 @@ onMounted(async () => {
                 <div class="record-card">
                   <div class="rc-header">
                     <span class="rc-title">病历</span>
-                    <el-button type="primary" size="small" link :loading="generating" @click="generateRecord">
+                    <el-button
+                      type="primary"
+                      size="small"
+                      link
+                      title="按本次问诊重新起草病历七段"
+                      :loading="generating"
+                      @click="generateFromInterview"
+                    >
                       AI 生成
                     </el-button>
                   </div>
@@ -1047,7 +1075,7 @@ onMounted(async () => {
               <div class="bubble-content">{{ message.content || '…' }}</div>
             </div>
 
-            <div v-if="generateStep" class="voice-ready-hint">⚡ {{ generateStep }}</div>
+            <div v-if="actionStep" class="voice-ready-hint">⚡ {{ actionStep }}</div>
             <div v-if="voice.error.value" class="voice-ready-hint">{{ voice.error.value }}</div>
           </div>
 
@@ -1086,18 +1114,29 @@ onMounted(async () => {
               </el-button>
 
               <!--
-                生成：把问诊内容灌进下游全部 AI 产出。
-                病情概况/鉴别诊断/风险/共病都是打开工作站时算好的（问诊之前），
+                生成 / 更新：把问诊内容灌进下游产出。
+                病情概况、鉴别诊断、风险、共病都是打开工作站时算好的（问诊之前），
                 不点这一下，医生问出来的新信息就进不了那些面板。
               -->
               <el-button
                 v-if="voice.messages.value.length"
                 type="success"
                 size="small"
-                :loading="generatingAll"
-                @click="generateAll"
+                title="按本次问诊重新起草病历七段"
+                :loading="generating"
+                @click="generateFromInterview"
               >
                 ⚡ 生成
+              </el-button>
+              <el-button
+                v-if="voice.messages.value.length"
+                type="primary"
+                size="small"
+                title="按本次问诊重算病情概况、鉴别诊断、风险与共病"
+                :loading="updatingAnalysis"
+                @click="updateAnalysis"
+              >
+                ⟳ 更新
               </el-button>
             </template>
           </div>

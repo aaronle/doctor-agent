@@ -176,6 +176,20 @@ describe('语音问诊', () => {
     expect(voice.doneQuestions.value).toHaveLength(0)
   })
 
+  it('落库不改变状态 —— 生成/更新不该顺手把问诊结束掉', async () => {
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006')
+    await voice.start()
+    expect(voice.state.value).toBe('playing')
+
+    await voice.persist()
+
+    // 「结束」只能由医生点「结束问诊」。早先落库复用了 finish()，
+    // 点一下「更新」问诊就悄悄结束了。
+    expect(voice.state.value).toBe('playing')
+    expect(voice.active.value).toBe(true)
+  })
+
   it('医生可手动勾销，模型判错时能一键纠正', async () => {
     stubInit()
     const voice = useVoiceInterview(() => 'P006')
