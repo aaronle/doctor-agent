@@ -1,0 +1,1096 @@
+div.workstation-page
+  div.his-header
+    div.his-header-left
+      button.el-button.is-text.back-btn
+        i.el-icon
+        span  «候诊列表»
+      span.his-divider  «|»
+      span.his-logo
+      span.his-title  «惠每门诊工作站»
+    div.his-header-right
+      button.el-button.el-button--small.is-text
+        span  «候诊列表»
+      button.el-button.el-button--danger.el-button--small.is-text
+        span  «退出»
+  div.basic-info-strip
+    div.strip-fields
+      span.strip-field.bold  «王某某»
+      span.strip-sep  «·»
+      span.strip-field  «女»
+      span.strip-sep  «·»
+      span.strip-field  «58岁»
+      span.strip-divider
+      span.strip-field  «内分泌科»
+        span.sf-label  «科室»
+      span.strip-field  «李医生»
+        span.sf-label  «主治»
+      span.strip-field  «2026-06-17»
+        span.sf-label  «就诊»
+      span.strip-field  «138****8001»
+        span.sf-label  «电话»
+      span.strip-field
+        span.sf-label  «过敏»
+        span.sf-allergy  «无»
+    div.strip-actions
+      span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+        span.el-tag__content  «门诊»
+      span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round
+        span.el-tag__content  «高风险»
+  div.workstation-body
+    div.sidebar
+      div.sidebar-header
+        span.sidebar-title  «候诊患者»
+        button.sidebar-toggle  «‹»
+      div.sidebar-list
+        div.sidebar-item.active
+          div.si-avatar.active  «王»
+          div.si-info
+            div.si-name  «王某某»
+            div.si-meta  «女 · 58岁»
+            div.si-diag  «2型糖尿病»
+          div.si-right
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round.si-risk
+              span.el-tag__content  «高风险»
+        div.sidebar-item
+          div.si-avatar  «张»
+          div.si-info
+            div.si-name  «张某»
+            div.si-meta  «男 · 45岁»
+            div.si-diag  «冠心病»
+          div.si-right
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round.si-risk
+              span.el-tag__content  «高风险»
+        div.sidebar-item
+          div.si-avatar  «李»
+          div.si-info
+            div.si-name  «李某某»
+            div.si-meta  «女 · 32岁»
+            div.si-diag  «甲亢»
+          div.si-right
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round.si-risk
+              span.el-tag__content  «低风险»
+        div.sidebar-item
+          div.si-avatar  «陈»
+          div.si-info
+            div.si-name  «陈某»
+            div.si-meta  «男 · 67岁»
+            div.si-diag  «高血压»
+          div.si-right
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round.si-risk
+              span.el-tag__content  «高风险»
+        div.sidebar-item
+          div.si-avatar  «刘»
+          div.si-info
+            div.si-name  «刘某某»
+            div.si-meta  «女 · 52岁»
+            div.si-diag  «糖尿病»
+          div.si-right
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--warning.el-tag--small.el-tag--light.is-round.si-risk
+              span.el-tag__content  «中风险»
+        div.sidebar-item
+          div.si-avatar  «赵»
+          div.si-info
+            div.si-name  «赵某某»
+            div.si-meta  «男 · 72岁»
+            div.si-diag  «脑梗死»
+          div.si-right
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round.si-risk
+              span.el-tag__content  «高风险»
+    div.main-two-col
+      div.his-record-panel
+        div.panel-title-bar
+          span.pt-title  «📋 门诊病历»
+          div.pt-actions
+            span.shortcut-hint  «Ctrl+/ 切回 AI»
+            button.el-button.el-button--small
+              span  «暂存»
+            button.el-button.el-button--primary.el-button--small
+              span  «提交病历»
+        div.diagnosis-section
+          div.diag-section-header
+            span.diag-section-title  «📌 诊断»
+            div.diag-section-actions
+              button.el-button.el-button--primary.el-button--small
+                span  «保存诊断»
+              button.el-button.el-button--small
+                span  «编辑»
+          div.diag-list
+            div.diag-empty  «暂无确诊诊断»
+          div.suspected-diag-section
+            div.suspected-diag-title  «疑似诊断（AI 推测）»
+            div.suspected-diag-list
+              span.el-tag.el-tag--warning.el-tag--default.el-tag--plain.suspected-diag-tag
+                span.el-tag__content
+                  span.sd-name  «2型糖尿病（血糖控制不佳）»
+                  span.sd-icd  «[E11.9]»
+                  span.sd-conf  «92%»
+              span.el-tag.el-tag--warning.el-tag--default.el-tag--plain.suspected-diag-tag
+                span.el-tag__content
+                  span.sd-name  «糖尿病肾病（早期）»
+                  span.sd-icd  «[E11.2]»
+                  span.sd-conf  «78%»
+              span.el-tag.el-tag--warning.el-tag--default.el-tag--plain.suspected-diag-tag
+                span.el-tag__content
+                  span.sd-name  «糖尿病视网膜病变（NPDR轻度）»
+                  span.sd-icd  «[E11.3]»
+                  span.sd-conf  «85%»
+        div.record-form-scroll
+          div.form-row
+            span.fl.required-mark  «主诉»
+            div.fi
+              textarea.form-textarea
+          div.form-row
+            span.fl.required-mark  «现病史»
+            div.fi
+              textarea.form-textarea
+          div.form-row
+            span.fl  «既往史»
+            div.fi
+              textarea.form-textarea
+          div.form-row
+            span.fl  «个人史»
+            div.fi
+              textarea.form-textarea
+          div.form-row.single-line
+            span.fl  «过敏史»
+            div.fi
+              input.form-input
+          div.form-row.single-line.vitals-row
+            span.fl  «体征»
+            div.fi.vitals-inline
+              div.vf-item
+                span.vf-label  «身高»
+                input.vf-input
+                span.vf-unit  «CM»
+              div.vf-item
+                span.vf-label  «体重»
+                input.vf-input
+                span.vf-unit  «KG»
+              div.vf-item
+                span.vf-label  «BMI»
+                input.vf-input
+              div.vf-item
+                span.vf-label  «体温»
+                input.vf-input
+                span.vf-unit  «℃»
+              div.vf-item
+                span.vf-label  «脉搏»
+                input.vf-input
+                span.vf-unit  «次/分»
+              div.vf-item
+                span.vf-label  «呼吸»
+                input.vf-input
+                span.vf-unit  «次/分»
+              div.vf-item.bp-item
+                span.vf-label  «血压»
+                input.vf-input.bp-half
+                span.vf-slash  «/»
+                input.vf-input.bp-half
+              div.vf-item
+                span.vf-label  «心率»
+                input.vf-input
+                span.vf-unit  «次/分»
+          div.form-row
+            span.fl  «体格检查»
+            div.fi
+              textarea.form-textarea
+          div.form-row.auxiliary-row
+            span.fl.auxiliary-label  «辅助检查»
+            div.fi
+              textarea.form-textarea
+          div.form-row
+            span.fl  «建议»
+            div.fi
+              textarea.form-textarea
+      div.his-orders-panel
+        div.panel-title-bar
+          span.pt-title  «💊 医嘱»
+          button.el-button.el-button--primary.el-button--small
+            i.el-icon
+            span  «开嘱»
+        div.order-sub-tabs
+          div.ostab.active  «💊 药品»
+            span.ostab-badge  «4»
+          div.ostab  «🔬 检查»
+            span.ostab-badge  «3»
+          div.ostab  «🧪 检验»
+            span.ostab-badge  «7»
+        div.order-table-wrap
+          div.el-table--fit.el-table--striped.el-table--border.el-table--enable-row-hover.el-table--enable-row-transition.el-table--small.el-table.el-table--layout-fixed.compact-table.is-scrolling-none
+            div.el-table__inner-wrapper
+              div.hidden-columns
+                div
+                div
+                div
+                div
+                div
+                div
+              div.el-table__header-wrapper
+                table.el-table__header
+                  colgroup
+                    col
+                    col
+                    col
+                    col
+                    col
+                    col
+                  thead
+                    tr
+                      th.el-table_36_column_181.is-leaf.el-table__cell
+                        div.cell  «药品名称»
+                      th.el-table_36_column_182.is-center.is-leaf.el-table__cell
+                        div.cell  «剂量»
+                      th.el-table_36_column_183.is-center.is-leaf.el-table__cell
+                        div.cell  «频次»
+                      th.el-table_36_column_184.is-center.is-leaf.el-table__cell
+                        div.cell  «用法»
+                      th.el-table_36_column_185.is-center.is-leaf.el-table__cell
+                        div.cell  «天数»
+                      th.el-table_36_column_186.is-center.is-leaf.el-table__cell
+                        div.cell  «状态»
+              div.el-table__body-wrapper
+                div.el-scrollbar
+                  div.el-scrollbar__wrap.el-scrollbar__wrap--hidden-default
+                    div.el-scrollbar__view
+                      table.el-table__body
+                        colgroup
+                        tbody
+                  div.el-scrollbar__bar.is-horizontal
+                    div.el-scrollbar__thumb
+                  div.el-scrollbar__bar.is-vertical
+                    div.el-scrollbar__thumb
+              div.el-table__border-left-patch
+            div.el-table__column-resize-proxy
+        div.result-panel
+          div.result-panel-header
+            span.rp-title
+              span  «⚠ 阳性结果 (9)»
+          div.result-list-wrap
+            div.result-list
+              div.result-list-item.exam
+                span.rli-badge  «检查»
+                span.rli-name  «12导联心电图»
+                span.rli-extra  «异常：心肌供血不足可能»
+                span.rli-arrow  «›»
+              div.result-list-item.exam
+                span.rli-badge  «检查»
+                span.rli-name  «双眼底照相»
+                span.rli-extra  «异常：NPDR 轻度»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «空腹血糖»
+                span.rli-extra  «近3次均值较好，较诊断下降0.7»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «餐后2h血糖»
+                span.rli-extra  «近3次均值高，呈下降趋势»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «糖化血红蛋白(HbA1c)»
+                span.rli-extra  «近3次均值较好，较诊断下降0.4%»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «尿微量白蛋白/肌酐(UACR)»
+                span.rli-extra  «近3次均均高，呈下降趋势»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «肾小球滤过率(eGFR)»
+                span.rli-extra  «偏高»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «低密度脂蛋白(LDL-C)»
+                span.rli-extra  «偏高»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «总胆固醇(TC)»
+                span.rli-extra  «偏高»
+                span.rli-arrow  «›»
+  div.el-overlay.el-modal-dialog
+    div.el-overlay-dialog
+  div.el-overlay.el-modal-dialog
+    div.el-overlay-dialog
+  div.el-overlay.el-modal-dialog
+    div.el-overlay-dialog
+  div.ai-emr-root
+    div.ai-float-wrapper
+      div.tips-drawer.connected-right
+        div.tips-header
+          span.tips-title  «AI 助手»
+            span.panel-ai-dot
+          div.tips-header-actions
+            button.el-button.el-button--small.is-text.tips-close
+              span  «×»
+        div.tips-tab-nav
+          div.ttab.active  «智慧诊疗»
+          div.ttab  «预警评估»
+          div.ttab  «病历管理»
+          div.ttab  «诊断管理»
+            span.ttab-dot.primary  «3»
+          div.ttab  «医嘱管理»
+          div.ttab  «共病管理»
+            span.ttab-dot.danger  «营»
+          div.ttab  «健康档案»
+          div.ttab  «时间轴»
+        div.tips-tab-body
+          div.tips-tab-pane
+            div.analysis-columns
+              div.analysis-left
+                div.condition-overview-card
+                  div.coc-header
+                    span.coc-title  «AI病情概要»
+                  div.coc-summary
+                    p  «患者2型糖尿病5年，近2周血糖控制明显恶化（空腹8-10mmol/L，HbA1c 8.6%），伴口渴多饮症状加重。合并高»
+                div.dd-card
+                  div.dd-header
+                    label.el-checkbox.dd-title-check
+                      span.el-checkbox__input.is-indeterminate
+                        input.el-checkbox__original
+                        span.el-checkbox__inner
+                    span.dd-title  «鉴别诊断»
+                    button.todo-action-btn.tab-record.dd-confirm-btn  «确认诊断»
+                  div.dd-rec-list
+                    div.dd-rec-item.primary.selected.focus
+                      div.dd-card-main
+                        label.el-checkbox.is-checked.todo-item-check.dd-card-check
+                        div.dd-card-body
+                      div.dd-inline-panel
+                        div.dd-inline-summary
+                    div.dd-rec-item
+                      div.dd-card-main
+                        label.el-checkbox.todo-item-check.dd-card-check
+                        div.dd-card-body
+                      div.dd-inline-panel
+                        div.dd-inline-summary
+                    div.dd-rec-item
+                      div.dd-card-main
+                        label.el-checkbox.todo-item-check.dd-card-check
+                        div.dd-card-body
+                      div.dd-inline-panel
+                        div.dd-inline-summary
+              div.analysis-resize-handle
+              div.analysis-right
+                div.record-card
+                  div.rc-header
+                    span.rc-title  «病历»
+                  div.rc-body
+                    div.rc-row.smart-note-row
+                      span.rc-label  «智能笔记»
+                      div.rc-field.smart-note-field
+                        textarea
+                      button.rc-writeback-icon.smart-note-search  «检»
+                    div.rc-row.rc-row-single
+                      span.rc-label  «主诉»
+                      div.rc-field
+                        input
+                      button.rc-writeback-icon  «回»
+                    div.rc-row
+                      span.rc-label  «现病史»
+                      div.rc-field
+                        textarea
+                      button.rc-writeback-icon  «回»
+                    div.rc-row
+                      span.rc-label  «既往史»
+                      div.rc-field
+                        textarea
+                      button.rc-writeback-icon  «回»
+                    div.rc-row
+                      span.rc-label  «个人史»
+                      div.rc-field
+                        textarea
+                      button.rc-writeback-icon  «回»
+                    div.rc-row.rc-row-single
+                      span.rc-label  «过敏史»
+                      div.rc-field
+                        input
+                      button.rc-writeback-icon  «回»
+                    div.rc-row.rc-vitals-row
+                      span.rc-label  «体征»
+                      div.rc-field.rc-vitals-field
+                        div.rc-vital
+                        div.rc-vital
+                        div.rc-vital
+                        div.rc-vital
+                        div.rc-vital
+                        div.rc-vital
+                        div.rc-vital.rc-vital-bp
+                        div.rc-vital
+                      button.rc-writeback-icon  «回»
+                    div.rc-row
+                      span.rc-label  «体格检查»
+                      div.rc-field
+                        textarea
+                      button.rc-writeback-icon  «回»
+                    div.rc-row
+                      span.rc-label  «辅助检查»
+                      div.rc-field
+                        textarea
+                      button.rc-writeback-icon  «回»
+                    div.rc-row
+                      span.rc-label  «建议»
+                      div.rc-field
+                        textarea
+                      button.rc-writeback-icon  «回»
+                div.key-assessment-section
+                  div.ka-header
+                    div.ka-title  «专项评估»
+                  div.ka-categories
+                    div.ka-category
+                      div.ka-cat-header
+                        div.ka-cat-title
+                        span.ka-cat-count  «7项»
+                        span.ka-cat-arrow  «›»
+                      div.ka-list
+                        div.ka-card.ka-card-danger
+                        div.ka-card.ka-card-danger
+                        div.ka-card.ka-card-warning.collapsed
+                        div.ka-card.ka-card-danger.collapsed
+                        div.ka-card.ka-card-warning.collapsed
+                        div.ka-card.ka-card-danger.collapsed
+                        div.ka-card.ka-card-danger.collapsed
+                    div.ka-category
+                      div.ka-cat-header
+                        div.ka-cat-title
+                        span.ka-cat-count  «10项»
+                        span.ka-cat-arrow  «›»
+                      div.ka-list
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                    div.ka-category
+                      div.ka-cat-header
+                        div.ka-cat-title
+                        span.ka-cat-count  «9项»
+                        span.ka-cat-arrow  «›»
+                      div.ka-list
+                        div.ka-card.ka-card-warning.collapsed
+                        div.ka-card.ka-card-warning.collapsed
+                        div.ka-card.ka-card-warning.collapsed
+                        div.ka-card.ka-card-warning.collapsed
+                        div.ka-card.ka-card-warning.collapsed
+                        div.ka-card.ka-card-danger.collapsed
+                        div.ka-card.ka-card-warning.collapsed
+                        div.ka-card.ka-card-warning.collapsed
+                        div.ka-card.ka-card-warning.collapsed
+                    div.ka-category
+                      div.ka-cat-header
+                        div.ka-cat-title
+                        span.ka-cat-count  «3项»
+                        span.ka-cat-arrow  «›»
+                      div.ka-list
+                        div.ka-card.ka-card-info.collapsed
+                        div.ka-card.ka-card-info.collapsed
+                        div.ka-card.ka-card-info.collapsed
+                    div.ka-category
+                      div.ka-cat-header
+                        div.ka-cat-title
+                        span.ka-cat-count  «4项»
+                        span.ka-cat-arrow  «›»
+                      div.ka-list
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+                        div.ka-card.ka-card-success.collapsed
+          div.tips-tab-pane
+            div.tab-section
+              div.tab-section-title  «疑似诊断»
+                button.el-button.el-button--primary.el-button--small.is-link.diag-add-link
+                  span  «+ 新增诊断»
+              p.susp-hint  «勾选拟纳入诊断；点击右侧 标记指定主诊断»
+                strong  «主»
+              div.suspected-list
+                div.suspected-item.selected.primary
+                  div.susp-conf-bar
+                  span.susp-checkbox
+                    span.susp-check-mark  «✓»
+                  div.susp-main
+                    div.susp-top
+                      span.susp-name  «2型糖尿病（血糖控制不佳）»
+                      span.susp-conf  «92%»
+                      em.susp-icd  «E11.9»
+                    div.susp-desc  «空腹血糖及 HbA1c 长期不达标，近 2 周口渴多饮加重，需强化降糖与生活方式干预。»
+                  button.primary-mark-btn.active  «主»
+                div.suspected-item
+                  div.susp-conf-bar
+                  span.susp-checkbox
+                  div.susp-main
+                    div.susp-top
+                      span.susp-name  «糖尿病肾病（早期）»
+                      span.susp-conf  «78%»
+                      em.susp-icd  «E11.2»
+                    div.susp-desc  «UACR 升高、eGFR 轻度下降，提示早期肾脏损害，需护肾与血压血糖联合管理。»
+                  button.primary-mark-btn  «主»
+                div.suspected-item
+                  div.susp-conf-bar
+                  span.susp-checkbox
+                  div.susp-main
+                    div.susp-top
+                      span.susp-name  «糖尿病视网膜病变（NPDR轻度）»
+                      span.susp-conf  «85%»
+                      em.susp-icd  «E11.3»
+                    div.susp-desc  «眼底示非增殖期视网膜病变轻度，血糖控制不佳可加速进展，建议定期眼科随访。»
+                  button.primary-mark-btn  «主»
+              div.diag-selection-actions
+                div.diag-selected-summary  «已选 条诊断»
+                  strong  «1»
+                  span  «· 主诊断：»
+                    strong  «2型糖尿病（血糖控制不佳）»
+                button.el-button.el-button--primary.el-button--small
+                  span  «确认并回写 HIS»
+          div.tips-tab-pane
+            div.tab-section
+              div.tab-section-title  «本次就诊时间轴»
+              div.timeline-list
+                div.timeline-group
+                  div.tl-time-tag  «08:40»
+                  div.tl-group-card
+                    div.tl-group-header
+                      span.tl-group-action  «进入本次接诊»
+                    div.tl-sub-section.doctor
+                      div.tl-sub-label  «医生»
+                      div.tl-sub-item-wrap
+                        div.tl-sub-item
+                div.timeline-group
+                  div.tl-time-tag  «08:42»
+                  div.tl-group-card
+                    div.tl-group-header
+                      span.tl-group-action  «AI 病情概要»
+                    div.tl-sub-section.ai
+                      div.tl-sub-label  «AI»
+                      div.tl-sub-item-wrap
+                        div.tl-sub-item
+                div.timeline-group
+                  div.tl-time-tag  «08:45»
+                  div.tl-group-card
+                    div.tl-group-header
+                      span.tl-group-action  «糖化血红蛋白结果»
+                    div.tl-sub-section.system
+                      div.tl-sub-item-wrap
+                        div.tl-sub-item.tl-lab-exam.tl-abnormal
+                div.timeline-group
+                  div.tl-time-tag  «08:46»
+                  div.tl-group-card
+                    div.tl-group-header
+                      span.tl-group-action  «肾功能相关检验»
+                    div.tl-sub-section.system
+                      div.tl-sub-item-wrap
+                        div.tl-sub-item.tl-lab-exam.tl-abnormal
+                div.timeline-group
+                  div.tl-time-tag  «08:48»
+                  div.tl-group-card
+                    div.tl-group-header
+                      span.tl-group-action  «双眼底照相结果»
+                    div.tl-sub-section.system
+                      div.tl-sub-item-wrap
+                        div.tl-sub-item.tl-lab-exam.tl-abnormal
+                div.timeline-group
+                  div.tl-time-tag  «08:50»
+                  div.tl-group-card
+                    div.tl-group-header
+                      span.tl-group-action  «12导联心电图结果»
+                    div.tl-sub-section.system
+                      div.tl-sub-item-wrap
+                        div.tl-sub-item.tl-lab-exam.tl-abnormal
+                div.timeline-group
+                  div.tl-time-tag  «08:55»
+                  div.tl-group-card
+                    div.tl-group-header
+                      span.tl-group-action  «推荐治疗方案»
+                    div.tl-sub-section.ai
+                      div.tl-sub-label  «AI»
+                      div.tl-sub-item-wrap
+                        div.tl-sub-item
+                div.timeline-group
+                  div.tl-time-tag  «09:02»
+                  div.tl-group-card
+                    div.tl-group-header
+                      span.tl-group-action  «确认随访计划»
+                    div.tl-sub-section.doctor
+                      div.tl-sub-label  «医生»
+                      div.tl-sub-item-wrap
+                        div.tl-sub-item
+              div.timeline-actions
+                button.el-button.el-button--primary.el-button--small.is-plain
+                  span  «生成随访计划并标记完成»
+          div.tips-tab-pane
+            div.risk-assess-block
+              div.tab-section-title  «专项评估»
+              div.risk-card
+                div.risk-card-header
+                  span.risk-dot
+                  span.risk-name  «血糖控制评估»
+                  span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round
+                    span.el-tag__content  «高风险»
+                  div.risk-actions
+                    button.el-button.el-button--primary.el-button--small.is-link
+                      span  «大模型解读»
+                    button.el-button.el-button--small.is-link
+                      span  «↗»
+                p.risk-summary  «空腹血糖8.5mmol/L，HbA1c 8.6%，近2周饮食控制差，口渴多饮加重»
+                  strong  «依据：»
+                p.risk-summary  «血糖长期不达标，糖尿病肾病及视网膜病变进展风险高»
+                p.risk-summary  «强化生活方式干预，考虑联合SGLT-2抑制剂，4周后复查HbA1c»
+                  strong  «建议：»
+              div.risk-card
+                div.risk-card-header
+                  span.risk-dot
+                  span.risk-name  «糖尿病肾病风险»
+                  span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round
+                    span.el-tag__content  «高风险»
+                  div.risk-actions
+                    button.el-button.el-button--primary.el-button--small.is-link
+                      span  «大模型解读»
+                    button.el-button.el-button--small.is-link
+                      span  «↗»
+                p.risk-summary  «UACR 45mg/g（正常<30），eGFR 78mL/min（G2期），小便泡沫增多»
+                  strong  «依据：»
+                p.risk-summary  «早期糖尿病肾病，微量蛋白尿阶段，肾功能轻度受损»
+                p.risk-summary  «继续ARB护肾，严格控制血压<130/80mmHg，3个月后复查UACR和肾功能»
+                  strong  «建议：»
+              div.risk-card
+                div.risk-card-header
+                  span.risk-dot
+                  span.risk-name  «视网膜病变风险»
+                  span.el-tag.el-tag--warning.el-tag--small.el-tag--light.is-round
+                    span.el-tag__content  «中风险»
+                  div.risk-actions
+                    button.el-button.el-button--primary.el-button--small.is-link
+                      span  «大模型解读»
+                    button.el-button.el-button--small.is-link
+                      span  «↗»
+                p.risk-summary  «眼底检查示NPDR轻度，病程5年，血糖长期不达标»
+                  strong  «依据：»
+                p.risk-summary  «非增殖期视网膜病变早期，血糖控制差是主要进展危险因素»
+                p.risk-summary  «每年散瞳眼底检查，控制HbA1c<7%，控制血压和血脂»
+                  strong  «建议：»
+          div.tips-tab-pane.record-pane
+            div.record-layout
+              div.record-main
+                div.btab-writeback-bar
+                  button.el-button.el-button--success.el-button--small.writeback-primary-btn
+                    span  «✔ 确认并回写到病历»
+                  span.record-complete-badge  «病历完整度 90%»
+                  span.writeback-hint  «Ctrl+/ 可随时切回 AI»
+                div.record-node
+                  div.node-header
+                    span.node-title  «主诉»
+                    button.el-button.el-button--primary.el-button--small.is-link.node-writeback-btn
+                      span  «回写此字段»
+                  div.node-content  «血糖控制不佳，口渴多饮 2 周。»
+                div.record-node
+                  div.node-header
+                    span.node-title  «现病史»
+                    button.el-button.el-button--primary.el-button--small.is-link.node-writeback-btn
+                      span  «回写此字段»
+                  div.node-content  «患者 2 型糖尿病病史 5 年，目前口服二甲双胍缓释片 0.5g bid + 阿卡波糖 50mg tid 降糖治疗。近 »
+                div.record-node
+                  div.node-header
+                    span.node-title  «既往史»
+                    button.el-button.el-button--primary.el-button--small.is-link.node-writeback-btn
+                      span  «回写此字段»
+                  div.node-content  «2 型糖尿病 5 年，原发性高血压 3 年，高脂血症 2 年。否认药物过敏史。»
+                div.record-node
+                  div.node-header
+                    span.node-title  «个人史»
+                    button.el-button.el-button--primary.el-button--small.is-link.node-writeback-btn
+                      span  «回写此字段»
+                  div.node-content  «吸烟史 10 年，约 10 支/天；偶有饮酒。否认毒物、粉尘接触史。»
+                div.record-node
+                  div.node-header
+                    span.node-title  «体格检查»
+                    button.el-button.el-button--primary.el-button--small.is-link.node-writeback-btn
+                      span  «回写此字段»
+                  div.node-content  «体温 36.5℃，脉搏 76 次/分，呼吸 18 次/分，血压 142/88 mmHg。BMI 26.1 kg/m²。神»
+                div.record-node
+                  div.node-header
+                    span.node-title  «辅助检查»
+                    button.el-button.el-button--primary.el-button--small.is-link.node-writeback-btn
+                      span  «回写此字段»
+                  div.node-content  «空腹血糖：8.5 mmol/L（↑）；HbA1c：8.6%（↑）。UACR：45 mg/g（↑）；eGFR：78 mL/»
+                div.record-node
+                  div.node-header
+                    span.node-title  «初步诊断»
+                    button.el-button.el-button--primary.el-button--small.is-link.node-writeback-btn
+                      span  «回写此字段»
+                  div.node-content  «1. 2 型糖尿病（血糖控制不佳） - 糖尿病肾病（早期） - 糖尿病视网膜病变（NPDR 轻度） 2. 原发性高血压 »
+              aside.record-qc-side
+                div.rc-side-card.rc-risk-card
+                  div.rc-side-head.warn
+                    span.rc-side-icon  «⚠»
+                    span.rc-side-title  «病历风险与遗漏»
+                  div.rc-risk-list
+                    div.rc-risk-row
+                      span.rc-risk-dot.ok
+                      span.rc-risk-text  «吸烟史已记录»
+                      span.rc-risk-status.ok  «已确认»
+                    div.rc-risk-row
+                      span.rc-risk-dot.warn
+                      span.rc-risk-text  «未记录过敏史»
+                      span.rc-risk-status.warn  «建议补充»
+                    div.rc-risk-row
+                      span.rc-risk-dot.warn
+                      span.rc-risk-text  «未记录月经/女性相关史»
+                      span.rc-risk-status.warn  «建议补充»
+                    div.rc-risk-row
+                      span.rc-risk-dot.warn
+                      span.rc-risk-text  «随访计划缺少复查时间»
+                      span.rc-risk-status.warn  «建议补充»
+                  button.rc-side-more  «查看全部 3 处遗漏»
+                    span  «›»
+                div.rc-side-card.rc-qc-card
+                  div.rc-side-head.ok
+                    span.rc-side-icon  «✓»
+                    span.rc-side-title  «质控与完整性»
+                  div.rc-qc-list
+                    div.rc-qc-row
+                      span.rc-qc-check  «✓»
+                      span.rc-qc-name  «结构完整性»
+                      span.rc-qc-pill  «100%»
+                    div.rc-qc-row
+                      span.rc-qc-check  «✓»
+                      span.rc-qc-name  «信息完整性»
+                      span.rc-qc-pill  «82%»
+                    div.rc-qc-row
+                      span.rc-qc-check  «✓»
+                      span.rc-qc-name  «逻辑一致性»
+                      span.rc-qc-pill  «84%»
+                    div.rc-qc-row
+                      span.rc-qc-check  «✓»
+                      span.rc-qc-name  «用语规范性»
+                      span.rc-qc-pill  «93%»
+                  button.rc-side-more.ok  «查看质控详情»
+                    span  «›»
+          div.tips-tab-pane
+            div.treat-panel
+              div.treat-section-head
+                div.treat-section-title  «推荐用药»
+                button.el-button.el-button--primary.el-button--small.is-link
+                  span  «+ 新增医嘱»
+              div.btab-writeback-bar
+                button.el-button.el-button--success.el-button--small.writeback-primary-btn
+                  span  «✔ 确认并回写到医嘱»
+                span.writeback-hint  «回写后 HIS 将打开开嘱面板»
+              div.treat-list
+                div.treat-card
+                  div.treat-top
+                    div.treat-drug-wrap
+                      span.treat-drug  «达格列净片»
+                    button.el-button.el-button--primary.el-button--small.is-link.treat-writeback-btn
+                      span  «添加到医嘱单»
+                  div.treat-spec  «10mg · qd · 口服»
+                  div.treat-basis  «SGLT-2抑制剂，改善血糖+护肾»
+                div.treat-card
+                  div.treat-top
+                    div.treat-drug-wrap
+                      span.treat-drug  «瑞舒伐他汀钙片»
+                    button.el-button.el-button--primary.el-button--small.is-link.treat-writeback-btn
+                      span  «添加到医嘱单»
+                  div.treat-spec  «10mg · qn · 口服»
+                  div.treat-basis  «LDL-C 3.2mmol/L超标，强化降脂»
+              div.treat-section-head.exam  «(s,...l)=>{for(let o=0;o<t.length;o++){const r=UT[t[o]];if(r»
+                span.treat-section-count  «2 项»
+              div.exam-list
+                div.exam-rec-order
+                  div.ero-head
+                    div.ero-title-wrap
+                      span.ero-name  «空腹血糖复查»
+                      span.el-tag.el-tag--warning.el-tag--small.el-tag--plain
+                        span.el-tag__content  «检验»
+                  div.ero-spec  «门诊 · 一次»
+                  div.ero-basis  «当前 空腹血糖 异常（8.5mmol/L，参考 <7.0），建议复查»
+                div.exam-rec-order
+                  div.ero-head
+                    div.ero-title-wrap
+                      span.ero-name  «餐后2h血糖复查»
+                      span.el-tag.el-tag--warning.el-tag--small.el-tag--plain
+                        span.el-tag__content  «检验»
+                  div.ero-spec  «门诊 · 一次»
+                  div.ero-basis  «当前 餐后2h血糖 异常（12.3mmol/L，参考 <10.0），建议复查»
+          div.tips-tab-pane
+            div
+              div.tab-section  «an=>E7(an)»
+                div.ai-summary-box
+                  p.ai-summary-text  «近三次HbA1c呈下降趋势（9.0%→8.8%→8.6%），但总体仍未达标。UACR轻度升高需关注。建议强化降糖方案，联»
+              div.tab-section
+                div.tab-section-title  «指标趋势»
+                div.el-table--fit.el-table--scrollable-x.el-table--enable-row-hover.el-table--enable-row-transition.el-table--small.el-table.el-table--layout-fixed.lab-trend-table.is-scrolling-right
+                  div.el-table__inner-wrapper
+                    div.hidden-columns
+                      div
+                      div
+                      div
+                      div
+                    div.el-table__header-wrapper
+                      table.el-table__header
+                        colgroup
+                        thead
+                    div.el-table__body-wrapper
+                      div.el-scrollbar
+                        div.el-scrollbar__wrap.el-scrollbar__wrap--hidden-default
+                        div.el-scrollbar__bar.is-horizontal
+                        div.el-scrollbar__bar.is-vertical
+                  div.el-table__column-resize-proxy
+          div.tips-tab-pane
+            div.tab-section
+              div.tab-section-title  «共病»
+              div.nutrition-alert-banner
+                div.nutrition-alert-head
+                  span.nutrition-alert-badge  «营养共病»
+                  span.nutrition-alert-title  «营养共病提醒»
+                  span.el-tag.el-tag--danger.el-tag--small.el-tag--plain
+                    span.el-tag__content  «评分 5 分»
+                div.nutrition-alert-msg  «患者营养筛查评分 5 分（>3 分），存在营养风险，需要申请营养科会诊。»
+                div.nutrition-alert-actions
+                  button.el-button.el-button--primary.el-button--small
+                    span  «申请营养科会诊»
+              div.comorbidity-overview
+                div.comorbidity-condition-card
+                  div.condition-header
+                    span.condition-name  «2型糖尿病高»
+                    span.el-tag.el-tag--danger.el-tag--small.el-tag--plain
+                      span.el-tag__content  «高危»
+                    span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+                      span.el-tag__content  «5年»
+                    span
+                  div.condition-body
+                    div.condition-analysis  «糖尿病病程5年，近期血糖控制不佳（HbA1c 8.5%），存在糖尿病肾病早期风险。建议加强血糖监测，考虑SGLT2i或G»
+                    div.condition-dept
+                      strong  «推荐科室：»
+                      span.el-tag.el-tag--success.el-tag--small.el-tag--light
+                        span.el-tag__content  «内分泌科»
+                div.comorbidity-condition-card
+                  div.condition-header
+                    span.condition-name  «原发性高血压 2级高»
+                    span.el-tag.el-tag--danger.el-tag--small.el-tag--plain
+                      span.el-tag__content  «高危»
+                    span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+                      span.el-tag__content  «3年»
+                    span
+                  div.condition-body
+                    div.condition-analysis  «高血压合并糖尿病，需更严格控制血压（目标<130/80mmHg）。建议调整降压方案，优选ACEI/ARB类。»
+                    div.condition-dept
+                      strong  «推荐科室：»
+                      span.el-tag.el-tag--success.el-tag--small.el-tag--light
+                        span.el-tag__content  «心内科»
+                div.comorbidity-condition-card
+                  div.condition-header
+                    span.condition-name  «高脂血症高»
+                    span.el-tag.el-tag--danger.el-tag--small.el-tag--plain
+                      span.el-tag__content  «高危»
+                    span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+                      span.el-tag__content  «2年»
+                    span
+                  div.condition-body
+                    div.condition-analysis  «合并糖尿病+高血压，ASCVD风险分层为极高危。LDL-C目标<1.8mmol/L。»
+                    div.condition-dept
+                      strong  «推荐科室：»
+                      span.el-tag.el-tag--success.el-tag--small.el-tag--light
+                        span.el-tag__content  «心内科»
+                div.comorbidity-condition-card
+                  div.condition-header
+                    span.condition-name  «超重»
+                    span.el-tag.el-tag--warning.el-tag--small.el-tag--plain
+                      span.el-tag__content  «中危»
+                    span
+                  div.condition-body
+                    div.condition-analysis  «BMI 26.1kg/m²，建议制定个体化饮食运动方案，目标减重5-10%。»
+                    div.condition-dept
+                      strong  «推荐科室：»
+                      span.el-tag.el-tag--success.el-tag--small.el-tag--light
+                        span.el-tag__content  «营养科»
+              div.comorbidity-actions-bar
+                button.el-button.el-button--warning
+                  span  «提醒患者»
+                button.el-button.el-button--primary
+                  span  «发起共病会诊»
+          div.tips-tab-pane
+            div.tab-section.archive-panel
+              div.archive-overview
+                div.ao-title  «疾病与就诊概览»
+                div.ao-row
+                  span.ao-k  «主病»
+                  span.ao-v.strong  «2型糖尿病»
+                div.ao-row
+                  span.ao-k  «诊断日»
+                  span.ao-v  «2021-03-18 09:20:00»
+                div.ao-row
+                  span.ao-k  «诊断»
+                  span.ao-v  «2型糖尿病、原发性高血压 2级、高脂血症、糖尿病肾病（早期）、NPDR轻度、2型糖尿病（血糖控制不佳）、2型糖尿病伴肾脏»
+                div.ao-row
+                  span.ao-k  «就诊»
+                  span.ao-v  «8 次展示 · 住 1 / 门 6 / 急 1»
+                div.ao-row
+                  span.ao-k  «跨度»
+                  span.ao-v  «1917 天（2021-03-18 ~ 2026-06-17）»
+                div.ao-row
+                  span.ao-k  «评估»
+                  span.ao-v  «口服降糖药、ARB降压、他汀调脂、生活方式干预、眼底筛查、营养评估»
+              div.archive-toolbar
+                div.archive-head
+                  div.tab-section-title  «全周期时间轴»
+                  span.archive-muted  «覆盖门诊 / 住院 / 急诊健康数据»
+                div.archive-filters
+                  button.af-chip.active  «全部»
+                  button.af-chip  «门诊»
+                  button.af-chip  «住院»
+                  button.af-chip  «急诊»
+              div.visit-list
+                div.visit-card
+                  div.vc-row
+                    span.vc-type.outpatient  «门诊»
+                    span.vc-time  «2026-06-17 09:12:00»
+                    span.vc-dept  «内分泌科»
+                    span.vc-toggle  «›»
+                  div.vc-meta
+                    span  «主诊 2型糖尿病（血糖控制不佳） (E11.9)»
+                    span.vc-rid  «· record 7929101»
+                  div.vc-cc  «血糖控制不佳，口渴多饮 2 周»
+                div.visit-card
+                  div.vc-row
+                    span.vc-type.inpatient  «住院»
+                    span.vc-time  «2025-11-08 14:20:00»
+                    span.vc-dept  «内分泌科»
+                    span.vc-toggle  «›»
+                  div.vc-meta
+                    span  «主诊 2型糖尿病伴肾脏并发症 (E11.2)»
+                    span.vc-rid  «· record 7918802»
+                  div.vc-cc  «血糖波动伴下肢水肿入院调药»
+                div.visit-card
+                  div.vc-row
+                    span.vc-type.outpatient  «门诊»
+                    span.vc-time  «2025-03-22 09:05:00»
+                    span.vc-dept  «内分泌科»
+                    span.vc-toggle  «›»
+                  div.vc-meta
+                    span  «主诊 2型糖尿病 (E11.9)»
+                    span.vc-rid  «· record 7901120»
+                  div.vc-cc  «血糖复查»
+                div.visit-card
+                  div.vc-row
+                    span.vc-type.outpatient  «门诊»
+                    span.vc-time  «2025-01-10 10:15:00»
+                    span.vc-dept  «眼科»
+                    span.vc-toggle  «›»
+                  div.vc-meta
+                    span  «主诊 糖尿病视网膜病变（NPDR轻度） (E11.3)»
+                    span.vc-rid  «· record 7899044»
+                  div.vc-cc  «眼底检查»
+                div.visit-card
+                  div.vc-row
+                    span.vc-type.outpatient  «门诊»
+                    span.vc-time  «2024-11-20 09:00:00»
+                    span.vc-dept  «内分泌科»
+                    span.vc-toggle  «›»
+                  div.vc-meta
+                    span  «主诊 2型糖尿病、原发性高血压 (E11.9)»
+                    span.vc-rid  «· record 7885011»
+                  div.vc-cc  «定期复诊»
+                div.visit-card
+                  div.vc-row
+                    span.vc-type.outpatient  «门诊»
+                    span.vc-time  «2024-09-15 08:50:00»
+                    span.vc-dept  «内分泌科»
+                    span.vc-toggle  «›»
+                  div.vc-meta
+                    span  «主诊 2型糖尿病 (E11.9)»
+                    span.vc-rid  «· record 7872203»
+                  div.vc-cc  «血糖控制不佳复诊»
+                div.visit-card
+                  div.vc-row
+                    span.vc-type.emergency  «急诊»
+                    span.vc-time  «2023-06-12 15:40:00»
+                    span.vc-dept  «急诊科»
+                    span.vc-toggle  «›»
+                  div.vc-meta
+                    span  «主诊 原发性高血压 2级 (I10)»
+                    span.vc-rid  «· record 7810045»
+                  div.vc-cc  «头晕伴血压升高»
+                div.visit-card
+                  div.vc-row
+                    span.vc-type.outpatient  «门诊»
+                    span.vc-time  «2021-03-18 09:20:00»
+                    span.vc-dept  «内分泌科»
+                    span.vc-toggle  «›»
+                  div.vc-meta
+                    span  «主诊 2型糖尿病（初诊） (E11.9)»
+                    span.vc-rid  «· record 7701200»
+                  div.vc-cc  «体检发现血糖升高»
+      div.panel-tips-toggle.active
+      div.assistant-panel.connected-left
+        div.panel-header
+          span.panel-title  «医生智能体»
+            span.panel-ai-dot
+          div.panel-header-actions
+            button.el-button.el-button--small.is-text.panel-action-btn
+              span  «⟩⟨»
+            button.el-button.el-button--small.is-text.panel-action-btn.panel-close
+              span  «×»
+        div.copilot-tab-bar
+          div.ctab.active
+            span.patient-tab-name  «王某某»
+            span.patient-tab-meta  «· 女 · 58岁»
+        div.chat-area
+          div.chat-messages
+            div.quick-skill-area
+              div.quick-skill-title  «本科常用 Skill»
+              div.quick-skill-grid
+                div.skill-chip
+                  span.skill-chip-icon  «🩸»
+                  span.skill-chip-label  «血糖控制评估»
+                div.skill-chip
+                  span.skill-chip-icon  «💊»
+                  span.skill-chip-label  «高血压复诊套餐»
+                div.skill-chip
+                  span.skill-chip-icon  «🔍»
+                  span.skill-chip-label  «并发症风险筛查»
+                div.skill-chip
+                  span.skill-chip-icon  «✅»
+                  span.skill-chip-label  «用药审核优化»
+                div.skill-chip
+                  span.skill-chip-icon  «📋»
+                  span.skill-chip-label  «多病共存管理»
+          div.action-bar
+            button.el-button.el-button--primary.el-button--small
+              span  «● 语音问诊»
+          div.chat-input-wrap
+            div.chat-textarea-wrap
+              div.el-textarea.chat-textarea
+                textarea.el-textarea__inner
+              div.chat-float-actions
+                button.float-voice-btn  «🎤»
+                button.float-send-btn  «↑»
+            div.chat-toolbar
+              div.tb-left
+                button.tb-plus-btn  «＋»
+                span.tb-hint
+              div.tb-actions
+                button.tb-action-btn  «接诊下一位»
+                button.tb-action-btn  «报告解读»
+                button.tb-action-btn  «鉴别诊断»
+            input
+            input

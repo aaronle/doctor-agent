@@ -1,0 +1,330 @@
+/*
+ * Agent 配置与运行控制台样式。
+ *
+ * 刻意**不复用** V4.3 的医生端样式：控制台是另一类使用者（管理员、调优人员）
+ * 在另一种场景下用的，跟医生端共用一套 scoped CSS 只会让两边互相牵制。
+ * 但设计令牌共用 —— 同一个产品应该是一套视觉语言。
+ */
+
+.admin-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.admin-header {
+  height: 52px;
+  flex-shrink: 0;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-logo {
+  font-size: 18px;
+}
+
+.admin-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.admin-sub {
+  font-size: 11px;
+  color: var(--gray-2);
+  border-left: 1px solid var(--line);
+  padding-left: 10px;
+}
+
+.admin-header-right {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* ---------------------------------------------------------------- 岗位侧栏 */
+
+.admin-side {
+  flex: 0 0 240px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.admin-side-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--line-2);
+  margin-bottom: 8px;
+}
+
+.agent-item {
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.agent-item:hover {
+  background: var(--blue-soft2);
+}
+
+.agent-item.active {
+  background: var(--blue-soft);
+  border-color: #c5d3fc;
+}
+
+.agent-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.agent-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.agent-item-meta {
+  font-size: 11px;
+  color: var(--gray);
+  margin-top: 2px;
+}
+
+.agent-item-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 10px;
+}
+
+.agent-ver {
+  color: var(--gray-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-src {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--line-2);
+  color: var(--gray);
+}
+
+.agent-src.published {
+  background: #eaf6ee;
+  color: var(--green);
+}
+
+.agent-rate {
+  margin-left: auto;
+  color: var(--green);
+  font-weight: 600;
+}
+
+.agent-rate.bad {
+  color: var(--up);
+}
+
+/* ---------------------------------------------------------------- 主区 */
+
+.admin-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.admin-main-head {
+  flex-shrink: 0;
+  padding: 12px 16px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.main-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.main-tasks {
+  font-size: 11px;
+  color: var(--gray);
+  margin-left: 10px;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+}
+
+.admin-tab {
+  font-size: 12px;
+  color: var(--gray);
+  padding-bottom: 8px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.admin-tab.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+  font-weight: 600;
+}
+
+.admin-tab em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--gray-2);
+  margin-left: 3px;
+}
+
+.admin-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px 70px;
+}
+
+/* ---------------------------------------------------------------- 配置卡 */
+
+.cfg-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--card);
+}
+
+/* 不可编辑的安全层用灰底 + 红边强调，视觉上就区别于可改的部分 */
+.cfg-card.locked {
+  background: #fcfcfd;
+  border-color: #fde2e2;
+}
+
+.cfg-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cfg-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cfg-hint {
+  font-size: 11px;
+  color: var(--gray);
+  line-height: 1.6;
+  margin: 0 0 8px;
+}
+
+.cfg-readonly {
+  margin: 0;
+  padding: 10px 12px;
+  background: #f7f8fa;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.tier-radio {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  margin-right: 0;
+}
+
+.tier-name {
+  font-weight: 600;
+  min-width: 140px;
+}
+
+.tier-label {
+  color: var(--gray);
+  min-width: 210px;
+}
+
+.tier-model {
+  font-size: 11px;
+  color: var(--gray-2);
+  background: var(--line-2);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------- 底部操作条 */
+
+.cfg-bar {
+  position: sticky;
+  bottom: -70px;
+  margin: 0 -16px -70px;
+  padding: 10px 16px;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cfg-state {
+  font-size: 12px;
+  color: var(--gray);
+}
+
+.cfg-state strong {
+  color: var(--ink);
+}
+
+.dirty {
+  font-style: normal;
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.cfg-bar-actions {
+  display: flex;
+  gap: 8px;
+}

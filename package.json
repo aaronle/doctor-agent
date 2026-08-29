@@ -15,7 +15,10 @@
     "test:api": ".venv/bin/python -m pytest apps/api/tests",
     "test:all": "npm run typecheck && npm run test:web && npm run test:api",
     "contracts:export": ".venv/bin/python scripts/export_contracts.py",
-    "typecheck": "npm run typecheck --workspace @doctor-agent/web"
+    "typecheck": "npm run typecheck --workspace @doctor-agent/web",
+    "fidelity": "node scripts/compare-v43-fidelity.mjs",
+    "extract": "node scripts/extract-v43-assets.mjs && node scripts/extract-v43-dom.mjs && node scripts/split-v43-css.mjs",
+    "verify": "npm run test:all && npm run build && npm run contracts:export && npm run fidelity"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

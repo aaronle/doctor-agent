@@ -1,0 +1,45 @@
+div.tab-section
+  div.tab-section-title  «疑似诊断»
+    button.el-button.el-button--primary.el-button--small.is-link.diag-add-link
+      span  «+ 新增诊断»
+  p.susp-hint  «勾选拟纳入诊断；点击右侧 标记指定主诊断»
+    strong  «主»
+  div.suspected-list
+    div.suspected-item.selected.primary
+      div.susp-conf-bar
+      span.susp-checkbox
+        span.susp-check-mark  «✓»
+      div.susp-main
+        div.susp-top
+          span.susp-name  «2型糖尿病（血糖控制不佳）»
+          span.susp-conf  «92%»
+          em.susp-icd  «E11.9»
+        div.susp-desc  «空腹血糖及 HbA1c 长期不达标，近 2 周口渴多饮加重，需强化降糖与生活方式干预。»
+      button.primary-mark-btn.active  «主»
+    div.suspected-item
+      div.susp-conf-bar
+      span.susp-checkbox
+      div.susp-main
+        div.susp-top
+          span.susp-name  «糖尿病肾病（早期）»
+          span.susp-conf  «78%»
+          em.susp-icd  «E11.2»
+        div.susp-desc  «UACR 升高、eGFR 轻度下降，提示早期肾脏损害，需护肾与血压血糖联合管理。»
+      button.primary-mark-btn  «主»
+    div.suspected-item
+      div.susp-conf-bar
+      span.susp-checkbox
+      div.susp-main
+        div.susp-top
+          span.susp-name  «糖尿病视网膜病变（NPDR轻度）»
+          span.susp-conf  «85%»
+          em.susp-icd  «E11.3»
+        div.susp-desc  «眼底示非增殖期视网膜病变轻度，血糖控制不佳可加速进展，建议定期眼科随访。»
+      button.primary-mark-btn  «主»
+  div.diag-selection-actions
+    div.diag-selected-summary  «已选 条诊断»
+      strong  «1»
+      span  «· 主诊断：»
+        strong  «2型糖尿病（血糖控制不佳）»
+    button.el-button.el-button--primary.el-button--small
+      span  «确认并回写 HIS»

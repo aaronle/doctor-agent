@@ -1,0 +1,193 @@
+{
+  "source": "AI-HIS门诊模块V4.3.html",
+  "viewport": {
+    "width": 1600,
+    "height": 1000
+  },
+  "targets": [
+    {
+      "key": "01-login",
+      "hash": "#/login",
+      "title": "登录 · 惠每AI门诊",
+      "domBytes": 5438,
+      "outlineLines": 34,
+      "classCount": 9
+    },
+    {
+      "key": "02-outpatient-list",
+      "hash": "#/outpatient/list",
+      "title": "候诊列表 · 惠每AI门诊",
+      "domBytes": 13688,
+      "outlineLines": 181,
+      "classCount": 32
+    },
+    {
+      "key": "03-patient-manage",
+      "hash": "#/outpatient/manage",
+      "title": "患者管理 · 惠每AI门诊",
+      "domBytes": 40719,
+      "outlineLines": 286,
+      "classCount": 34
+    },
+    {
+      "key": "04-workstation-P001",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 92741,
+      "outlineLines": 1035,
+      "classCount": 360
+    },
+    {
+      "key": "05-workstation-P002",
+      "hash": "#/outpatient/P002",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 71757,
+      "outlineLines": 825,
+      "classCount": 338
+    },
+    {
+      "key": "06-workstation-P006",
+      "hash": "#/outpatient/P006",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 97032,
+      "outlineLines": 1119,
+      "classCount": 379
+    },
+    {
+      "key": "10-aitab-01-智慧诊疗",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 22422,
+      "outlineLines": 370,
+      "classCount": 360
+    },
+    {
+      "key": "10-aitab-02-预警评估",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 3746,
+      "outlineLines": 50,
+      "classCount": 360
+    },
+    {
+      "key": "10-aitab-03-病历管理",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 6699,
+      "outlineLines": 96,
+      "classCount": 360
+    },
+    {
+      "key": "10-aitab-04-诊断管理",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 2891,
+      "outlineLines": 45,
+      "classCount": 360
+    },
+    {
+      "key": "10-aitab-05-医嘱管理",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 3136,
+      "outlineLines": 45,
+      "classCount": 360
+    },
+    {
+      "key": "10-aitab-06-共病管理",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 4879,
+      "outlineLines": 72,
+      "classCount": 360
+    },
+    {
+      "key": "10-aitab-07-健康档案",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 6236,
+      "outlineLines": 111,
+      "classCount": 360
+    },
+    {
+      "key": "10-aitab-08-时间轴",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 7366,
+      "outlineLines": 114,
+      "classCount": 360
+    },
+    {
+      "key": "19-his-only",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 21709,
+      "outlineLines": 275,
+      "classCount": 87
+    },
+    {
+      "key": "20-orders-01-药品",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 21709,
+      "outlineLines": 275,
+      "classCount": 87
+    },
+    {
+      "key": "20-orders-02-检查",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 19294,
+      "outlineLines": 267,
+      "classCount": 89
+    },
+    {
+      "key": "20-orders-03-检验",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 22803,
+      "outlineLines": 267,
+      "classCount": 92
+    },
+    {
+      "key": "30-key-assessment-expanded",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 92892,
+      "outlineLines": 1035,
+      "classCount": 360
+    },
+    {
+      "key": "31-sidebar-expanded",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 96511,
+      "outlineLines": 1096,
+      "classCount": 368
+    },
+    {
+      "key": "40-voice-playing",
+      "hash": "#/outpatient/P006",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 99584,
+      "outlineLines": 1157,
+      "classCount": 391
+    },
+    {
+      "key": "41-voice-observations",
+      "hash": "#/outpatient/P006",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 101068,
+      "outlineLines": 1179,
+      "classCount": 396
+    },
+    {
+      "key": "42-differential-expanded",
+      "hash": "#/outpatient/P006",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 98618,
+      "outlineLines": 1119,
+      "classCount": 393
+    }
+  ]
+}

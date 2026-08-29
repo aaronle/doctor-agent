@@ -34,3 +34,4 @@
 - [`../references/ui-demo/AI-HIS门诊模块V4.3.html`](../references/ui-demo/AI-HIS门诊模块V4.3.html)（不可修改的最早 HTML 原件）
 - [`../references/ui-demo/README.md`](../references/ui-demo/README.md)（来源、校验值和不可覆盖规则）
 - [`../design/current/AI-HIS医生智能体一期.html`](../design/current/AI-HIS医生智能体一期.html)（当前直接实现基线）
+- [`product/10-V4.3反向需求规格说明书.md`](product/10-V4.3反向需求规格说明书.md)：从 V4.3 逐屏倒推的完整需求书，正向流程的起点

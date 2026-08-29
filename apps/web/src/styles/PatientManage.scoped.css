@@ -1,0 +1,36 @@
+/* 由 scripts/split-v43-css.mjs 从 app.css 自动拆出，请勿手工编辑。
+   PatientManage 组件作用域：33 条 */
+
+.pm-page{height:100vh;display:flex;flex-direction:column;background:#f0f2f5;overflow:hidden}
+.his-header{background:linear-gradient(135deg,#1a2a4a,#1e3a5f);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid #2d4a7a}
+.his-header-left{display:flex;align-items:center;gap:12px}
+.his-header-right{display:flex;align-items:center;gap:16px}
+.his-logo{font-size:22px}
+.his-title{font-size:18px;font-weight:700;color:#e8f0fe;letter-spacing:.5px}
+.his-subtitle{font-size:12px;color:#7a96c0;border-left:1px solid #3a5a8a;padding-left:12px;margin-left:4px}
+.his-date{font-size:13px;color:#7a96c0}
+.pm-main{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:14px 18px 16px}
+.pm-stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;flex-shrink:0}
+.stat-card{text-align:left;background:#fff;border:1px solid #e8edf5;border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.stat-card:hover,.stat-card.highlight{border-color:#93c5fd;box-shadow:0 2px 8px #1677ff14}
+.stat-label{font-size:12px;color:#64748b;margin-bottom:6px}
+.stat-value{font-size:24px;font-weight:700;color:#1a2a4a;line-height:1.1}
+.stat-value .unit{font-size:12px;font-weight:500;margin-left:2px;color:#94a3b8}
+.stat-value.danger{color:#e6191a}
+.stat-value.warn{color:#d97706}
+.stat-foot{margin-top:4px;font-size:11px;color:#e6191a}
+.pm-alert{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#fff1f0;border:1px solid #ffccc7;border-radius:8px;flex-shrink:0}
+.pm-alert-text{font-size:13px;color:#a8071a;line-height:1.5}
+.pm-alert-text strong{margin-right:6px}
+.pm-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1px solid #e8edf5;border-radius:10px;padding:10px 12px;flex-shrink:0}
+.pm-filters,.pm-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pm-count{font-size:12px;color:#64748b}
+.pm-count strong{color:#1677ff}
+.pm-table-wrap{flex:1;min-height:0;background:#fff;border:1px solid #e8edf5;border-radius:10px;overflow:hidden;padding:8px}
+.pm-name{font-weight:700;color:#1a2a4a}
+.pm-meta,.pm-sub{font-size:12px;color:#94a3b8}
+.pm-sub.danger,.danger{color:#e6191a;font-weight:600}
+.pm-crit-tag,.pm-rem-tag{margin:0 4px 4px 0}
+.pm-reminders{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.pm-reminded{margin-top:4px;font-size:11px;color:#52c41a}
+@media (max-width: 1200px){.pm-stats{grid-template-columns:repeat(3,1fr)}}

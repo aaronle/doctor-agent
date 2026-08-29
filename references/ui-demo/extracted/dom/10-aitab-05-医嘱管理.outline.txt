@@ -1,0 +1,45 @@
+div.treat-panel
+  div.treat-section-head
+    div.treat-section-title  «推荐用药»
+    button.el-button.el-button--primary.el-button--small.is-link
+      span  «+ 新增医嘱»
+  div.btab-writeback-bar
+    button.el-button.el-button--success.el-button--small.writeback-primary-btn
+      span  «✔ 确认并回写到医嘱»
+    span.writeback-hint  «回写后 HIS 将打开开嘱面板»
+  div.treat-list
+    div.treat-card
+      div.treat-top
+        div.treat-drug-wrap
+          span.treat-drug  «达格列净片»
+        button.el-button.el-button--primary.el-button--small.is-link.treat-writeback-btn
+          span  «添加到医嘱单»
+      div.treat-spec  «10mg · qd · 口服»
+      div.treat-basis  «SGLT-2抑制剂，改善血糖+护肾»
+    div.treat-card
+      div.treat-top
+        div.treat-drug-wrap
+          span.treat-drug  «瑞舒伐他汀钙片»
+        button.el-button.el-button--primary.el-button--small.is-link.treat-writeback-btn
+          span  «添加到医嘱单»
+      div.treat-spec  «10mg · qn · 口服»
+      div.treat-basis  «LDL-C 3.2mmol/L超标，强化降脂»
+  div.treat-section-head.exam  «(s,...l)=>{for(let o=0;o<t.length;o++){const r=UT[t[o]];if(r»
+    span.treat-section-count  «2 项»
+  div.exam-list
+    div.exam-rec-order
+      div.ero-head
+        div.ero-title-wrap
+          span.ero-name  «空腹血糖复查»
+          span.el-tag.el-tag--warning.el-tag--small.el-tag--plain
+            span.el-tag__content  «检验»
+      div.ero-spec  «门诊 · 一次»
+      div.ero-basis  «当前 空腹血糖 异常（8.5mmol/L，参考 <7.0），建议复查»
+    div.exam-rec-order
+      div.ero-head
+        div.ero-title-wrap
+          span.ero-name  «餐后2h血糖复查»
+          span.el-tag.el-tag--warning.el-tag--small.el-tag--plain
+            span.el-tag__content  «检验»
+      div.ero-spec  «门诊 · 一次»
+      div.ero-basis  «当前 餐后2h血糖 异常（12.3mmol/L，参考 <10.0），建议复查»

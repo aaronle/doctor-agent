@@ -1,0 +1,16 @@
+/* 由 scripts/split-v43-css.mjs 从 app.css 自动拆出，请勿手工编辑。
+   app-overrides 组件作用域：13 条 */
+
+.strong{color:var(--ink);font-weight:600}
+.btn.sm{padding:4px 8px;font-size:11px}
+.risk-badge.high{background:#fdecec;color:#e5484d}
+.risk-badge.mid{background:#fef3e2;color:#e08c2b}
+.risk-badge.low{background:#eaf1ff;color:var(--blue)}
+.toast.warn{border-left-color:var(--amber)}
+.toast.warn .toast-ico{background:var(--amber)}
+.panel-title{font-size:11px;font-weight:700}
+.hint-box.warn{background:#fffbeb;border-color:#fde68a}
+.hint-box.danger{background:#fff5f5;border-color:#fecaca}
+.his-header{background:#fff!important;border-bottom:1px solid var(--line)!important}
+.his-title{color:var(--ink)!important;font-weight:700!important}
+.workstation-page,.his-list-page{height:100%;background:var(--bg);color:var(--ink);font-size:12px}
