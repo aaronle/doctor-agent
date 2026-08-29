@@ -22,3 +22,5 @@ __pycache__/
 *.log
 ~$*.docx
 tmp/
+# V4.3 动态抽取的截图体积大且可由脚本复现，只保留结构与样式产物
+references/ui-demo/extracted/dom/*.png

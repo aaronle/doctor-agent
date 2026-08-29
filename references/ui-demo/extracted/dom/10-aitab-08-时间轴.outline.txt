@@ -1,0 +1,114 @@
+div.tab-section
+  div.tab-section-title  «本次就诊时间轴»
+  div.timeline-list
+    div.timeline-group
+      div.tl-time-tag  «08:40»
+      div.tl-group-card
+        div.tl-group-header
+          span.tl-group-action  «进入本次接诊»
+        div.tl-sub-section.doctor
+          div.tl-sub-label  «医生»
+          div.tl-sub-item-wrap
+            div.tl-sub-item
+              span.tl-sub-action  «进入本次接诊»
+              span.tl-sub-detail  «患者：王某某 · 内分泌科复诊»
+    div.timeline-group
+      div.tl-time-tag  «08:42»
+      div.tl-group-card
+        div.tl-group-header
+          span.tl-group-action  «AI 病情概要»
+        div.tl-sub-section.ai
+          div.tl-sub-label  «AI»
+          div.tl-sub-item-wrap
+            div.tl-sub-item
+              span.tl-sub-action  «AI 病情概要»
+              span.tl-sub-detail  «血糖控制不佳，合并高血压、高脂血症、早期肾病»
+    div.timeline-group
+      div.tl-time-tag  «08:45»
+      div.tl-group-card
+        div.tl-group-header
+          span.tl-group-action  «糖化血红蛋白结果»
+        div.tl-sub-section.system
+          div.tl-sub-item-wrap
+            div.tl-sub-item.tl-lab-exam.tl-abnormal
+              div.tl-sub-main
+                span.tl-cat-tag.lab  «检验»
+                span.tl-sub-action  «糖化血红蛋白结果»
+                span.tl-abnormal-tag  «异常»
+                span.tl-sub-detail.tl-detail-abnormal  «HbA1c 8.6%（参考 <7.0%）↑»
+                button.el-button.el-button--primary.el-button--small.is-link.tl-ai-btn
+                  span  «AI 分析»
+              div.tl-result-body.abnormal  «糖化血红蛋白(HbA1c)：8.6%（参考 <7.0%），近3次 9.0%→8.8%→8.6%，呈下降但仍未达标。»
+    div.timeline-group
+      div.tl-time-tag  «08:46»
+      div.tl-group-card
+        div.tl-group-header
+          span.tl-group-action  «肾功能相关检验»
+        div.tl-sub-section.system
+          div.tl-sub-item-wrap
+            div.tl-sub-item.tl-lab-exam.tl-abnormal
+              div.tl-sub-main
+                span.tl-cat-tag.lab  «检验»
+                span.tl-sub-action  «肾功能相关检验»
+                span.tl-abnormal-tag  «异常»
+                span.tl-sub-detail.tl-detail-abnormal  «UACR 45↑ · eGFR 78↓»
+                button.el-button.el-button--primary.el-button--small.is-link.tl-ai-btn
+                  span  «AI 分析»
+              div.tl-result-body.abnormal  «尿微量白蛋白/肌酐(UACR) 45 mg/g（参考 <30）↑；肾小球滤过率(eGFR) 78 mL/min（参考 >»
+    div.timeline-group
+      div.tl-time-tag  «08:48»
+      div.tl-group-card
+        div.tl-group-header
+          span.tl-group-action  «双眼底照相结果»
+        div.tl-sub-section.system
+          div.tl-sub-item-wrap
+            div.tl-sub-item.tl-lab-exam.tl-abnormal
+              div.tl-sub-main
+                span.tl-cat-tag.exam  «检查»
+                span.tl-sub-action  «双眼底照相结果»
+                span.tl-abnormal-tag  «异常»
+                span.tl-sub-detail.tl-detail-abnormal  «NPDR 轻度»
+                button.el-button.el-button--primary.el-button--small.is-link.tl-ai-btn
+                  span  «AI 分析»
+              div.tl-result-body.abnormal  «双眼糖尿病视网膜病变（NPDR轻度），微动脉瘤（+），硬性渗出少量，无新生血管。»
+    div.timeline-group
+      div.tl-time-tag  «08:50»
+      div.tl-group-card
+        div.tl-group-header
+          span.tl-group-action  «12导联心电图结果»
+        div.tl-sub-section.system
+          div.tl-sub-item-wrap
+            div.tl-sub-item.tl-lab-exam.tl-abnormal
+              div.tl-sub-main
+                span.tl-cat-tag.exam  «检查»
+                span.tl-sub-action  «12导联心电图结果»
+                span.tl-abnormal-tag  «异常»
+                span.tl-sub-detail.tl-detail-abnormal  «ST段轻度压低，T波低平»
+                button.el-button.el-button--primary.el-button--small.is-link.tl-ai-btn
+                  span  «AI 分析»
+              div.tl-result-body.abnormal  «窦性心律，HR 76次/分，ST段 V4-V6 轻度压低（0.5mm），T波低平，提示心肌供血不足可能。»
+    div.timeline-group
+      div.tl-time-tag  «08:55»
+      div.tl-group-card
+        div.tl-group-header
+          span.tl-group-action  «推荐治疗方案»
+        div.tl-sub-section.ai
+          div.tl-sub-label  «AI»
+          div.tl-sub-item-wrap
+            div.tl-sub-item
+              span.tl-sub-action  «推荐治疗方案»
+              span.tl-sub-detail  «评估联合 SGLT2i/GLP-1RA · 继续 ARB + 他汀»
+    div.timeline-group
+      div.tl-time-tag  «09:02»
+      div.tl-group-card
+        div.tl-group-header
+          span.tl-group-action  «确认随访计划»
+        div.tl-sub-section.doctor
+          div.tl-sub-label  «医生»
+          div.tl-sub-item-wrap
+            div.tl-sub-item
+              span.tl-sub-action  «确认随访计划»
+              span.tl-sub-detail  «1 月后复查 HbA1c、肾功能，营养科会诊»
+  div.timeline-actions
+    button.el-button.el-button--primary.el-button--small.is-plain
+      span  «生成随访计划并标记完成»

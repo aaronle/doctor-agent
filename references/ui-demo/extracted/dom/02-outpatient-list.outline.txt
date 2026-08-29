@@ -1,0 +1,181 @@
+div.his-list-page
+  div.his-header
+    div.his-header-left
+      span.his-logo  «🏥»
+      span.his-title  «惠每门诊工作站»
+      span.his-subtitle  «HIS · 门诊管理系统»
+    div.his-header-right
+      div.ai-badge  «AI Mock 已就绪»
+        span.ai-dot
+      span.his-date  «张医生 · 2026/8/29»
+      button.el-button.el-button--danger.el-button--small.is-text
+        span  «退出»
+  div.his-toolbar
+    div.toolbar-left
+      div.el-input.el-input--prefix.el-input--suffix
+        div.el-input__wrapper
+          span.el-input__prefix
+            span.el-input__prefix-inner
+              i.el-icon.el-input__icon
+          input.el-input__inner
+          span.el-input__suffix
+            span.el-input__suffix-inner
+              i.el-icon.el-input__icon.el-input__clear
+      div.el-select
+        div.el-select__wrapper
+          div.el-select__selection
+            div.el-select__selected-item.el-select__input-wrapper.is-hidden
+              input.el-select__input
+            div.el-select__selected-item.el-select__placeholder.is-transparent
+              span  «全部科室»
+          div.el-select__suffix
+            i.el-icon.el-select__caret.el-select__icon
+      div.el-select
+        div.el-select__wrapper
+          div.el-select__selection
+            div.el-select__selected-item.el-select__input-wrapper.is-hidden
+              input.el-select__input
+            div.el-select__selected-item.el-select__placeholder.is-transparent
+              span  «全部风险»
+          div.el-select__suffix
+            i.el-icon.el-select__caret.el-select__icon
+    div.toolbar-right
+      span.patient-count  «今日候诊： 人»
+        strong  «6»
+      button.el-button.el-button--primary.el-button--small
+        i.el-icon
+        span  «刷新»
+  div.his-main
+    div.patient-grid
+      div.patient-card
+        div.card-header
+          div.patient-avatar  «王»
+          div.patient-basic
+            div.patient-name  «王某某»
+            div.patient-meta  «女 · 58岁 · 内分泌科»
+          div.card-badges
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round.risk-tag
+              span.el-tag__content  «高风险»
+        div.card-complaint
+          span.label  «主诉：»
+          span.text  «血糖控制不佳，口渴多饮 2 周»
+        div.card-diagnosis
+          span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+            span.el-tag__content  «2型糖尿病»
+        div.card-footer
+          span.visit-date  «2026-06-17»
+          span.doctor  «主治：李医生»
+          button.el-button.el-button--primary.el-button--small.enter-btn
+            span  «进入工作站 →»
+      div.patient-card
+        div.card-header
+          div.patient-avatar  «张»
+          div.patient-basic
+            div.patient-name  «张某»
+            div.patient-meta  «男 · 45岁 · 心内科»
+          div.card-badges
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round.risk-tag
+              span.el-tag__content  «高风险»
+        div.card-complaint
+          span.label  «主诉：»
+          span.text  «胸闷气短 1 个月，加重 3 天»
+        div.card-diagnosis
+          span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+            span.el-tag__content  «冠心病»
+        div.card-footer
+          span.visit-date  «2026-06-17»
+          span.doctor  «主治：王医生»
+          button.el-button.el-button--primary.el-button--small.enter-btn
+            span  «进入工作站 →»
+      div.patient-card
+        div.card-header
+          div.patient-avatar  «李»
+          div.patient-basic
+            div.patient-name  «李某某»
+            div.patient-meta  «女 · 32岁 · 内分泌科»
+          div.card-badges
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round.risk-tag
+              span.el-tag__content  «低风险»
+        div.card-complaint
+          span.label  «主诉：»
+          span.text  «甲状腺肿大检查复诊»
+        div.card-diagnosis
+          span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+            span.el-tag__content  «甲亢»
+        div.card-footer
+          span.visit-date  «2026-06-17»
+          span.doctor  «主治：李医生»
+          button.el-button.el-button--primary.el-button--small.enter-btn
+            span  «进入工作站 →»
+      div.patient-card
+        div.card-header
+          div.patient-avatar  «陈»
+          div.patient-basic
+            div.patient-name  «陈某»
+            div.patient-meta  «男 · 67岁 · 神经内科»
+          div.card-badges
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round.risk-tag
+              span.el-tag__content  «高风险»
+        div.card-complaint
+          span.label  «主诉：»
+          span.text  «头晕头痛反复发作 1 个月»
+        div.card-diagnosis
+          span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+            span.el-tag__content  «高血压»
+        div.card-footer
+          span.visit-date  «2026-06-17»
+          span.doctor  «主治：陈医生»
+          button.el-button.el-button--primary.el-button--small.enter-btn
+            span  «进入工作站 →»
+      div.patient-card
+        div.card-header
+          div.patient-avatar  «刘»
+          div.patient-basic
+            div.patient-name  «刘某某»
+            div.patient-meta  «女 · 52岁 · 内分泌科»
+          div.card-badges
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--warning.el-tag--small.el-tag--light.is-round.risk-tag
+              span.el-tag__content  «中风险»
+        div.card-complaint
+          span.label  «主诉：»
+          span.text  «体检发现血糖升高，来院就诊»
+        div.card-diagnosis
+          span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+            span.el-tag__content  «糖尿病»
+        div.card-footer
+          span.visit-date  «2026-06-17»
+          span.doctor  «主治：李医生»
+          button.el-button.el-button--primary.el-button--small.enter-btn
+            span  «进入工作站 →»
+      div.patient-card
+        div.card-header
+          div.patient-avatar  «赵»
+          div.patient-basic
+            div.patient-name  «赵某某»
+            div.patient-meta  «男 · 72岁 · 神经内科»
+          div.card-badges
+            span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+              span.el-tag__content  «门诊»
+            span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round.risk-tag
+              span.el-tag__content  «高风险»
+        div.card-complaint
+          span.label  «主诉：»
+          span.text  «右侧肢体无力伴言语不清 3 天»
+        div.card-diagnosis
+          span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+            span.el-tag__content  «脑梗死»
+        div.card-footer
+          span.visit-date  «2026-06-20»
+          span.doctor  «主治：陈医生»
+          button.el-button.el-button--primary.el-button--small.enter-btn
+            span  «进入工作站 →»

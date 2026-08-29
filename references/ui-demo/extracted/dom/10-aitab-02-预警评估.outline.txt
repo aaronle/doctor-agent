@@ -1,0 +1,50 @@
+div.risk-assess-block
+  div.tab-section-title  «专项评估»
+  div.risk-card
+    div.risk-card-header
+      span.risk-dot
+      span.risk-name  «血糖控制评估»
+      span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round
+        span.el-tag__content  «高风险»
+      div.risk-actions
+        button.el-button.el-button--primary.el-button--small.is-link
+          span  «大模型解读»
+        button.el-button.el-button--small.is-link
+          span  «↗»
+    p.risk-summary  «空腹血糖8.5mmol/L，HbA1c 8.6%，近2周饮食控制差，口渴多饮加重»
+      strong  «依据：»
+    p.risk-summary  «血糖长期不达标，糖尿病肾病及视网膜病变进展风险高»
+    p.risk-summary  «强化生活方式干预，考虑联合SGLT-2抑制剂，4周后复查HbA1c»
+      strong  «建议：»
+  div.risk-card
+    div.risk-card-header
+      span.risk-dot
+      span.risk-name  «糖尿病肾病风险»
+      span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round
+        span.el-tag__content  «高风险»
+      div.risk-actions
+        button.el-button.el-button--primary.el-button--small.is-link
+          span  «大模型解读»
+        button.el-button.el-button--small.is-link
+          span  «↗»
+    p.risk-summary  «UACR 45mg/g（正常<30），eGFR 78mL/min（G2期），小便泡沫增多»
+      strong  «依据：»
+    p.risk-summary  «早期糖尿病肾病，微量蛋白尿阶段，肾功能轻度受损»
+    p.risk-summary  «继续ARB护肾，严格控制血压<130/80mmHg，3个月后复查UACR和肾功能»
+      strong  «建议：»
+  div.risk-card
+    div.risk-card-header
+      span.risk-dot
+      span.risk-name  «视网膜病变风险»
+      span.el-tag.el-tag--warning.el-tag--small.el-tag--light.is-round
+        span.el-tag__content  «中风险»
+      div.risk-actions
+        button.el-button.el-button--primary.el-button--small.is-link
+          span  «大模型解读»
+        button.el-button.el-button--small.is-link
+          span  «↗»
+    p.risk-summary  «眼底检查示NPDR轻度，病程5年，血糖长期不达标»
+      strong  «依据：»
+    p.risk-summary  «非增殖期视网膜病变早期，血糖控制差是主要进展危险因素»
+    p.risk-summary  «每年散瞳眼底检查，控制HbA1c<7%，控制血压和血脂»
+      strong  «建议：»

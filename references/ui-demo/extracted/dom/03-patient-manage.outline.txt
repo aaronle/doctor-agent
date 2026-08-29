@@ -1,0 +1,286 @@
+div.pm-page
+  div.his-header
+    div.his-header-left
+      span.his-logo  «🏥»
+      span.his-title  «患者管理»
+      span.his-subtitle  «统计接诊 · 危急值与失访智能提醒»
+    div.his-header-right
+      button.el-button.el-button--small.is-text
+        span  «返回医生站»
+      button.el-button.el-button--small.is-text
+        span  «候诊列表»
+      span.his-date  «张医生 · 2026/8/29»
+      button.el-button.el-button--danger.el-button--small.is-text
+        span  «退出»
+  div.pm-main
+    div.pm-stats
+      button.stat-card
+        div.stat-label  «在管患者»
+        div.stat-value  «7»
+          span.unit  «人»
+      button.stat-card
+        div.stat-label  «高风险»
+        div.stat-value.danger  «5»
+          span.unit  «人»
+      button.stat-card
+        div.stat-label  «危急指标»
+        div.stat-value.danger  «5»
+          span.unit  «人»
+      button.stat-card
+        div.stat-label  «久未回诊(≥60天)»
+        div.stat-value.warn  «7»
+          span.unit  «人»
+      button.stat-card.highlight
+        div.stat-label  «危急+失访»
+        div.stat-value.danger  «5»
+          span.unit  «人»
+        div.stat-foot  «优先智能提醒»
+      button.stat-card
+        div.stat-label  «检查异常/未出»
+        div.stat-value  «6»
+          span.unit  «人»
+    div.pm-alert
+      div.pm-alert-text  «检出危急指标 5 人，其中危急值后长时间未回诊 5 人，建议主动召回随访。»
+        strong  «智能提醒»
+      button.el-button.el-button--danger.el-button--small
+        span  «一键提醒危急/失访»
+    div.pm-toolbar
+      div.pm-filters
+        div.el-input.el-input--suffix
+          div.el-input__wrapper
+            input.el-input__inner
+            span.el-input__suffix
+              span.el-input__suffix-inner
+                i.el-icon.el-input__icon.el-input__clear
+        div.el-select
+          div.el-select__wrapper
+            div.el-select__selection
+              div.el-select__selected-item.el-select__input-wrapper.is-hidden
+                input.el-select__input
+              div.el-select__selected-item.el-select__placeholder.is-transparent
+                span  «科室»
+            div.el-select__suffix
+              i.el-icon.el-select__caret.el-select__icon
+        div.el-select
+          div.el-select__wrapper
+            div.el-select__selection
+              div.el-select__selected-item.el-select__input-wrapper.is-hidden
+                input.el-select__input
+              div.el-select__selected-item.el-select__placeholder.is-transparent
+                span  «风险»
+            div.el-select__suffix
+              i.el-icon.el-select__caret.el-select__icon
+        div.el-input.el-input--suffix
+          div.el-input__wrapper
+            input.el-input__inner
+            span.el-input__suffix
+              span.el-input__suffix-inner
+                i.el-icon.el-input__icon.el-input__clear
+        div.el-select
+          div.el-select__wrapper
+            div.el-select__selection
+              div.el-select__selected-item.el-select__input-wrapper.is-hidden
+                input.el-select__input
+              div.el-select__selected-item.el-select__placeholder.is-transparent
+                span  «检查检验状态»
+            div.el-select__suffix
+              i.el-icon.el-select__caret.el-select__icon
+        div.el-select
+          div.el-select__wrapper
+            div.el-select__selection
+              div.el-select__selected-item.el-select__input-wrapper.is-hidden
+                input.el-select__input
+              div.el-select__selected-item.el-select__placeholder.is-transparent
+                span  «提醒类型»
+            div.el-select__suffix
+              i.el-icon.el-select__caret.el-select__icon
+        div.el-date-editor.el-date-editor--daterange.el-input__wrapper.el-range-editor
+          i.el-icon.el-input__icon.el-range__icon
+          input.el-range-input
+          span.el-range-separator  «-»
+          input.el-range-input
+          i.el-icon.el-input__icon.el-range__close-icon.el-range__close-icon--hidden
+        button.el-button.el-button--primary.is-text
+          span  «重置»
+      div.pm-actions
+        span.pm-count  «筛选结果 人»
+          strong  «7»
+        button.el-button.el-button--small.is-disabled
+          span  «提醒已选(0)»
+        button.el-button.el-button--primary.el-button--small
+          span  «刷新»
+    div.pm-table-wrap
+      div.el-table--fit.el-table--striped.el-table--border.el-table--enable-row-transition.el-table--small.el-table.el-table--layout-fixed.is-scrolling-none
+        div.el-table__inner-wrapper
+          div.hidden-columns
+            div
+            div
+            div
+            div
+            div
+            div
+            div
+            div
+            div
+            div
+            div
+            div
+          div.el-table__header-wrapper
+            table.el-table__header
+              colgroup
+                col
+                col
+                col
+                col
+                col
+                col
+                col
+                col
+                col
+                col
+                col
+                col
+              thead
+                tr
+                  th.el-table_1_column_1.el-table-column--selection.is-leaf.el-table__cell
+                    div.cell
+                      label.el-checkbox.el-checkbox--small
+                        span.el-checkbox__input
+                  th.el-table_1_column_2.is-leaf.el-table__cell
+                    div.cell  «患者»
+                  th.el-table_1_column_3.is-leaf.el-table__cell
+                    div.cell  «科室»
+                  th.el-table_1_column_4.is-leaf.el-table__cell
+                    div.cell  «末次就诊»
+                  th.el-table_1_column_5.is-leaf.el-table__cell
+                    div.cell  «症状/主诉»
+                  th.el-table_1_column_6.is-leaf.el-table__cell
+                    div.cell  «诊断»
+                  th.el-table_1_column_7.is-center.is-leaf.el-table__cell
+                    div.cell  «风险»
+                  th.el-table_1_column_8.is-center.is-leaf.el-table__cell
+                    div.cell  «检验异常»
+                  th.el-table_1_column_9.is-center.is-leaf.el-table__cell
+                    div.cell  «检查状态»
+                  th.el-table_1_column_10.is-leaf.el-table__cell
+                    div.cell  «危急指标»
+                  th.el-table_1_column_11.is-leaf.el-table__cell
+                    div.cell  «智能提醒»
+                  th.el-table_1_column_12.is-center.el-table-fixed-column--right.is-first-column.is-leaf.el-table__cell
+                    div.cell  «操作»
+          div.el-table__body-wrapper
+            div.el-scrollbar
+              div.el-scrollbar__wrap.el-scrollbar__wrap--hidden-default
+                div.el-scrollbar__view
+                  table.el-table__body
+                    colgroup
+                      col
+                      col
+                      col
+                      col
+                      col
+                      col
+                      col
+                      col
+                      col
+                      col
+                      col
+                      col
+                    tbody
+                      tr.el-table__row
+                        td.el-table_1_column_1.el-table-column--selection.el-table__cell
+                        td.el-table_1_column_2.el-table__cell
+                        td.el-table_1_column_3.el-table__cell
+                        td.el-table_1_column_4.el-table__cell
+                        td.el-table_1_column_5.el-table__cell
+                        td.el-table_1_column_6.el-table__cell
+                        td.el-table_1_column_7.is-center.el-table__cell
+                        td.el-table_1_column_8.is-center.el-table__cell
+                        td.el-table_1_column_9.is-center.el-table__cell
+                        td.el-table_1_column_10.el-table__cell
+                        td.el-table_1_column_11.el-table__cell
+                        td.el-table_1_column_12.is-center.el-table-fixed-column--right.is-first-column.el-table__cell
+                      tr.el-table__row.el-table__row--striped
+                        td.el-table_1_column_1.el-table-column--selection.el-table__cell
+                        td.el-table_1_column_2.el-table__cell
+                        td.el-table_1_column_3.el-table__cell
+                        td.el-table_1_column_4.el-table__cell
+                        td.el-table_1_column_5.el-table__cell
+                        td.el-table_1_column_6.el-table__cell
+                        td.el-table_1_column_7.is-center.el-table__cell
+                        td.el-table_1_column_8.is-center.el-table__cell
+                        td.el-table_1_column_9.is-center.el-table__cell
+                        td.el-table_1_column_10.el-table__cell
+                        td.el-table_1_column_11.el-table__cell
+                        td.el-table_1_column_12.is-center.el-table-fixed-column--right.is-first-column.el-table__cell
+                      tr.el-table__row
+                        td.el-table_1_column_1.el-table-column--selection.el-table__cell
+                        td.el-table_1_column_2.el-table__cell
+                        td.el-table_1_column_3.el-table__cell
+                        td.el-table_1_column_4.el-table__cell
+                        td.el-table_1_column_5.el-table__cell
+                        td.el-table_1_column_6.el-table__cell
+                        td.el-table_1_column_7.is-center.el-table__cell
+                        td.el-table_1_column_8.is-center.el-table__cell
+                        td.el-table_1_column_9.is-center.el-table__cell
+                        td.el-table_1_column_10.el-table__cell
+                        td.el-table_1_column_11.el-table__cell
+                        td.el-table_1_column_12.is-center.el-table-fixed-column--right.is-first-column.el-table__cell
+                      tr.el-table__row.el-table__row--striped.hover-row
+                        td.el-table_1_column_1.el-table-column--selection.el-table__cell
+                        td.el-table_1_column_2.el-table__cell
+                        td.el-table_1_column_3.el-table__cell
+                        td.el-table_1_column_4.el-table__cell
+                        td.el-table_1_column_5.el-table__cell
+                        td.el-table_1_column_6.el-table__cell
+                        td.el-table_1_column_7.is-center.el-table__cell
+                        td.el-table_1_column_8.is-center.el-table__cell
+                        td.el-table_1_column_9.is-center.el-table__cell
+                        td.el-table_1_column_10.el-table__cell
+                        td.el-table_1_column_11.el-table__cell
+                        td.el-table_1_column_12.is-center.el-table-fixed-column--right.is-first-column.el-table__cell
+                      tr.el-table__row
+                        td.el-table_1_column_1.el-table-column--selection.el-table__cell
+                        td.el-table_1_column_2.el-table__cell
+                        td.el-table_1_column_3.el-table__cell
+                        td.el-table_1_column_4.el-table__cell
+                        td.el-table_1_column_5.el-table__cell
+                        td.el-table_1_column_6.el-table__cell
+                        td.el-table_1_column_7.is-center.el-table__cell
+                        td.el-table_1_column_8.is-center.el-table__cell
+                        td.el-table_1_column_9.is-center.el-table__cell
+                        td.el-table_1_column_10.el-table__cell
+                        td.el-table_1_column_11.el-table__cell
+                        td.el-table_1_column_12.is-center.el-table-fixed-column--right.is-first-column.el-table__cell
+                      tr.el-table__row.el-table__row--striped
+                        td.el-table_1_column_1.el-table-column--selection.el-table__cell
+                        td.el-table_1_column_2.el-table__cell
+                        td.el-table_1_column_3.el-table__cell
+                        td.el-table_1_column_4.el-table__cell
+                        td.el-table_1_column_5.el-table__cell
+                        td.el-table_1_column_6.el-table__cell
+                        td.el-table_1_column_7.is-center.el-table__cell
+                        td.el-table_1_column_8.is-center.el-table__cell
+                        td.el-table_1_column_9.is-center.el-table__cell
+                        td.el-table_1_column_10.el-table__cell
+                        td.el-table_1_column_11.el-table__cell
+                        td.el-table_1_column_12.is-center.el-table-fixed-column--right.is-first-column.el-table__cell
+                      tr.el-table__row
+                        td.el-table_1_column_1.el-table-column--selection.el-table__cell
+                        td.el-table_1_column_2.el-table__cell
+                        td.el-table_1_column_3.el-table__cell
+                        td.el-table_1_column_4.el-table__cell
+                        td.el-table_1_column_5.el-table__cell
+                        td.el-table_1_column_6.el-table__cell
+                        td.el-table_1_column_7.is-center.el-table__cell
+                        td.el-table_1_column_8.is-center.el-table__cell
+                        td.el-table_1_column_9.is-center.el-table__cell
+                        td.el-table_1_column_10.el-table__cell
+                        td.el-table_1_column_11.el-table__cell
+                        td.el-table_1_column_12.is-center.el-table-fixed-column--right.is-first-column.el-table__cell
+              div.el-scrollbar__bar.is-horizontal
+                div.el-scrollbar__thumb
+              div.el-scrollbar__bar.is-vertical
+                div.el-scrollbar__thumb
+          div.el-table__border-left-patch
+        div.el-table__column-resize-proxy

@@ -1,0 +1,370 @@
+div.analysis-columns
+  div.analysis-left
+    div.condition-overview-card
+      div.coc-header
+        span.coc-title  «AI病情概要»
+      div.coc-summary
+        p  «患者2型糖尿病5年，近2周血糖控制明显恶化（空腹8-10mmol/L，HbA1c 8.6%），伴口渴多饮症状加重。合并高»
+    div.dd-card
+      div.dd-header
+        label.el-checkbox.dd-title-check
+          span.el-checkbox__input.is-indeterminate
+            input.el-checkbox__original
+            span.el-checkbox__inner
+        span.dd-title  «鉴别诊断»
+        button.todo-action-btn.tab-record.dd-confirm-btn  «确认诊断»
+      div.dd-rec-list
+        div.dd-rec-item.primary.selected.focus
+          div.dd-card-main
+            label.el-checkbox.is-checked.todo-item-check.dd-card-check
+              span.el-checkbox__input.is-checked
+                input.el-checkbox__original
+                span.el-checkbox__inner
+            div.dd-card-body
+              div.dd-card-top
+                span.dd-primary-tag.dd-rank-tag.is-first  «首选»
+                span.dd-primary-name  «2型糖尿病（血糖控制不佳）»
+                em.dd-icd  «E11.9»
+              p.dd-reason  «空腹血糖及 HbA1c 长期不达标，近 2 周口渴多饮加重，需强化降糖与生活方式干预。»
+          div.dd-inline-panel
+            div.dd-inline-summary
+              div.dd-diff-block
+                div.dd-diff-label.dd-diff-toggle
+                  span  «需鉴别»
+                  span.dd-diff-count  «（2）»
+                  span.dd-diff-arrow  «›»
+        div.dd-rec-item
+          div.dd-card-main
+            label.el-checkbox.todo-item-check.dd-card-check
+              span.el-checkbox__input
+                input.el-checkbox__original
+                span.el-checkbox__inner
+            div.dd-card-body
+              div.dd-card-top
+                span.dd-primary-tag.dd-rank-tag.is-alt  «备选»
+                span.dd-primary-name  «糖尿病肾病（早期）»
+                em.dd-icd  «E11.2»
+              p.dd-reason  «UACR 升高、eGFR 轻度下降，提示早期肾脏损害，需护肾与血压血糖联合管理。»
+          div.dd-inline-panel
+            div.dd-inline-summary
+              div.dd-diff-block
+                div.dd-diff-label.dd-diff-toggle
+                  span  «需鉴别»
+                  span.dd-diff-count  «（2）»
+                  span.dd-diff-arrow  «›»
+        div.dd-rec-item
+          div.dd-card-main
+            label.el-checkbox.todo-item-check.dd-card-check
+              span.el-checkbox__input
+                input.el-checkbox__original
+                span.el-checkbox__inner
+            div.dd-card-body
+              div.dd-card-top
+                span.dd-primary-tag.dd-rank-tag.is-second  «次选»
+                span.dd-primary-name  «糖尿病视网膜病变（NPDR轻度）»
+                em.dd-icd  «E11.3»
+              p.dd-reason  «眼底示非增殖期视网膜病变轻度，血糖控制不佳可加速进展，建议定期眼科随访。»
+          div.dd-inline-panel
+            div.dd-inline-summary
+              div.dd-diff-block
+                div.dd-diff-label.dd-diff-toggle
+                  span  «需鉴别»
+                  span.dd-diff-count  «（2）»
+                  span.dd-diff-arrow  «›»
+  div.analysis-resize-handle
+  div.analysis-right
+    div.record-card
+      div.rc-header
+        span.rc-title  «病历»
+      div.rc-body
+        div.rc-row.smart-note-row
+          span.rc-label  «智能笔记»
+          div.rc-field.smart-note-field
+            textarea
+          button.rc-writeback-icon.smart-note-search  «检»
+        div.rc-row.rc-row-single
+          span.rc-label  «主诉»
+          div.rc-field
+            input
+          button.rc-writeback-icon  «回»
+        div.rc-row
+          span.rc-label  «现病史»
+          div.rc-field
+            textarea
+          button.rc-writeback-icon  «回»
+        div.rc-row
+          span.rc-label  «既往史»
+          div.rc-field
+            textarea
+          button.rc-writeback-icon  «回»
+        div.rc-row
+          span.rc-label  «个人史»
+          div.rc-field
+            textarea
+          button.rc-writeback-icon  «回»
+        div.rc-row.rc-row-single
+          span.rc-label  «过敏史»
+          div.rc-field
+            input
+          button.rc-writeback-icon  «回»
+        div.rc-row.rc-vitals-row
+          span.rc-label  «体征»
+          div.rc-field.rc-vitals-field
+            div.rc-vital
+              span.rc-vk  «身高»
+              input
+              span.rc-vu  «CM»
+            div.rc-vital
+              span.rc-vk  «体重»
+              input
+              span.rc-vu  «KG»
+            div.rc-vital
+              span.rc-vk  «BMI»
+              input
+            div.rc-vital
+              span.rc-vk  «体温»
+              input
+              span.rc-vu  «℃»
+            div.rc-vital
+              span.rc-vk  «脉搏»
+              input
+              span.rc-vu  «次/分»
+            div.rc-vital
+              span.rc-vk  «呼吸»
+              input
+              span.rc-vu  «次/分»
+            div.rc-vital.rc-vital-bp
+              span.rc-vk  «血压»
+              input.rc-bp
+              span.rc-slash  «/»
+              input.rc-bp
+            div.rc-vital
+              span.rc-vk  «心率»
+              input
+              span.rc-vu  «次/分»
+          button.rc-writeback-icon  «回»
+        div.rc-row
+          span.rc-label  «体格检查»
+          div.rc-field
+            textarea
+          button.rc-writeback-icon  «回»
+        div.rc-row
+          span.rc-label  «辅助检查»
+          div.rc-field
+            textarea
+          button.rc-writeback-icon  «回»
+        div.rc-row
+          span.rc-label  «建议»
+          div.rc-field
+            textarea
+          button.rc-writeback-icon  «回»
+    div.key-assessment-section
+      div.ka-header
+        div.ka-title  «专项评估»
+      div.ka-categories
+        div.ka-category
+          div.ka-cat-header
+            div.ka-cat-title
+              span.ka-cat-name  «诊疗质控助手»
+            span.ka-cat-count  «7项»
+            span.ka-cat-arrow  «›»
+          div.ka-list
+            div.ka-card.ka-card-danger
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «诊断预后分析»
+                  span.ka-card-toggle.expanded  «›»
+                div.ka-card-detail-row
+                  div.ka-card-detail
+                    div.ka-card-assessment  «帮助医师与患者科学认识预后，合理制定治疗目标与方案，改善医患沟通与治疗决策质量。»
+            div.ka-card.ka-card-danger
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «专病风险评估»
+                  span.ka-card-toggle.expanded  «›»
+                div.ka-card-detail-row
+                  div.ka-card-detail
+                    div.ka-card-assessment  «早期识别高危患者，落实专病风险分层管理，降低门诊不良结局发生率。»
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «院感风险监测»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-danger.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «不良事件监测»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «传染病预警报告»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-danger.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «突发公共卫生事件监测»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-danger.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «危急值闭环管理»
+                  span.ka-card-toggle  «›»
+        div.ka-category
+          div.ka-cat-header
+            div.ka-cat-title
+              span.ka-cat-name  «患者服务助手»
+            span.ka-cat-count  «10项»
+            span.ka-cat-arrow  «›»
+          div.ka-list
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «慢病早期筛查与风险评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «职业病服务评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «转诊服务评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «慢病健康管理包»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «专病健康体检服务»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «专病全病程服务评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «智能设备服务评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «检查检验预约及引导服务»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «健康教育与生活方式干预»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «康复门诊与中医适宜技术服务»
+                  span.ka-card-toggle  «›»
+        div.ka-category
+          div.ka-cat-header
+            div.ka-cat-title
+              span.ka-cat-name  «运营管理助手»
+            span.ka-cat-count  «9项»
+            span.ka-cat-arrow  «›»
+          div.ka-list
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «诊疗权限管理服务»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «预约确认服务»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «医保合规开单»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «合理控费评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «自费与超医保评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-danger.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «医保飞检风险评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «医疗资源效率»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «医生工作量与绩效核算»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-warning.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «首诊复诊比例配置»
+                  span.ka-card-toggle  «›»
+        div.ka-category
+          div.ka-cat-header
+            div.ka-cat-title
+              span.ka-cat-name  «临床科研助手»
+            span.ka-cat-count  «3项»
+            span.ka-cat-arrow  «›»
+          div.ka-list
+            div.ka-card.ka-card-info.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «科研课题入组评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-info.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «药物临床试验评估»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-info.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «科研课题智能推荐»
+                  span.ka-card-toggle  «›»
+        div.ka-category
+          div.ka-cat-header
+            div.ka-cat-title
+              span.ka-cat-name  «临床教学助手»
+            span.ka-cat-count  «4项»
+            span.ka-cat-arrow  «›»
+          div.ka-list
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «教学病例评估推荐»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «处方与病历点评»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «考核题库推荐»
+                  span.ka-card-toggle  «›»
+            div.ka-card.ka-card-success.collapsed
+              div.ka-card-body
+                div.ka-card-title-row
+                  div.ka-card-name  «教学档案»
+                  span.ka-card-toggle  «›»

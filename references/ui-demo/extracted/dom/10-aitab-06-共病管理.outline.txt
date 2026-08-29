@@ -1,0 +1,72 @@
+div.tab-section
+  div.tab-section-title  «共病»
+  div.nutrition-alert-banner
+    div.nutrition-alert-head
+      span.nutrition-alert-badge  «营养共病»
+      span.nutrition-alert-title  «营养共病提醒»
+      span.el-tag.el-tag--danger.el-tag--small.el-tag--plain
+        span.el-tag__content  «评分 5 分»
+    div.nutrition-alert-msg  «患者营养筛查评分 5 分（>3 分），存在营养风险，需要申请营养科会诊。»
+    div.nutrition-alert-actions
+      button.el-button.el-button--primary.el-button--small
+        span  «申请营养科会诊»
+  div.comorbidity-overview
+    div.comorbidity-condition-card
+      div.condition-header
+        span.condition-name  «2型糖尿病高»
+        span.el-tag.el-tag--danger.el-tag--small.el-tag--plain
+          span.el-tag__content  «高危»
+        span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+          span.el-tag__content  «5年»
+        span
+      div.condition-body
+        div.condition-analysis  «糖尿病病程5年，近期血糖控制不佳（HbA1c 8.5%），存在糖尿病肾病早期风险。建议加强血糖监测，考虑SGLT2i或G»
+        div.condition-dept
+          strong  «推荐科室：»
+          span.el-tag.el-tag--success.el-tag--small.el-tag--light
+            span.el-tag__content  «内分泌科»
+    div.comorbidity-condition-card
+      div.condition-header
+        span.condition-name  «原发性高血压 2级高»
+        span.el-tag.el-tag--danger.el-tag--small.el-tag--plain
+          span.el-tag__content  «高危»
+        span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+          span.el-tag__content  «3年»
+        span
+      div.condition-body
+        div.condition-analysis  «高血压合并糖尿病，需更严格控制血压（目标<130/80mmHg）。建议调整降压方案，优选ACEI/ARB类。»
+        div.condition-dept
+          strong  «推荐科室：»
+          span.el-tag.el-tag--success.el-tag--small.el-tag--light
+            span.el-tag__content  «心内科»
+    div.comorbidity-condition-card
+      div.condition-header
+        span.condition-name  «高脂血症高»
+        span.el-tag.el-tag--danger.el-tag--small.el-tag--plain
+          span.el-tag__content  «高危»
+        span.el-tag.el-tag--info.el-tag--small.el-tag--plain
+          span.el-tag__content  «2年»
+        span
+      div.condition-body
+        div.condition-analysis  «合并糖尿病+高血压，ASCVD风险分层为极高危。LDL-C目标<1.8mmol/L。»
+        div.condition-dept
+          strong  «推荐科室：»
+          span.el-tag.el-tag--success.el-tag--small.el-tag--light
+            span.el-tag__content  «心内科»
+    div.comorbidity-condition-card
+      div.condition-header
+        span.condition-name  «超重»
+        span.el-tag.el-tag--warning.el-tag--small.el-tag--plain
+          span.el-tag__content  «中危»
+        span
+      div.condition-body
+        div.condition-analysis  «BMI 26.1kg/m²，建议制定个体化饮食运动方案，目标减重5-10%。»
+        div.condition-dept
+          strong  «推荐科室：»
+          span.el-tag.el-tag--success.el-tag--small.el-tag--light
+            span.el-tag__content  «营养科»
+  div.comorbidity-actions-bar
+    button.el-button.el-button--warning
+      span  «提醒患者»
+    button.el-button.el-button--primary
+      span  «发起共病会诊»

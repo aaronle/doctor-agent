@@ -1,0 +1,111 @@
+div.tab-section.archive-panel
+  div.archive-overview
+    div.ao-title  «疾病与就诊概览»
+    div.ao-row
+      span.ao-k  «主病»
+      span.ao-v.strong  «2型糖尿病»
+    div.ao-row
+      span.ao-k  «诊断日»
+      span.ao-v  «2021-03-18 09:20:00»
+    div.ao-row
+      span.ao-k  «诊断»
+      span.ao-v  «2型糖尿病、原发性高血压 2级、高脂血症、糖尿病肾病（早期）、NPDR轻度、2型糖尿病（血糖控制不佳）、2型糖尿病伴肾脏»
+    div.ao-row
+      span.ao-k  «就诊»
+      span.ao-v  «8 次展示 · 住 1 / 门 6 / 急 1»
+    div.ao-row
+      span.ao-k  «跨度»
+      span.ao-v  «1917 天（2021-03-18 ~ 2026-06-17）»
+    div.ao-row
+      span.ao-k  «评估»
+      span.ao-v  «口服降糖药、ARB降压、他汀调脂、生活方式干预、眼底筛查、营养评估»
+  div.archive-toolbar
+    div.archive-head
+      div.tab-section-title  «全周期时间轴»
+      span.archive-muted  «覆盖门诊 / 住院 / 急诊健康数据»
+    div.archive-filters
+      button.af-chip.active  «全部»
+      button.af-chip  «门诊»
+      button.af-chip  «住院»
+      button.af-chip  «急诊»
+  div.visit-list
+    div.visit-card
+      div.vc-row
+        span.vc-type.outpatient  «门诊»
+        span.vc-time  «2026-06-17 09:12:00»
+        span.vc-dept  «内分泌科»
+        span.vc-toggle  «›»
+      div.vc-meta
+        span  «主诊 2型糖尿病（血糖控制不佳） (E11.9)»
+        span.vc-rid  «· record 7929101»
+      div.vc-cc  «血糖控制不佳，口渴多饮 2 周»
+    div.visit-card
+      div.vc-row
+        span.vc-type.inpatient  «住院»
+        span.vc-time  «2025-11-08 14:20:00»
+        span.vc-dept  «内分泌科»
+        span.vc-toggle  «›»
+      div.vc-meta
+        span  «主诊 2型糖尿病伴肾脏并发症 (E11.2)»
+        span.vc-rid  «· record 7918802»
+      div.vc-cc  «血糖波动伴下肢水肿入院调药»
+    div.visit-card
+      div.vc-row
+        span.vc-type.outpatient  «门诊»
+        span.vc-time  «2025-03-22 09:05:00»
+        span.vc-dept  «内分泌科»
+        span.vc-toggle  «›»
+      div.vc-meta
+        span  «主诊 2型糖尿病 (E11.9)»
+        span.vc-rid  «· record 7901120»
+      div.vc-cc  «血糖复查»
+    div.visit-card
+      div.vc-row
+        span.vc-type.outpatient  «门诊»
+        span.vc-time  «2025-01-10 10:15:00»
+        span.vc-dept  «眼科»
+        span.vc-toggle  «›»
+      div.vc-meta
+        span  «主诊 糖尿病视网膜病变（NPDR轻度） (E11.3)»
+        span.vc-rid  «· record 7899044»
+      div.vc-cc  «眼底检查»
+    div.visit-card
+      div.vc-row
+        span.vc-type.outpatient  «门诊»
+        span.vc-time  «2024-11-20 09:00:00»
+        span.vc-dept  «内分泌科»
+        span.vc-toggle  «›»
+      div.vc-meta
+        span  «主诊 2型糖尿病、原发性高血压 (E11.9)»
+        span.vc-rid  «· record 7885011»
+      div.vc-cc  «定期复诊»
+    div.visit-card
+      div.vc-row
+        span.vc-type.outpatient  «门诊»
+        span.vc-time  «2024-09-15 08:50:00»
+        span.vc-dept  «内分泌科»
+        span.vc-toggle  «›»
+      div.vc-meta
+        span  «主诊 2型糖尿病 (E11.9)»
+        span.vc-rid  «· record 7872203»
+      div.vc-cc  «血糖控制不佳复诊»
+    div.visit-card
+      div.vc-row
+        span.vc-type.emergency  «急诊»
+        span.vc-time  «2023-06-12 15:40:00»
+        span.vc-dept  «急诊科»
+        span.vc-toggle  «›»
+      div.vc-meta
+        span  «主诊 原发性高血压 2级 (I10)»
+        span.vc-rid  «· record 7810045»
+      div.vc-cc  «头晕伴血压升高»
+    div.visit-card
+      div.vc-row
+        span.vc-type.outpatient  «门诊»
+        span.vc-time  «2021-03-18 09:20:00»
+        span.vc-dept  «内分泌科»
+        span.vc-toggle  «›»
+      div.vc-meta
+        span  «主诊 2型糖尿病（初诊） (E11.9)»
+        span.vc-rid  «· record 7701200»
+      div.vc-cc  «体检发现血糖升高»
