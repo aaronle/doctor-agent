@@ -1,0 +1,26 @@
+{
+  "name": "doctor-agent",
+  "private": true,
+  "version": "0.2.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": ".venv/bin/uvicorn app.main:app --app-dir apps/api --host 127.0.0.1 --port 8000 --reload",
+    "dev:web": "npm run dev --workspace @doctor-agent/web",
+    "build": "npm run build --workspace @doctor-agent/web",
+    "test": "npm run test --workspace @doctor-agent/web",
+    "test:web": "npm run test --workspace @doctor-agent/web",
+    "test:api": ".venv/bin/python -m pytest apps/api/tests",
+    "test:all": "npm run typecheck && npm run test:web && npm run test:api",
+    "contracts:export": ".venv/bin/python scripts/export_contracts.py",
+    "typecheck": "npm run typecheck --workspace @doctor-agent/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

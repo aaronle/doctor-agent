@@ -7,6 +7,16 @@ dist/
 build/
 coverage/
 .venv/
+.pytest_cache/
+.vite/
+.doctor-agent/
+# 数据库一律不进 Git：连字符与下划线两种命名都挡住
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
 __pycache__/
 *.pyc
 *.log

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Doctor Agent 一期交互原型</title>
+  <link rel="stylesheet" href="./styles.css">
+  <!-- Design-only bridge for importing this prototype into the project Figma file. -->
+  <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+</head>
+<body>
+  <div class="prototype-notice" role="status">
+    <strong>演示环境</strong><span>全部患者与临床数据均为模拟，不连接真实 HIS，不执行真实写回。</span>
+  </div>
+
+  <div class="app-shell">
+    <header class="brand-header">
+      <div class="brand-lockup" aria-label="北大医疗 北京大学国际医院">
+        <div class="brand-mark" aria-hidden="true"><span>北</span></div>
+        <div>
+          <div class="brand-org">北大医疗 · 北京大学国际医院</div>
+          <div class="brand-product">Doctor Agent 医生智能体</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span class="service-state"><i></i>Agent 服务正常</span>
+        <button class="icon-button" aria-label="通知">通知 <b>2</b></button>
+        <span class="doctor-name">内分泌科 · 张医生</span>
+      </div>
+    </header>
+
+    <section class="patient-safety" aria-label="患者安全信息">
+      <div class="patient-id-block">
+        <button class="back-button" aria-label="返回候诊列表">‹</button>
+        <div>
+          <div class="patient-name">李悦 <span>女 · 42 岁</span></div>
+          <div class="patient-meta">门诊号 OP20260828017 · 就诊 ID V260828017</div>
+        </div>
+      </div>
+      <div class="safety-facts">
+        <span><small>科室</small>内分泌门诊</span>
+        <span><small>过敏</small><strong class="critical-text">青霉素</strong></span>
+        <span><small>数据截至</small>10:26:18</span>
+      </div>
+      <button class="risk-strip" id="riskStrip" aria-expanded="false">
+        <span class="risk-level">红色风险 1</span>
+        <span class="risk-summary">夜间低血糖待处置</span>
+        <span class="warning-count">黄色 2</span>
+        <span aria-hidden="true">›</span>
+      </button>
+    </section>
+
+    <main class="workspace">
+      <aside class="patient-rail" aria-label="候诊患者">
+        <button class="rail-toggle" id="railToggle" aria-expanded="true" title="收起患者队列">‹</button>
+        <div class="rail-heading">今日候诊 <b>12</b></div>
+        <button class="patient-chip active"><span>李</span><div><b>李悦</b><small>接诊中 · 红色风险</small></div><i class="dot critical"></i></button>
+        <button class="patient-chip"><span>王</span><div><b>王晨</b><small>09:40 · 已候诊 12 分</small></div><i class="dot warning"></i></button>
+        <button class="patient-chip"><span>赵</span><div><b>赵宁</b><small>10:00 · 已签到</small></div></button>
+        <button class="patient-chip"><span>陈</span><div><b>陈涛</b><small>10:20 · 未签到</small></div></button>
+        <button class="rail-more">查看全部患者</button>
+      </aside>
+
+      <section class="clinical-panel" aria-label="主临床工作区">
+        <nav class="clinical-tabs" aria-label="临床工作区导航">
+          <button class="active">门诊病历</button>
+          <button>诊断 <b>2</b></button>
+          <button>检查检验 <b>4</b></button>
+          <button>处理意见</button>
+        </nav>
+        <div class="record-toolbar">
+          <div><strong>门诊初诊病历</strong><span class="save-state">已自动暂存 · 10:27:12</span></div>
+          <div><button class="subtle-button">查看版本</button><button class="subtle-button">展开全部</button></div>
+        </div>
+        <div class="record-editor">
+          <section class="record-section complete">
+            <header><span>主诉</span><em>已确认</em></header>
+            <div class="record-field" contenteditable="true">口渴、多饮伴夜尿增多 2 周。</div>
+          </section>
+          <section class="record-section suggestion-open">
+            <header><span>现病史</span><em>AI 建议待确认</em></header>
+            <div class="record-field" contenteditable="true">患者 2 周前无明显诱因出现口渴、多饮，每日饮水约 3 L，夜尿 3–4 次。近 1 周自测空腹血糖偏高。</div>
+            <div class="inline-suggestion">
+              <div><span class="ai-label">AI 段落建议</span><small>病历生成 · 数据截至 10:26</small></div>
+              <p>建议补充：体重变化、视物模糊、肢端麻木及近期感染情况；“无低血糖发作”尚未获得患者确认。</p>
+              <div class="suggestion-actions"><button class="primary-mini">合并到本段</button><button>编辑</button><button>拒绝</button><button class="evidence-trigger">查看 4 条来源</button></div>
+            </div>
+          </section>
+          <section class="record-section needs-input">
+            <header><span>既往史</span><em>需补充</em></header>
+            <div class="record-field muted" contenteditable="true">点击录入，或从病情概况中选择已确认信息……</div>
+          </section>
+          <section class="record-grid">
+            <div class="record-section compact"><header><span>体格检查</span><em>已录入</em></header><div class="record-field">BP 138/86 mmHg · BMI 27.4 kg/m²</div></div>
+            <div class="record-section compact"><header><span>辅助检查</span><em>数据有更新</em></header><div class="record-field">空腹血糖 8.9 mmol/L ↑ · HbA1c 7.6% ↑</div></div>
+          </section>
+          <section class="diagnosis-block">
+            <div class="section-title"><strong>本次诊断</strong><button class="text-button" data-feature="diagnosis">打开诊断管理</button></div>
+            <div class="diagnosis-row"><span class="primary-tag">主要</span><b>2 型糖尿病（初步）</b><small>E11.900 · 医生已确认</small></div>
+            <div class="diagnosis-row pending"><span class="pending-tag">待排</span><b>甲状腺功能亢进症</b><small>来源：鉴别诊断 · 待补充甲功</small></div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="agent-workspace" aria-label="医生智能体工作区">
+        <div class="agent-header">
+          <div><strong>医生智能体</strong><small>一个入口 · 七项临床任务</small></div>
+          <button id="agentCollapse" class="icon-button" aria-label="收起智能体工作区">›</button>
+        </div>
+        <nav class="feature-nav" aria-label="一期功能">
+          <button data-feature="voice"><span>01</span>语音问诊<i class="dot success"></i></button>
+          <button class="active" data-feature="summary"><span>02</span>病情概况<i class="dot info"></i></button>
+          <button data-feature="record"><span>03</span>病历生成</button>
+          <button data-feature="differential"><span>04</span>鉴别诊断<i class="dot info"></i></button>
+          <button data-feature="diagnosis"><span>05</span>诊断管理</button>
+          <button data-feature="risk"><span>06</span>风险管理<b class="nav-badge">3</b></button>
+          <button data-feature="comorbidity"><span>07</span>共病管理<i class="dot warning"></i></button>
+        </nav>
+        <div class="agent-content" id="agentContent" aria-live="polite"></div>
+        <div class="agent-footer">
+          <button class="question-trigger">＋ 补充一个临床问题</button>
+          <button class="icon-button" title="任务与审计">任务</button>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="action-bar">
+      <div><span class="save-indicator"><i></i>医生草稿已暂存</span><span>待确认 AI 建议 3</span><button id="footerRisk">待处理风险 3</button></div>
+      <div><button class="secondary-button">暂存</button><button class="primary-button" disabled title="红色风险未处置">提交模拟写回</button></div>
+    </footer>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="evidence-drawer" id="evidenceDrawer" aria-hidden="true" aria-label="证据详情">
+    <header><div><strong id="drawerTitle">证据与处置</strong><small>患者 李悦 · V260828017</small></div><button class="icon-button" id="drawerClose" aria-label="关闭">×</button></header>
+    <div id="drawerContent"></div>
+  </aside>
+
+  <script src="./app.js"></script>
+</body>
+</html>

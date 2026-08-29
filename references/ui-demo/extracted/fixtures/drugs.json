@@ -1,0 +1,146 @@
+[
+  {
+    "id": "D001",
+    "name": "二甲双胍缓释片",
+    "spec": "0.5g/片",
+    "unit": "片",
+    "category": "降糖药",
+    "stock": 500
+  },
+  {
+    "id": "D002",
+    "name": "阿卡波糖片",
+    "spec": "50mg/片",
+    "unit": "片",
+    "category": "降糖药",
+    "stock": 300
+  },
+  {
+    "id": "D003",
+    "name": "格列美脲片",
+    "spec": "2mg/片",
+    "unit": "片",
+    "category": "降糖药",
+    "stock": 200
+  },
+  {
+    "id": "D004",
+    "name": "西格列汀片",
+    "spec": "100mg/片",
+    "unit": "片",
+    "category": "降糖药",
+    "stock": 150
+  },
+  {
+    "id": "D005",
+    "name": "达格列净片",
+    "spec": "10mg/片",
+    "unit": "片",
+    "category": "降糖药(SGLT-2)",
+    "stock": 100
+  },
+  {
+    "id": "D006",
+    "name": "利拉鲁肽注射液",
+    "spec": "3mL:18mg/支",
+    "unit": "支",
+    "category": "降糖药(GLP-1)",
+    "stock": 80
+  },
+  {
+    "id": "D007",
+    "name": "厄贝沙坦片",
+    "spec": "150mg/片",
+    "unit": "片",
+    "category": "降压药(ARB)",
+    "stock": 300
+  },
+  {
+    "id": "D008",
+    "name": "缬沙坦片",
+    "spec": "80mg/片",
+    "unit": "片",
+    "category": "降压药(ARB)",
+    "stock": 250
+  },
+  {
+    "id": "D009",
+    "name": "氨氯地平片",
+    "spec": "5mg/片",
+    "unit": "片",
+    "category": "降压药(CCB)",
+    "stock": 400
+  },
+  {
+    "id": "D010",
+    "name": "硝苯地平控释片",
+    "spec": "30mg/片",
+    "unit": "片",
+    "category": "降压药(CCB)",
+    "stock": 200
+  },
+  {
+    "id": "D011",
+    "name": "阿托伐他汀钙片",
+    "spec": "20mg/片",
+    "unit": "片",
+    "category": "降脂药",
+    "stock": 350
+  },
+  {
+    "id": "D012",
+    "name": "瑞舒伐他汀钙片",
+    "spec": "10mg/片",
+    "unit": "片",
+    "category": "降脂药",
+    "stock": 200
+  },
+  {
+    "id": "D013",
+    "name": "阿司匹林肠溶片",
+    "spec": "100mg/片",
+    "unit": "片",
+    "category": "抗血小板",
+    "stock": 500
+  },
+  {
+    "id": "D014",
+    "name": "氯吡格雷片",
+    "spec": "75mg/片",
+    "unit": "片",
+    "category": "抗血小板",
+    "stock": 300
+  },
+  {
+    "id": "D015",
+    "name": "丙基硫氧嘧啶片",
+    "spec": "50mg/片",
+    "unit": "片",
+    "category": "抗甲状腺药",
+    "stock": 200
+  },
+  {
+    "id": "D016",
+    "name": "甲钴胺片",
+    "spec": "0.5mg/片",
+    "unit": "片",
+    "category": "神经营养药",
+    "stock": 400
+  },
+  {
+    "id": "D017",
+    "name": "复方丹参滴丸",
+    "spec": "27mg/粒",
+    "unit": "粒",
+    "category": "中成药",
+    "stock": 300
+  },
+  {
+    "id": "D018",
+    "name": "缬沙坦氨氯地平片",
+    "spec": "80mg/5mg/片",
+    "unit": "片",
+    "category": "复方降压药",
+    "stock": 100
+  }
+]

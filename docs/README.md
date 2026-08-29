@@ -15,11 +15,22 @@
 - [`00-一期研发总纲.md`](00-一期研发总纲.md)
 - [`product/01-产品功能详细规格.md`](product/01-产品功能详细规格.md)
 - [`product/02-UIUX详细规格与页面Mockup.md`](product/02-UIUX详细规格与页面Mockup.md)
+- [`product/03-Demo审视与北大医疗UIUX优化方案.md`](product/03-Demo审视与北大医疗UIUX优化方案.md)（当前为沿用最早 HTML 的决策记录）
+- [`product/04-UIUX原型与需求追踪说明.md`](product/04-UIUX原型与需求追踪说明.md)
+- [`product/05-第一期Figma勾画稿清单.md`](product/05-第一期Figma勾画稿清单.md)
+- [`product/06-F01-F03语音问诊与病历生成UI需求规格.md`](product/06-F01-F03语音问诊与病历生成UI需求规格.md)（当前高保真状态、交互、字段、Agent 契约与验收基线）
+- [`product/07-专项评估技能组UIUX需求规格.md`](product/07-专项评估技能组UIUX需求规格.md)（五类“小秘书”方向、33 项专项能力、集成边界与测试要求）
+- [`testing/01-一期UIUX与功能测试用例.md`](testing/01-一期UIUX与功能测试用例.md)
+- [`testing/02-一期七功能Mock产品测试报告.md`](testing/02-一期七功能Mock产品测试报告.md)
 - [`agent-integration/01-Agent集成与Mockup详细规格.md`](agent-integration/01-Agent集成与Mockup详细规格.md)
+- [`agent-integration/02-Agent配置与运行控制台需求规格.md`](agent-integration/02-Agent配置与运行控制台需求规格.md)（六个 Agent 的 Prompt、Haiku、数据接口、Skills/MCP、评测、发布与回滚后台）
 - [`agent-roles-and-evaluation/01-Agent岗位与调优Mockup详细规格.md`](agent-roles-and-evaluation/01-Agent岗位与调优Mockup详细规格.md)
 - [`implementation/01-快速开发准备与迭代计划.md`](implementation/01-快速开发准备与迭代计划.md)
+- [`implementation/02-本地开发与架构说明.md`](implementation/02-本地开发与架构说明.md)
 
 ## 参考材料
 
 - [`product/AI-HIS医生智能体一期产品设计与工作界面方案.docx`](product/AI-HIS医生智能体一期产品设计与工作界面方案.docx)
-- [`../references/ui-demo/AI-HIS门诊模块V4.3.html`](../references/ui-demo/AI-HIS门诊模块V4.3.html)
+- [`../references/ui-demo/AI-HIS门诊模块V4.3.html`](../references/ui-demo/AI-HIS门诊模块V4.3.html)（不可修改的最早 HTML 原件）
+- [`../references/ui-demo/README.md`](../references/ui-demo/README.md)（来源、校验值和不可覆盖规则）
+- [`../design/current/AI-HIS医生智能体一期.html`](../design/current/AI-HIS医生智能体一期.html)（当前直接实现基线）

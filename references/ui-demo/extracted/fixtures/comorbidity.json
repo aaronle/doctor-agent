@@ -1,0 +1,81 @@
+{
+  "P001": {
+    "detected": true,
+    "risk_level": "高风险",
+    "conditions": [
+      {
+        "name": "2型糖尿病",
+        "icd": "E11.9",
+        "duration": "5年",
+        "risk_level": "高危",
+        "analysis": "糖尿病病程5年，近期血糖控制不佳（HbA1c 8.5%），存在糖尿病肾病早期风险。建议加强血糖监测，考虑SGLT2i或GLP-1RA类药物。",
+        "recommended_dept": "内分泌科"
+      },
+      {
+        "name": "原发性高血压 2级",
+        "icd": "I10",
+        "duration": "3年",
+        "risk_level": "高危",
+        "analysis": "高血压合并糖尿病，需更严格控制血压（目标<130/80mmHg）。建议调整降压方案，优选ACEI/ARB类。",
+        "recommended_dept": "心内科"
+      },
+      {
+        "name": "高脂血症",
+        "icd": "E78.5",
+        "duration": "2年",
+        "risk_level": "高危",
+        "analysis": "合并糖尿病+高血压，ASCVD风险分层为极高危。LDL-C目标<1.8mmol/L。",
+        "recommended_dept": "心内科"
+      },
+      {
+        "name": "超重",
+        "icd": "E66.3",
+        "risk_level": "中危",
+        "analysis": "BMI 26.1kg/m²，建议制定个体化饮食运动方案，目标减重5-10%。",
+        "recommended_dept": "营养科"
+      }
+    ],
+    "summary": "患者同时患有2型糖尿病、原发性高血压、高脂血症、超重等4种慢性疾病，属于典型的多病共存患者。需综合管理而非单病种分治。",
+    "recommendation": "建议转诊至「多病共存管理门诊」进行综合评估和管理。"
+  },
+  "P006": {
+    "detected": true,
+    "risk_level": "高风险",
+    "conditions": [
+      {
+        "name": "脑梗死（急性期）",
+        "icd": "I63.9",
+        "duration": "3天",
+        "risk_level": "高危",
+        "analysis": "急性脑梗死3天，需紧急启动二级预防：双联抗血小板+强化降脂。",
+        "recommended_dept": "神经内科"
+      },
+      {
+        "name": "高血压 3级",
+        "icd": "I10",
+        "duration": "15年",
+        "risk_level": "高危",
+        "analysis": "高血压合并脑梗死、糖尿病，属极高危。需严格控制血压<130/80mmHg。",
+        "recommended_dept": "心内科"
+      },
+      {
+        "name": "2型糖尿病",
+        "icd": "E11.9",
+        "duration": "10年",
+        "risk_level": "中危",
+        "analysis": "合并脑梗死，需强化降糖管理。建议优选具有心血管获益的降糖药物。",
+        "recommended_dept": "内分泌科"
+      },
+      {
+        "name": "高脂血症",
+        "icd": "E78.5",
+        "duration": "10年",
+        "risk_level": "高危",
+        "analysis": "LDL-C 3.6mmol/L，脑梗死患者目标<1.8mmol/L，严重不达标。",
+        "recommended_dept": "心内科"
+      }
+    ],
+    "summary": "患者同时患有脑梗死（急性期）、高血压3级、2型糖尿病、高脂血症等4种疾病，属于典型的多病共存高危患者。",
+    "recommendation": "建议启动多学科协作（MDT）会诊，联合制定综合治疗方案。"
+  }
+}

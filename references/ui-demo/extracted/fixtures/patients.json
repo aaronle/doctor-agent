@@ -1,0 +1,1698 @@
+[
+  {
+    "id": "P001",
+    "name": "王某某",
+    "gender": "女",
+    "age": 58,
+    "id_no": "310101196603150028",
+    "phone": "138****8001",
+    "visit_type": "门诊",
+    "dept": "内分泌科",
+    "doctor": "李医生",
+    "visit_date": "2026-06-17",
+    "chief_complaint": "血糖控制不佳，口渴多饮 2 周",
+    "is_return_visit": true,
+    "pre_consultation_done": true,
+    "diagnoses": [],
+    "suspected_diagnoses": [
+      {
+        "name": "2型糖尿病（血糖控制不佳）",
+        "confidence": 0.92,
+        "icd": "E11.9",
+        "desc": "空腹血糖及 HbA1c 长期不达标，近 2 周口渴多饮加重，需强化降糖与生活方式干预。"
+      },
+      {
+        "name": "糖尿病肾病（早期）",
+        "confidence": 0.78,
+        "icd": "E11.2",
+        "desc": "UACR 升高、eGFR 轻度下降，提示早期肾脏损害，需护肾与血压血糖联合管理。"
+      },
+      {
+        "name": "糖尿病视网膜病变（NPDR轻度）",
+        "confidence": 0.85,
+        "icd": "E11.3",
+        "desc": "眼底示非增殖期视网膜病变轻度，血糖控制不佳可加速进展，建议定期眼科随访。"
+      }
+    ],
+    "past_history": "2型糖尿病控诊5年，血糖未达标，合并高血压、血脂异常等。UACR↑，NPDR轻度，病历近似偶服。",
+    "allergies": "",
+    "nutrition_screening_score": 5,
+    "vitals": {
+      "bp": "142/88 mmHg",
+      "hr": 76,
+      "temp": 36.5,
+      "weight": 68.5,
+      "height": 162,
+      "bmi": 26.1,
+      "spo2": 98
+    },
+    "lab_results": [
+      {
+        "name": "空腹血糖",
+        "value": "8.5",
+        "unit": "mmol/L",
+        "ref": "<7.0",
+        "abnormal": true,
+        "history": [
+          "9.2",
+          "8.8",
+          "8.5"
+        ],
+        "history_dates": [
+          "2024-09-15",
+          "2024-11-20",
+          "2025-01-10"
+        ],
+        "trend": "下降",
+        "diff_note": "近3次均值较好，较诊断下降0.7"
+      },
+      {
+        "name": "餐后2h血糖",
+        "value": "12.3",
+        "unit": "mmol/L",
+        "ref": "<10.0",
+        "abnormal": true,
+        "history": [
+          "13.1",
+          "12.8",
+          "12.3"
+        ],
+        "history_dates": [
+          "2024-09-15",
+          "2024-11-20",
+          "2025-01-10"
+        ],
+        "trend": "下降",
+        "diff_note": "近3次均值高，呈下降趋势"
+      },
+      {
+        "name": "糖化血红蛋白(HbA1c)",
+        "value": "8.6%",
+        "unit": "%",
+        "ref": "<7.0%",
+        "abnormal": true,
+        "history": [
+          "9.0%",
+          "8.8%",
+          "8.6%"
+        ],
+        "history_dates": [
+          "2024-09-15",
+          "2024-11-20",
+          "2025-01-10"
+        ],
+        "trend": "下降",
+        "diff_note": "近3次均值较好，较诊断下降0.4%"
+      },
+      {
+        "name": "尿微量白蛋白/肌酐(UACR)",
+        "value": "45",
+        "unit": "mg/g",
+        "ref": "<30",
+        "abnormal": true,
+        "history": [
+          "52",
+          "48",
+          "45"
+        ],
+        "history_dates": [
+          "2024-09-15",
+          "2024-11-20",
+          "2025-01-10"
+        ],
+        "trend": "下降",
+        "diff_note": "近3次均均高，呈下降趋势"
+      },
+      {
+        "name": "肾小球滤过率(eGFR)",
+        "value": "78",
+        "unit": "mL/min/1.73m²",
+        "ref": ">90",
+        "abnormal": true,
+        "history": [
+          "80",
+          "79",
+          "78"
+        ],
+        "history_dates": [
+          "2024-09-15",
+          "2024-11-20",
+          "2025-01-10"
+        ],
+        "trend": "稳定",
+        "diff_note": ""
+      },
+      {
+        "name": "低密度脂蛋白(LDL-C)",
+        "value": "3.2",
+        "unit": "mmol/L",
+        "ref": "<2.6",
+        "abnormal": true,
+        "history": [
+          "3.5",
+          "3.3",
+          "3.2"
+        ],
+        "history_dates": [
+          "2024-09-15",
+          "2024-11-20",
+          "2025-01-10"
+        ],
+        "trend": "下降",
+        "diff_note": ""
+      },
+      {
+        "name": "总胆固醇(TC)",
+        "value": "5.4",
+        "unit": "mmol/L",
+        "ref": "<5.2",
+        "abnormal": true,
+        "history": [
+          "5.8",
+          "5.6",
+          "5.4"
+        ],
+        "history_dates": [
+          "2024-09-15",
+          "2024-11-20",
+          "2025-01-10"
+        ],
+        "trend": "下降",
+        "diff_note": ""
+      }
+    ],
+    "orders": [
+      {
+        "id": "O001",
+        "drug": "二甲双胍缓释片",
+        "dose": "0.5g",
+        "freq": "bid",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      },
+      {
+        "id": "O002",
+        "drug": "阿卡波糖片",
+        "dose": "50mg",
+        "freq": "tid",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      },
+      {
+        "id": "O003",
+        "drug": "沙坦类ARB（厄贝沙坦）",
+        "dose": "150mg",
+        "freq": "qd",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      },
+      {
+        "id": "O004",
+        "drug": "阿托伐他汀钙片",
+        "dose": "20mg",
+        "freq": "qn",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      }
+    ],
+    "visit_history": [
+      {
+        "id": "VH001-08",
+        "datetime": "2026-06-17 09:12:00",
+        "date": "2026-06-17",
+        "visit_type": "门诊",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "血糖控制不佳，口渴多饮 2 周",
+        "diagnosis": "2型糖尿病（血糖控制不佳）",
+        "icd": "E11.9",
+        "record_id": "7929101",
+        "course": "近2周口渴多饮加重，自测空腹血糖8-10 mmol/L。",
+        "exam_points": "HbA1c 8.6%，UACR↑，eGFR轻度下降。",
+        "plan": "评估联合SGLT2i/GLP-1RA，强化监测与营养会诊。",
+        "timeline": [
+          {
+            "time": "2026-06-17 09:30:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "继续二甲双胍缓释片 0.5g bid + 阿卡波糖 50mg tid"
+          },
+          {
+            "time": "2026-06-17 09:35:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "厄贝沙坦 150mg qd；阿托伐他汀钙 20mg qn"
+          }
+        ],
+        "exams": [
+          {
+            "time": "2026-06-17 10:05:00",
+            "name": "眼底照相",
+            "result": "双眼 NPDR 轻度，微动脉瘤(+)"
+          }
+        ],
+        "labs": [
+          {
+            "time": "2026-06-17 09:40:00",
+            "name": "空腹血糖",
+            "value": "8.5",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2026-06-17 09:40:00",
+            "name": "糖化血红蛋白(HbA1c)",
+            "value": "8.6",
+            "unit": "%",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2026-06-17 09:40:00",
+            "name": "尿微量白蛋白/肌酐(UACR)",
+            "value": "45",
+            "unit": "mg/g",
+            "ref": "<30",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2026-06-17 09:40:00",
+            "name": "肾小球滤过率(eGFR)",
+            "value": "78",
+            "unit": "mL/min",
+            "ref": ">90",
+            "abnormal": "↓"
+          },
+          {
+            "time": "2026-06-17 09:40:00",
+            "name": "低密度脂蛋白(LDL-C)",
+            "value": "3.2",
+            "unit": "mmol/L",
+            "ref": "<2.6",
+            "abnormal": "↑"
+          }
+        ]
+      },
+      {
+        "id": "VH001-07",
+        "datetime": "2025-11-08 14:20:00",
+        "date": "2025-11-08",
+        "visit_type": "住院",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "血糖波动伴下肢水肿入院调药",
+        "diagnosis": "2型糖尿病伴肾脏并发症",
+        "icd": "E11.2",
+        "record_id": "7918802",
+        "course": "门诊随访中血糖波动大，双下肢轻度水肿，收入院评估。",
+        "exam_points": "UACR升高，eGFR下降，血压偏高。",
+        "plan": "院内调药，护肾降压，出院后门诊随访。",
+        "timeline": [
+          {
+            "time": "2025-11-08 16:10:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "强化胰岛素教育 + 调整口服降糖方案"
+          },
+          {
+            "time": "2025-11-09 09:00:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "ARB 剂量上调，加强血压与肾功能监测"
+          }
+        ],
+        "exams": [
+          {
+            "time": "2025-11-09 10:20:00",
+            "name": "双肾彩色多普勒超声",
+            "result": "双肾大小正常，皮质回声略增强"
+          },
+          {
+            "time": "2025-11-09 14:00:00",
+            "name": "常规心电图检查",
+            "result": "1.窦性心律 2.轻度ST-T改变"
+          }
+        ],
+        "labs": [
+          {
+            "time": "2025-11-09 07:30:00",
+            "name": "空腹血糖",
+            "value": "9.1",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2025-11-09 07:30:00",
+            "name": "糖化血红蛋白(HbA1c)",
+            "value": "8.9",
+            "unit": "%",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2025-11-09 07:30:00",
+            "name": "血肌酐",
+            "value": "98",
+            "unit": "μmol/L",
+            "ref": "44-97",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2025-11-09 07:30:00",
+            "name": "尿素氮",
+            "value": "7.8",
+            "unit": "mmol/L",
+            "ref": "2.9-7.5",
+            "abnormal": "↑"
+          }
+        ]
+      },
+      {
+        "id": "VH001-06",
+        "datetime": "2025-03-22 09:05:00",
+        "date": "2025-03-22",
+        "visit_type": "门诊",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "血糖复查",
+        "diagnosis": "2型糖尿病",
+        "icd": "E11.9",
+        "record_id": "7901120",
+        "course": "规律服药中，血糖仍波动，生活方式依从性一般。",
+        "exam_points": "HbA1c仍未达标。",
+        "plan": "评估联合SGLT-2抑制剂，强化生活方式干预。",
+        "timeline": [
+          {
+            "time": "2025-03-22 09:40:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "维持原降糖方案，预约营养评估"
+          }
+        ],
+        "exams": [],
+        "labs": [
+          {
+            "time": "2025-03-22 09:20:00",
+            "name": "空腹血糖",
+            "value": "8.8",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2025-03-22 09:20:00",
+            "name": "糖化血红蛋白(HbA1c)",
+            "value": "8.8",
+            "unit": "%",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          }
+        ]
+      },
+      {
+        "id": "VH001-05",
+        "datetime": "2025-01-10 10:15:00",
+        "date": "2025-01-10",
+        "visit_type": "门诊",
+        "dept": "眼科",
+        "doctor": "赵医生",
+        "chief_complaint": "眼底检查",
+        "diagnosis": "糖尿病视网膜病变（NPDR轻度）",
+        "icd": "E11.3",
+        "record_id": "7899044",
+        "course": "糖尿病病程中常规眼底筛查，无明显视力下降主诉。",
+        "exam_points": "双眼底照相示非增殖期视网膜病变（NPDR）轻度。",
+        "plan": "严格控糖控压，每年复查眼底。",
+        "timeline": [
+          {
+            "time": "2025-01-10 10:40:00",
+            "type": "exam",
+            "title": "检查",
+            "detail": "双眼底照相 + 视力检查"
+          }
+        ],
+        "exams": [
+          {
+            "time": "2025-01-10 10:30:00",
+            "name": "双眼底照相",
+            "result": "NPDR轻度，微动脉瘤(+), 硬性渗出少量"
+          },
+          {
+            "time": "2025-01-10 10:35:00",
+            "name": "视力检查",
+            "result": "右眼 0.8，左眼 0.9（矫正）"
+          }
+        ],
+        "labs": []
+      },
+      {
+        "id": "VH001-04",
+        "datetime": "2024-11-20 09:00:00",
+        "date": "2024-11-20",
+        "visit_type": "门诊",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "定期复诊",
+        "diagnosis": "2型糖尿病、原发性高血压",
+        "icd": "E11.9",
+        "record_id": "7885011",
+        "course": "血糖较前略有改善，近期自测血压轻度升高。",
+        "exam_points": "血压偏高，肾功能及血脂待复查。",
+        "plan": "继续降糖方案，加用ARB控制血压。",
+        "timeline": [
+          {
+            "time": "2024-11-20 09:25:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "加用厄贝沙坦 150mg qd"
+          }
+        ],
+        "exams": [],
+        "labs": [
+          {
+            "time": "2024-11-20 09:15:00",
+            "name": "空腹血糖",
+            "value": "8.8",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2024-11-20 09:15:00",
+            "name": "糖化血红蛋白(HbA1c)",
+            "value": "8.8",
+            "unit": "%",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2024-11-20 09:15:00",
+            "name": "低密度脂蛋白(LDL-C)",
+            "value": "3.3",
+            "unit": "mmol/L",
+            "ref": "<2.6",
+            "abnormal": "↑"
+          }
+        ]
+      },
+      {
+        "id": "VH001-03",
+        "datetime": "2024-09-15 08:50:00",
+        "date": "2024-09-15",
+        "visit_type": "门诊",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "血糖控制不佳复诊",
+        "diagnosis": "2型糖尿病",
+        "icd": "E11.9",
+        "record_id": "7872203",
+        "course": "近1月空腹血糖偏高，饮食控制欠佳，偶有口渴多饮。",
+        "exam_points": "空腹血糖升高，HbA1c未达标。",
+        "plan": "调整二甲双胍剂量，加强血糖监测与饮食指导。",
+        "timeline": [
+          {
+            "time": "2024-09-15 09:10:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "二甲双胍缓释片加量至 0.5g bid"
+          }
+        ],
+        "exams": [],
+        "labs": [
+          {
+            "time": "2024-09-15 09:00:00",
+            "name": "空腹血糖",
+            "value": "9.2",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2024-09-15 09:00:00",
+            "name": "糖化血红蛋白(HbA1c)",
+            "value": "9.0",
+            "unit": "%",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          }
+        ]
+      },
+      {
+        "id": "VH001-02",
+        "datetime": "2023-06-12 15:40:00",
+        "date": "2023-06-12",
+        "visit_type": "急诊",
+        "dept": "急诊科",
+        "doctor": "周医生",
+        "chief_complaint": "头晕伴血压升高",
+        "diagnosis": "原发性高血压 2级",
+        "icd": "I10",
+        "record_id": "7810045",
+        "course": "突发头晕，自测血压168/100 mmHg，急诊就诊。",
+        "exam_points": "急诊心电图未见急性缺血改变。",
+        "plan": "降压观察后转内分泌/心内科随访。",
+        "timeline": [
+          {
+            "time": "2023-06-12 16:00:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "急诊降压处理，休息观察2小时"
+          }
+        ],
+        "exams": [
+          {
+            "time": "2023-06-12 16:10:00",
+            "name": "常规心电图检查",
+            "result": "窦性心律，未见明显ST段抬高"
+          }
+        ],
+        "labs": [
+          {
+            "time": "2023-06-12 16:20:00",
+            "name": "肌钙蛋白I",
+            "value": "0.01",
+            "unit": "ng/mL",
+            "ref": "<0.04",
+            "abnormal": "—"
+          },
+          {
+            "time": "2023-06-12 16:20:00",
+            "name": "空腹血糖",
+            "value": "8.1",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          }
+        ]
+      },
+      {
+        "id": "VH001-01",
+        "datetime": "2021-03-18 09:20:00",
+        "date": "2021-03-18",
+        "visit_type": "门诊",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "体检发现血糖升高",
+        "diagnosis": "2型糖尿病（初诊）",
+        "icd": "E11.9",
+        "record_id": "7701200",
+        "course": "单位体检空腹血糖升高，伴轻度口渴多饮。",
+        "exam_points": "空腹血糖及 HbA1c 达诊断标准。",
+        "plan": "启动生活方式干预 + 二甲双胍治疗。",
+        "timeline": [
+          {
+            "time": "2021-03-18 09:50:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "启动二甲双胍 0.5g qd，糖尿病教育"
+          }
+        ],
+        "exams": [],
+        "labs": [
+          {
+            "time": "2021-03-18 09:30:00",
+            "name": "空腹血糖",
+            "value": "8.0",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2021-03-18 09:30:00",
+            "name": "糖化血红蛋白(HbA1c)",
+            "value": "7.4",
+            "unit": "%",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          }
+        ]
+      }
+    ],
+    "health_archive": {
+      "primary_disease": "2型糖尿病",
+      "diagnosis_date": "2021-03-18 09:20:00",
+      "diagnoses": [
+        "2型糖尿病",
+        "原发性高血压 2级",
+        "高脂血症",
+        "糖尿病肾病（早期）",
+        "NPDR轻度"
+      ],
+      "treatments": [
+        "口服降糖药",
+        "ARB降压",
+        "他汀调脂",
+        "生活方式干预",
+        "眼底筛查",
+        "营养评估"
+      ]
+    },
+    "risk_level": "高风险",
+    "has_fundus_exam": false,
+    "has_retinopathy": true,
+    "retinopathy_grade": "NPDR 轻度",
+    "primary_diagnosis": "2型糖尿病"
+  },
+  {
+    "id": "P002",
+    "name": "张某",
+    "gender": "男",
+    "age": 45,
+    "id_no": "310101198105220031",
+    "phone": "139****8002",
+    "visit_type": "门诊",
+    "dept": "心内科",
+    "doctor": "王医生",
+    "visit_date": "2026-06-17",
+    "chief_complaint": "胸闷气短 1 个月，加重 3 天",
+    "is_return_visit": true,
+    "pre_consultation_done": true,
+    "diagnoses": [],
+    "suspected_diagnoses": [
+      {
+        "name": "不稳定型心绞痛",
+        "confidence": 0.85,
+        "icd": "I20.0",
+        "desc": "近 3 天胸闷加重、活动耐量下降，符合不稳定型心绞痛特征，需警惕急性冠脉综合征。"
+      },
+      {
+        "name": "冠心病心绞痛加重",
+        "confidence": 0.9,
+        "icd": "I25.1",
+        "desc": "冠心病病史基础上症状再发加重，建议完善心电图、心肌酶及冠脉评估。"
+      },
+      {
+        "name": "高血压性心脏病",
+        "confidence": 0.55,
+        "icd": "I11",
+        "desc": "长期高血压合并心脏症状，需评估靶器官损害及心功能。"
+      }
+    ],
+    "past_history": "",
+    "allergies": "青霉素过敏",
+    "nutrition_screening_score": 2,
+    "vitals": {
+      "bp": "136/82 mmHg",
+      "hr": 82,
+      "temp": 36.7,
+      "weight": 75,
+      "height": 175,
+      "bmi": 24.5,
+      "spo2": 97
+    },
+    "lab_results": [
+      {
+        "name": "低密度脂蛋白(LDL-C)",
+        "value": "2.8",
+        "unit": "mmol/L",
+        "ref": "<1.8",
+        "abnormal": true,
+        "history": [
+          "3.2",
+          "3.0",
+          "2.8"
+        ],
+        "history_dates": [
+          "2025-10-01",
+          "2026-01-15",
+          "2026-06-17"
+        ],
+        "trend": "下降",
+        "diff_note": "冠心病目标未达标"
+      },
+      {
+        "name": "肌钙蛋白I",
+        "value": "0.02",
+        "unit": "ng/mL",
+        "ref": "<0.04",
+        "abnormal": false,
+        "history": [
+          "0.02"
+        ],
+        "history_dates": [
+          "2026-06-17"
+        ],
+        "trend": "",
+        "diff_note": ""
+      },
+      {
+        "name": "总胆固醇(TC)",
+        "value": "5.1",
+        "unit": "mmol/L",
+        "ref": "<5.2",
+        "abnormal": false,
+        "history": [
+          "5.6",
+          "5.3",
+          "5.1"
+        ],
+        "history_dates": [
+          "2025-10-01",
+          "2026-01-15",
+          "2026-06-17"
+        ],
+        "trend": "下降",
+        "diff_note": ""
+      }
+    ],
+    "orders": [],
+    "visit_history": [],
+    "risk_level": "高风险",
+    "has_fundus_exam": false,
+    "has_retinopathy": false,
+    "retinopathy_grade": "",
+    "primary_diagnosis": "冠心病"
+  },
+  {
+    "id": "P003",
+    "name": "李某某",
+    "gender": "女",
+    "age": 32,
+    "id_no": "310101199402108821",
+    "phone": "137****8003",
+    "visit_type": "门诊",
+    "dept": "内分泌科",
+    "doctor": "李医生",
+    "visit_date": "2026-06-17",
+    "chief_complaint": "甲状腺肿大检查复诊",
+    "is_return_visit": true,
+    "pre_consultation_done": false,
+    "diagnoses": [
+      {
+        "name": "甲状腺功能亢进症",
+        "icd": "E05.9",
+        "duration": "1年",
+        "is_primary": true
+      }
+    ],
+    "suspected_diagnoses": [
+      {
+        "name": "甲状腺功能亢进症（控制中）",
+        "confidence": 0.9,
+        "icd": "E05.9",
+        "desc": "药物治疗后症状改善，TSH 仍偏低、心率偏快，提示尚未完全控制，需调整药量。"
+      }
+    ],
+    "past_history": "甲状腺功能亢进1年，服用丙基硫氧嘧啶，甲功复查。",
+    "allergies": "",
+    "nutrition_screening_score": 1,
+    "vitals": {
+      "bp": "118/72 mmHg",
+      "hr": 96,
+      "temp": 36.9,
+      "weight": 52,
+      "height": 163,
+      "bmi": 19.6,
+      "spo2": 99
+    },
+    "lab_results": [
+      {
+        "name": "促甲状腺激素(TSH)",
+        "value": "0.08",
+        "unit": "mIU/L",
+        "ref": "0.27-4.20",
+        "abnormal": true,
+        "history": [
+          "0.02",
+          "0.05",
+          "0.08"
+        ],
+        "history_dates": [
+          "2024-10-01",
+          "2025-01-15",
+          "2025-04-20"
+        ],
+        "trend": "上升",
+        "diff_note": "趋于正常范围"
+      },
+      {
+        "name": "游离T4(FT4)",
+        "value": "22.1",
+        "unit": "pmol/L",
+        "ref": "12.0-22.0",
+        "abnormal": true,
+        "history": [
+          "35.2",
+          "28.4",
+          "22.1"
+        ],
+        "history_dates": [
+          "2024-10-01",
+          "2025-01-15",
+          "2025-04-20"
+        ],
+        "trend": "下降",
+        "diff_note": "接近正常上限"
+      }
+    ],
+    "orders": [
+      {
+        "id": "O007",
+        "drug": "丙基硫氧嘧啶片",
+        "dose": "50mg",
+        "freq": "tid",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      }
+    ],
+    "visit_history": [
+      {
+        "date": "2024-10-01",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "甲亢初诊",
+        "diagnosis": "甲状腺功能亢进症",
+        "course": "心悸、手抖、体重下降数月，活动后明显。",
+        "exam_points": "甲功示TSH降低、FT4升高。",
+        "plan": "启动丙硫氧嘧啶治疗，定期复查肝功与甲功。"
+      },
+      {
+        "date": "2025-01-15",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "甲功复查",
+        "diagnosis": "甲状腺功能亢进症",
+        "course": "症状较初诊好转，仍有轻度心悸。",
+        "exam_points": "甲功仍未完全正常，心率偏快。",
+        "plan": "微调抗甲亢药物剂量，继续监测心率与体重变化。"
+      },
+      {
+        "date": "2025-04-20",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "定期复诊",
+        "diagnosis": "甲状腺功能亢进症（好转）",
+        "course": "症状明显改善，日常活动耐受良好。",
+        "exam_points": "甲功接近正常上限。",
+        "plan": "维持当前方案，1月后复查甲功评估是否减量。"
+      }
+    ],
+    "risk_level": "低风险",
+    "has_fundus_exam": false,
+    "has_retinopathy": false,
+    "retinopathy_grade": "",
+    "primary_diagnosis": "甲亢"
+  },
+  {
+    "id": "P004",
+    "name": "陈某",
+    "gender": "男",
+    "age": 67,
+    "id_no": "310101195909240019",
+    "phone": "136****8004",
+    "visit_type": "门诊",
+    "dept": "神经内科",
+    "doctor": "陈医生",
+    "visit_date": "2026-06-17",
+    "chief_complaint": "头晕头痛反复发作 1 个月",
+    "is_return_visit": false,
+    "pre_consultation_done": true,
+    "diagnoses": [
+      {
+        "name": "高血压 3级",
+        "icd": "I10",
+        "duration": "10年",
+        "is_primary": true
+      },
+      {
+        "name": "2型糖尿病",
+        "icd": "E11.9",
+        "duration": "8年",
+        "is_primary": false
+      },
+      {
+        "name": "脑供血不足",
+        "icd": "G45.9",
+        "duration": "1年",
+        "is_primary": false
+      }
+    ],
+    "suspected_diagnoses": [
+      {
+        "name": "高血压 3级（极高危）",
+        "confidence": 0.95,
+        "icd": "I10",
+        "desc": "血压显著升高伴头晕头痛，属极高危，需强化降压并评估靶器官损害。"
+      },
+      {
+        "name": "脑供血不足（高血压性）",
+        "confidence": 0.8,
+        "icd": "G45.9",
+        "desc": "体位相关头晕，结合高血压病史，考虑脑供血不足，建议完善影像评估。"
+      },
+      {
+        "name": "2型糖尿病脑血管并发症",
+        "confidence": 0.55,
+        "icd": "E11.5",
+        "desc": "长期糖尿病合并脑血管症状，需同时优化血糖与血压管理。"
+      }
+    ],
+    "past_history": "高血压10年，血压控制差；2型糖尿病8年，规律服药；近1年出现头晕症状。",
+    "allergies": "",
+    "nutrition_screening_score": 4,
+    "vitals": {
+      "bp": "168/102 mmHg",
+      "hr": 88,
+      "temp": 36.6,
+      "weight": 82,
+      "height": 170,
+      "bmi": 28.4,
+      "spo2": 96
+    },
+    "lab_results": [
+      {
+        "name": "空腹血糖",
+        "value": "9.8",
+        "unit": "mmol/L",
+        "ref": "<7.0",
+        "abnormal": true,
+        "history": [
+          "11.2",
+          "10.5",
+          "9.8"
+        ],
+        "history_dates": [
+          "2024-08-20",
+          "2024-11-10",
+          "2025-02-18"
+        ],
+        "trend": "下降",
+        "diff_note": ""
+      },
+      {
+        "name": "糖化血红蛋白(HbA1c)",
+        "value": "9.2%",
+        "unit": "%",
+        "ref": "<7.0%",
+        "abnormal": true,
+        "history": [
+          "10.1%",
+          "9.8%",
+          "9.2%"
+        ],
+        "history_dates": [
+          "2024-08-20",
+          "2024-11-10",
+          "2025-02-18"
+        ],
+        "trend": "下降",
+        "diff_note": ""
+      }
+    ],
+    "orders": [
+      {
+        "id": "O008",
+        "drug": "硝苯地平控释片",
+        "dose": "30mg",
+        "freq": "qd",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      },
+      {
+        "id": "O009",
+        "drug": "缬沙坦片",
+        "dose": "80mg",
+        "freq": "qd",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      },
+      {
+        "id": "O010",
+        "drug": "格列美脲片",
+        "dose": "2mg",
+        "freq": "qd",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      }
+    ],
+    "visit_history": [
+      {
+        "date": "2025-02-18",
+        "dept": "神经内科",
+        "doctor": "陈医生",
+        "chief_complaint": "头晕初诊",
+        "diagnosis": "高血压、脑供血不足",
+        "course": "反复头晕伴轻度视物模糊，晨起及体位改变时明显。",
+        "exam_points": "血压偏高，头颅CT未见出血。",
+        "plan": "启动降压治疗，完善颈动脉超声并神经内科随访。"
+      }
+    ],
+    "risk_level": "高风险",
+    "has_fundus_exam": false,
+    "has_retinopathy": false,
+    "retinopathy_grade": "",
+    "primary_diagnosis": "高血压"
+  },
+  {
+    "id": "P005",
+    "name": "刘某某",
+    "gender": "女",
+    "age": 52,
+    "id_no": "310101197304210044",
+    "phone": "135****8005",
+    "visit_type": "门诊",
+    "dept": "内分泌科",
+    "doctor": "李医生",
+    "visit_date": "2026-06-17",
+    "chief_complaint": "体检发现血糖升高，来院就诊",
+    "is_return_visit": false,
+    "pre_consultation_done": false,
+    "diagnoses": [
+      {
+        "name": "2型糖尿病（初诊）",
+        "icd": "E11.9",
+        "duration": "初诊",
+        "is_primary": true
+      }
+    ],
+    "suspected_diagnoses": [
+      {
+        "name": "2型糖尿病（初诊）",
+        "confidence": 0.88,
+        "icd": "E11.9",
+        "desc": "体检发现空腹血糖及 HbA1c 升高，伴口渴多饮，符合 2 型糖尿病初诊标准。"
+      },
+      {
+        "name": "糖耐量受损",
+        "confidence": 0.3,
+        "icd": "R73.0",
+        "desc": "若复查未达糖尿病诊断阈值，需鉴别糖耐量受损并随访。"
+      }
+    ],
+    "past_history": "否认其他慢病史，家族有糖尿病史（父亲）。",
+    "allergies": "",
+    "nutrition_screening_score": 2,
+    "vitals": {
+      "bp": "122/76 mmHg",
+      "hr": 72,
+      "temp": 36.4,
+      "weight": 63,
+      "height": 160,
+      "bmi": 24.6,
+      "spo2": 98
+    },
+    "lab_results": [
+      {
+        "name": "空腹血糖",
+        "value": "7.8",
+        "unit": "mmol/L",
+        "ref": "<7.0",
+        "abnormal": true,
+        "history": [
+          "7.8"
+        ],
+        "history_dates": [
+          "2026-06-10"
+        ],
+        "trend": "",
+        "diff_note": "初诊"
+      },
+      {
+        "name": "糖化血红蛋白(HbA1c)",
+        "value": "7.2%",
+        "unit": "%",
+        "ref": "<7.0%",
+        "abnormal": true,
+        "history": [
+          "7.2%"
+        ],
+        "history_dates": [
+          "2026-06-10"
+        ],
+        "trend": "",
+        "diff_note": "初诊"
+      }
+    ],
+    "orders": [],
+    "visit_history": [],
+    "risk_level": "中风险",
+    "has_fundus_exam": false,
+    "has_retinopathy": false,
+    "retinopathy_grade": "",
+    "primary_diagnosis": "糖尿病"
+  },
+  {
+    "id": "P006",
+    "name": "赵某某",
+    "gender": "男",
+    "age": 72,
+    "id_no": "310101195408150017",
+    "phone": "133****8006",
+    "visit_type": "门诊",
+    "dept": "神经内科",
+    "doctor": "陈医生",
+    "visit_date": "2026-06-20",
+    "chief_complaint": "右侧肢体无力伴言语不清 3 天",
+    "is_return_visit": true,
+    "pre_consultation_done": true,
+    "diagnoses": [
+      {
+        "name": "脑梗死",
+        "icd": "I63.9",
+        "duration": "3天",
+        "is_primary": true
+      },
+      {
+        "name": "高血压 3级",
+        "icd": "I10",
+        "duration": "15年",
+        "is_primary": false
+      },
+      {
+        "name": "2型糖尿病",
+        "icd": "E11.9",
+        "duration": "10年",
+        "is_primary": false
+      }
+    ],
+    "suspected_diagnoses": [
+      {
+        "name": "急性脑梗死",
+        "confidence": 0.95,
+        "icd": "I63.9",
+        "desc": "急性起病的偏瘫伴言语不清，符合急性脑梗死表现，需急诊评估与二级预防。"
+      },
+      {
+        "name": "高血压 3级（极高危）",
+        "confidence": 0.9,
+        "icd": "I10",
+        "desc": "长期高血压控制不佳，本次伴脑血管事件，属极高危。"
+      },
+      {
+        "name": "2型糖尿病",
+        "confidence": 0.88,
+        "icd": "E11.9",
+        "desc": "糖尿病病史明确，血糖未达标，增加脑血管事件风险。"
+      },
+      {
+        "name": "混合型高脂血症",
+        "confidence": 0.82,
+        "icd": "E78.2",
+        "desc": "LDL-C 明显超标，脑梗死患者降脂需强化至目标值。"
+      }
+    ],
+    "past_history": "高血压15年，血压控制不佳；2型糖尿病10年，口服降糖药；1年前TIA发作1次，未规律服用抗血小板药。",
+    "allergies": "",
+    "nutrition_screening_score": 4,
+    "vitals": {
+      "bp": "158/96 mmHg",
+      "hr": 78,
+      "temp": 36.4,
+      "weight": 74,
+      "height": 172,
+      "bmi": 25,
+      "spo2": 96
+    },
+    "lab_results": [
+      {
+        "name": "空腹血糖",
+        "value": "8.2",
+        "unit": "mmol/L",
+        "ref": "<7.0",
+        "abnormal": true,
+        "history": [
+          "9.5",
+          "8.8",
+          "8.2"
+        ],
+        "history_dates": [
+          "2025-09-10",
+          "2025-12-05",
+          "2026-03-15"
+        ],
+        "trend": "下降",
+        "diff_note": ""
+      },
+      {
+        "name": "糖化血红蛋白(HbA1c)",
+        "value": "7.8%",
+        "unit": "%",
+        "ref": "<7.0%",
+        "abnormal": true,
+        "history": [
+          "8.5%",
+          "8.1%",
+          "7.8%"
+        ],
+        "history_dates": [
+          "2025-09-10",
+          "2025-12-05",
+          "2026-03-15"
+        ],
+        "trend": "下降",
+        "diff_note": ""
+      },
+      {
+        "name": "低密度脂蛋白(LDL-C)",
+        "value": "3.6",
+        "unit": "mmol/L",
+        "ref": "<1.8",
+        "abnormal": true,
+        "history": [
+          "4.2",
+          "3.9",
+          "3.6"
+        ],
+        "history_dates": [
+          "2025-09-10",
+          "2025-12-05",
+          "2026-03-15"
+        ],
+        "trend": "下降",
+        "diff_note": "脑梗死患者目标<1.8，严重超标"
+      },
+      {
+        "name": "总胆固醇(TC)",
+        "value": "5.8",
+        "unit": "mmol/L",
+        "ref": "<5.2",
+        "abnormal": true,
+        "history": [
+          "6.2",
+          "6.0",
+          "5.8"
+        ],
+        "history_dates": [
+          "2025-09-10",
+          "2025-12-05",
+          "2026-03-15"
+        ],
+        "trend": "下降",
+        "diff_note": ""
+      }
+    ],
+    "orders": [
+      {
+        "id": "O011",
+        "drug": "氯吡格雷片",
+        "dose": "75mg",
+        "freq": "qd",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      },
+      {
+        "id": "O012",
+        "drug": "阿托伐他汀钙片",
+        "dose": "40mg",
+        "freq": "qn",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      },
+      {
+        "id": "O013",
+        "drug": "氨氯地平片",
+        "dose": "5mg",
+        "freq": "qd",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      },
+      {
+        "id": "O014",
+        "drug": "厄贝沙坦片",
+        "dose": "150mg",
+        "freq": "qd",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      },
+      {
+        "id": "O015",
+        "drug": "二甲双胍缓释片",
+        "dose": "0.5g",
+        "freq": "bid",
+        "route": "口服",
+        "days": 30,
+        "status": "在用"
+      }
+    ],
+    "visit_history": [
+      {
+        "id": "VH006-04",
+        "datetime": "2026-06-20 08:40:00",
+        "date": "2026-06-20",
+        "visit_type": "急诊",
+        "dept": "急诊科",
+        "doctor": "陈医生",
+        "chief_complaint": "右侧肢体无力伴言语不清 3 天",
+        "diagnosis": "急性脑梗死",
+        "icd": "I63.9",
+        "record_id": "7931008",
+        "course": "3天前晨起后右手持物不稳、右下肢拖曳，伴言语含糊。",
+        "exam_points": "头颅MRI示急性梗死灶，NIHSS 6分。",
+        "plan": "启动双联抗血小板+强化降脂，神经内科继续治疗。",
+        "timeline": [
+          {
+            "time": "2026-06-20 09:10:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "氯吡格雷 75mg + 阿司匹林负荷/维持方案"
+          },
+          {
+            "time": "2026-06-20 09:20:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "阿托伐他汀钙 40mg qn 强化降脂"
+          }
+        ],
+        "exams": [
+          {
+            "time": "2026-06-20 10:00:00",
+            "name": "头颅MRI+DWI",
+            "result": "左侧基底节区急性梗死灶"
+          },
+          {
+            "time": "2026-06-20 10:30:00",
+            "name": "颈部血管超声",
+            "result": "双侧颈动脉内膜增厚，右侧斑块形成"
+          }
+        ],
+        "labs": [
+          {
+            "time": "2026-06-20 09:00:00",
+            "name": "空腹血糖",
+            "value": "8.2",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2026-06-20 09:00:00",
+            "name": "低密度脂蛋白(LDL-C)",
+            "value": "3.6",
+            "unit": "mmol/L",
+            "ref": "<1.8",
+            "abnormal": "↑↑"
+          },
+          {
+            "time": "2026-06-20 09:00:00",
+            "name": "糖化血红蛋白(HbA1c)",
+            "value": "7.8",
+            "unit": "%",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          }
+        ]
+      },
+      {
+        "id": "VH006-03",
+        "datetime": "2026-03-15 09:20:00",
+        "date": "2026-03-15",
+        "visit_type": "门诊",
+        "dept": "神经内科",
+        "doctor": "陈医生",
+        "chief_complaint": "头晕复诊",
+        "diagnosis": "脑供血不足、高血压、糖尿病",
+        "icd": "G45.9",
+        "record_id": "7915501",
+        "course": "近2周头晕发作增多，伴轻度视物模糊。",
+        "exam_points": "血压、血糖控制欠佳，影像待完善。",
+        "plan": "完善头颅MRA及颈动脉超声，强化降压降糖管理。",
+        "timeline": [
+          {
+            "time": "2026-03-15 09:45:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "调整氨氯地平+厄贝沙坦联合降压"
+          }
+        ],
+        "exams": [
+          {
+            "time": "2026-03-15 10:20:00",
+            "name": "头颅MRA",
+            "result": "颅内动脉粥样硬化改变，未见明显狭窄"
+          }
+        ],
+        "labs": [
+          {
+            "time": "2026-03-15 09:30:00",
+            "name": "空腹血糖",
+            "value": "8.8",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2026-03-15 09:30:00",
+            "name": "低密度脂蛋白(LDL-C)",
+            "value": "3.9",
+            "unit": "mmol/L",
+            "ref": "<1.8",
+            "abnormal": "↑"
+          }
+        ]
+      },
+      {
+        "id": "VH006-02",
+        "datetime": "2025-12-05 10:00:00",
+        "date": "2025-12-05",
+        "visit_type": "门诊",
+        "dept": "神经内科",
+        "doctor": "陈医生",
+        "chief_complaint": "TIA复诊",
+        "diagnosis": "TIA后遗症、高血压",
+        "icd": "G45.9",
+        "record_id": "7902208",
+        "course": "TIA后规律复诊，偶有头晕，服药依从性一般。",
+        "exam_points": "血压控制欠佳。",
+        "plan": "继续抗血小板+降压方案，调整降压药剂量。",
+        "timeline": [
+          {
+            "time": "2025-12-05 10:20:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "继续抗血小板，调整降压方案"
+          }
+        ],
+        "exams": [],
+        "labs": [
+          {
+            "time": "2025-12-05 10:10:00",
+            "name": "空腹血糖",
+            "value": "8.8",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          }
+        ]
+      },
+      {
+        "id": "VH006-01",
+        "datetime": "2025-09-10 11:05:00",
+        "date": "2025-09-10",
+        "visit_type": "急诊",
+        "dept": "急诊科",
+        "doctor": "陈医生",
+        "chief_complaint": "TIA发作",
+        "diagnosis": "短暂性脑缺血发作",
+        "icd": "G45.9",
+        "record_id": "7889012",
+        "course": "突发右侧肢体无力约20分钟后完全缓解，无意识障碍。",
+        "exam_points": "头颅MRI未见新发梗死灶。",
+        "plan": "启动抗血小板治疗，严格控制血压与血糖。",
+        "timeline": [
+          {
+            "time": "2025-09-10 11:40:00",
+            "type": "treatment",
+            "title": "治疗",
+            "detail": "启动抗血小板二级预防"
+          }
+        ],
+        "exams": [
+          {
+            "time": "2025-09-10 12:00:00",
+            "name": "头颅MRI",
+            "result": "未见新发梗死灶"
+          }
+        ],
+        "labs": [
+          {
+            "time": "2025-09-10 11:30:00",
+            "name": "空腹血糖",
+            "value": "9.5",
+            "unit": "mmol/L",
+            "ref": "<7.0",
+            "abnormal": "↑"
+          },
+          {
+            "time": "2025-09-10 11:30:00",
+            "name": "低密度脂蛋白(LDL-C)",
+            "value": "4.2",
+            "unit": "mmol/L",
+            "ref": "<1.8",
+            "abnormal": "↑↑"
+          }
+        ]
+      }
+    ],
+    "health_archive": {
+      "primary_disease": "脑梗死",
+      "diagnosis_date": "2026-06-20 08:40:00",
+      "diagnoses": [
+        "急性脑梗死",
+        "高血压 3级",
+        "2型糖尿病",
+        "高脂血症",
+        "TIA病史"
+      ],
+      "treatments": [
+        "抗血小板",
+        "强化降脂",
+        "降压",
+        "降糖",
+        "二级预防教育"
+      ]
+    },
+    "risk_level": "高风险",
+    "has_fundus_exam": false,
+    "has_retinopathy": false,
+    "retinopathy_grade": "",
+    "primary_diagnosis": "脑梗死"
+  },
+  {
+    "id": "P007",
+    "name": "周某某",
+    "gender": "男",
+    "age": 61,
+    "id_no": "310101196502080033",
+    "phone": "132****8007",
+    "visit_type": "门诊",
+    "dept": "内分泌科",
+    "doctor": "李医生",
+    "visit_date": "2025-11-18",
+    "chief_complaint": "血糖明显升高伴视力模糊",
+    "is_return_visit": true,
+    "pre_consultation_done": true,
+    "in_queue": false,
+    "diagnoses": [
+      {
+        "name": "2型糖尿病（血糖失控）",
+        "icd": "E11.9",
+        "duration": "8年",
+        "is_primary": true
+      },
+      {
+        "name": "糖尿病视网膜病变可疑",
+        "icd": "E11.3",
+        "duration": "新发",
+        "is_primary": false
+      }
+    ],
+    "suspected_diagnoses": [
+      {
+        "name": "2型糖尿病（血糖失控）",
+        "confidence": 0.95,
+        "icd": "E11.9",
+        "desc": "HbA1c 与空腹血糖显著升高，需紧急强化降糖并评估并发症。"
+      }
+    ],
+    "past_history": "2型糖尿病8年，近半年未规律复诊；高血压病史。",
+    "allergies": "",
+    "nutrition_screening_score": 4,
+    "vitals": {
+      "bp": "156/94 mmHg",
+      "hr": 84,
+      "temp": 36.5,
+      "weight": 78,
+      "height": 170,
+      "bmi": 27,
+      "spo2": 97
+    },
+    "lab_results": [
+      {
+        "name": "空腹血糖",
+        "value": "11.2",
+        "unit": "mmol/L",
+        "ref": "<7.0",
+        "abnormal": true,
+        "history": [
+          "10.5",
+          "11.0",
+          "11.2"
+        ],
+        "history_dates": [
+          "2025-05-10",
+          "2025-08-20",
+          "2025-11-18"
+        ],
+        "trend": "上升",
+        "diff_note": "危急值水平"
+      },
+      {
+        "name": "糖化血红蛋白(HbA1c)",
+        "value": "9.4%",
+        "unit": "%",
+        "ref": "<7.0%",
+        "abnormal": true,
+        "history": [
+          "8.8%",
+          "9.1%",
+          "9.4%"
+        ],
+        "history_dates": [
+          "2025-05-10",
+          "2025-08-20",
+          "2025-11-18"
+        ],
+        "trend": "上升",
+        "diff_note": "严重不达标"
+      },
+      {
+        "name": "低密度脂蛋白(LDL-C)",
+        "value": "3.5",
+        "unit": "mmol/L",
+        "ref": "<2.6",
+        "abnormal": true,
+        "history": [
+          "3.6",
+          "3.5",
+          "3.5"
+        ],
+        "history_dates": [
+          "2025-05-10",
+          "2025-08-20",
+          "2025-11-18"
+        ],
+        "trend": "稳定",
+        "diff_note": ""
+      }
+    ],
+    "orders": [],
+    "visit_history": [
+      {
+        "id": "VH007-01",
+        "datetime": "2025-11-18 10:20:00",
+        "date": "2025-11-18",
+        "visit_type": "门诊",
+        "dept": "内分泌科",
+        "doctor": "李医生",
+        "chief_complaint": "血糖明显升高伴视力模糊",
+        "diagnosis": "2型糖尿病（血糖失控）",
+        "icd": "E11.9",
+        "course": "近1月口渴多饮加重，视力模糊，自测血糖常>11。",
+        "exam_points": "HbA1c 9.4%，空腹血糖11.2。",
+        "plan": "强化降糖并预约眼科与2周复诊，患者其后失联。",
+        "timeline": [],
+        "exams": [],
+        "labs": []
+      }
+    ],
+    "risk_level": "高风险",
+    "has_fundus_exam": false,
+    "has_retinopathy": false,
+    "retinopathy_grade": "",
+    "primary_diagnosis": "2型糖尿病"
+  }
+]

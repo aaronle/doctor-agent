@@ -1,5 +1,7 @@
 # Agent 集成与 Mockup 详细规格
 
+Agent 配置后台、Haiku 模型 Profile、数据接口、版本发布、评测门禁和运行审计的完整规格见 [`02-Agent配置与运行控制台需求规格.md`](02-Agent配置与运行控制台需求规格.md)。本文件继续作为医生工作站与 Runtime/AgentScope 之间的任务、事件和结果契约。
+
 版本：`v0.1-draft`
 主责：Agent 集成条线
 当前策略：先实现正式契约和 Mock Runtime，后续通过 Adapter 接入 AgentScope。
@@ -423,4 +425,3 @@ AgentScope 的 SDK、HTTP 协议、鉴权、Nacos 服务发现和部署方式均
 - 非法结果不能进入 UI 或写回。
 - 每次调用可按 `trace_id` 追踪。
 - Worker、岗位与 Sub-agent 的具体实现仍标记为“待讨论”，不影响当前契约。
-

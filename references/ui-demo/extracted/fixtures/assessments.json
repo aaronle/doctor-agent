@@ -1,0 +1,318 @@
+{
+  "P001": {
+    "overall_conclusion": {
+      "risk_level": "高风险",
+      "summary": "患者2型糖尿病5年，近2周血糖控制明显恶化（空腹8-10mmol/L，HbA1c 8.6%），伴口渴多饮症状加重。合并高血压、高脂血症、超重。UACR轻度升高（45mg/g）提示早期糖尿病肾病，眼底检查示NPDR轻度。综合评估为高风险，需强化降糖、降压、降脂综合治疗，定期复查肾功能和眼底。"
+    },
+    "risk_assessments": [
+      {
+        "id": "p001_sugar",
+        "name": "血糖控制评估",
+        "level": "高风险",
+        "color": "danger",
+        "summary": "空腹血糖8.5mmol/L，HbA1c 8.6%，远未达标（目标<7%）。近2周饮食控制差，需强化降糖方案。",
+        "evidence": "空腹血糖8.5mmol/L，HbA1c 8.6%，近2周饮食控制差，口渴多饮加重",
+        "assessment": "血糖长期不达标，糖尿病肾病及视网膜病变进展风险高",
+        "suggestion": "强化生活方式干预，考虑联合SGLT-2抑制剂，4周后复查HbA1c"
+      },
+      {
+        "id": "p001_kidney",
+        "name": "糖尿病肾病风险",
+        "level": "高风险",
+        "color": "danger",
+        "summary": "UACR 45mg/g（↑），eGFR 78（↓），小便泡沫增多，提示早期糖尿病肾病，需积极干预。",
+        "evidence": "UACR 45mg/g（正常<30），eGFR 78mL/min（G2期），小便泡沫增多",
+        "assessment": "早期糖尿病肾病，微量蛋白尿阶段，肾功能轻度受损",
+        "suggestion": "继续ARB护肾，严格控制血压<130/80mmHg，3个月后复查UACR和肾功能"
+      },
+      {
+        "id": "p001_eye",
+        "name": "视网膜病变风险",
+        "level": "中风险",
+        "color": "warning",
+        "summary": "NPDR轻度，血糖控制不佳可加速进展。需每年眼底检查，严格控制血糖血压。",
+        "evidence": "眼底检查示NPDR轻度，病程5年，血糖长期不达标",
+        "assessment": "非增殖期视网膜病变早期，血糖控制差是主要进展危险因素",
+        "suggestion": "每年散瞳眼底检查，控制HbA1c<7%，控制血压和血脂"
+      }
+    ],
+    "risk_alerts": [],
+    "treatment_effectiveness": {
+      "ai_summary": "近三次HbA1c呈下降趋势（9.0%→8.8%→8.6%），但总体仍未达标。UACR轻度升高需关注。建议强化降糖方案，联合SGLT-2抑制剂，同时严格控制血压和血脂。"
+    },
+    "recommended_orders": [
+      {
+        "drug": "达格列净片",
+        "dose": "10mg",
+        "freq": "qd",
+        "route": "口服",
+        "basis": "SGLT-2抑制剂，改善血糖+护肾"
+      },
+      {
+        "drug": "瑞舒伐他汀钙片",
+        "dose": "10mg",
+        "freq": "qn",
+        "route": "口服",
+        "basis": "LDL-C 3.2mmol/L超标，强化降脂"
+      }
+    ]
+  },
+  "P002": {
+    "overall_conclusion": {
+      "risk_level": "高风险",
+      "summary": "患者冠心病2年、高血压5年，近1月胸闷气短，近3天加重，活动耐量明显下降，伴左肩放射感。症状符合不稳定型心绞痛表现，需警惕急性冠脉综合征风险。建议立即完善心电图、心肌酶、冠脉CTA检查，并推荐住院进一步评估与治疗。"
+    },
+    "risk_assessments": [
+      {
+        "id": "p002_angina",
+        "name": "心绞痛风险评估",
+        "level": "高风险",
+        "color": "danger",
+        "summary": "近3天胸闷加重，活动耐量下降，休息缓解不明显，符合不稳定型心绞痛特征，需紧急评估。",
+        "evidence": "胸闷气短1月加重3天，活动诱发，左肩放射，冠心病史2年",
+        "assessment": "症状符合不稳定型心绞痛，需警惕急性冠脉综合征",
+        "suggestion": "立即心电图+心肌酶+冠脉CTA，排除ACS"
+      },
+      {
+        "id": "p002_lipid",
+        "name": "血脂管理评估",
+        "level": "高风险",
+        "color": "danger",
+        "summary": "LDL-C 2.8mmol/L，冠心病患者目标<1.8mmol/L，远未达标，需强化他汀治疗。",
+        "evidence": "LDL-C 2.8mmol/L（冠心病目标<1.8）",
+        "assessment": "LDL-C严重超标，心血管事件风险高",
+        "suggestion": "强化他汀治疗，目标LDL-C<1.8"
+      }
+    ],
+    "risk_alerts": [],
+    "treatment_effectiveness": {
+      "ai_summary": "患者冠心病合并高血压，LDL-C未达标，近期心绞痛症状加重。需强化降脂治疗，调整抗心绞痛方案，必要时加用β受体阻滞剂。"
+    },
+    "recommended_orders": [
+      {
+        "drug": "阿托伐他汀钙片",
+        "dose": "40mg",
+        "freq": "qn",
+        "route": "口服",
+        "basis": "强化降脂，LDL-C目标<1.8mmol/L"
+      },
+      {
+        "drug": "美托洛尔缓释片",
+        "dose": "47.5mg",
+        "freq": "qd",
+        "route": "口服",
+        "basis": "β受体阻滞剂，改善心绞痛症状和预后"
+      },
+      {
+        "drug": "硝酸甘油片",
+        "dose": "0.5mg",
+        "freq": "prn",
+        "route": "舌下含服",
+        "basis": "急性心绞痛发作时缓解症状"
+      }
+    ]
+  },
+  "P003": {
+    "overall_conclusion": {
+      "risk_level": "低风险",
+      "summary": "患者甲亢药物治疗半年，症状明显改善。但心率仍偏快（96次/分），TSH 0.08仍低于正常，FT4 22.1处于正常上限。需继续丙硫氧嘧啶治疗，调整剂量。"
+    },
+    "risk_assessments": [
+      {
+        "id": "p003_thyroid",
+        "name": "甲功控制评估",
+        "level": "中风险",
+        "color": "warning",
+        "summary": "TSH 0.08（↓），FT4 22.1（正常上限），心率96次/分。甲亢未完全控制，需调整药量。",
+        "evidence": "TSH 0.08mIU/L（↓），FT4 22.1pmol/L（正常上限），心率96次/分",
+        "assessment": "甲亢未完全控制，指标向正常范围靠近但未达标",
+        "suggestion": "继续丙硫氧嘧啶，考虑适当增加剂量，1月后复查甲功"
+      }
+    ],
+    "risk_alerts": [],
+    "treatment_effectiveness": {
+      "ai_summary": "丙硫氧嘧啶治疗有效，甲亢症状明显改善。TSH呈上升趋势，FT4呈下降趋势，均向正常范围靠近。继续当前方案，微调剂量。"
+    },
+    "recommended_orders": [
+      {
+        "drug": "丙硫氧嘧啶片",
+        "dose": "50mg",
+        "freq": "tid",
+        "route": "口服",
+        "basis": "继续抗甲亢治疗，微调剂量"
+      }
+    ]
+  },
+  "P004": {
+    "overall_conclusion": {
+      "risk_level": "高风险",
+      "summary": "患者高血压3级（极高危）10年，血压168/102mmHg严重未达标，伴头晕头痛、体位性眩晕。合并2型糖尿病8年，血糖控制差。多重危险因素叠加，心脑血管事件风险极高。"
+    },
+    "risk_assessments": [
+      {
+        "id": "p004_stroke",
+        "name": "脑卒中风险评估",
+        "level": "高风险",
+        "color": "danger",
+        "summary": "高血压3级+糖尿病+头晕头痛+体位性眩晕，脑血管事件风险极高。需紧急头颅CT+颈动脉超声。",
+        "evidence": "高血压3级（168/102mmHg），糖尿病8年，头晕头痛",
+        "assessment": "脑血管事件风险极高，需警惕TIA或脑梗死",
+        "suggestion": "立即头颅CT平扫+颈动脉超声，排除TIA或脑梗死"
+      },
+      {
+        "id": "p004_bp",
+        "name": "高血压急症评估",
+        "level": "高风险",
+        "color": "danger",
+        "summary": "血压168/102mmHg，伴头晕头痛，当前降压方案效果不佳。",
+        "evidence": "血压168/102mmHg（3级），当前硝苯地平+缬沙坦效果不佳",
+        "assessment": "高血压急症风险，当前降压方案效果不佳需调整",
+        "suggestion": "调整降压方案为CCB+ARB+利尿剂三联，目标血压<130/80"
+      }
+    ],
+    "risk_alerts": [],
+    "treatment_effectiveness": {
+      "ai_summary": "患者高血压和糖尿病均控制极差，多重危险因素叠加。需立即强化降压、降糖、降脂综合治疗，并排查脑血管病变。"
+    },
+    "recommended_orders": [
+      {
+        "drug": "氨氯地平氢氯噻嗪复方片",
+        "dose": "5/12.5mg",
+        "freq": "qd",
+        "route": "口服",
+        "basis": "CCB+利尿剂复方，强化降压"
+      },
+      {
+        "drug": "缬沙坦片",
+        "dose": "160mg",
+        "freq": "qd",
+        "route": "口服",
+        "basis": "ARB剂量加倍，增强降压+靶器官保护"
+      },
+      {
+        "drug": "达格列净片",
+        "dose": "10mg",
+        "freq": "qd",
+        "route": "口服",
+        "basis": "SGLT-2抑制剂，降糖+减重+心血管保护"
+      }
+    ]
+  },
+  "P005": {
+    "overall_conclusion": {
+      "risk_level": "中风险",
+      "summary": "患者52岁女性，体检发现空腹血糖7.8mmol/L，HbA1c 7.2%，符合2型糖尿病诊断标准（初诊）。有糖尿病家族史。建议生活方式干预3个月，若血糖不达标再启动药物治疗。"
+    },
+    "risk_assessments": [
+      {
+        "id": "p005_diagnosis",
+        "name": "糖尿病诊断确认",
+        "level": "中风险",
+        "color": "warning",
+        "summary": "空腹血糖7.8mmol/L+HbA1c 7.2%，符合糖尿病诊断标准。初诊，建议生活方式干预3个月。",
+        "evidence": "空腹血糖7.8mmol/L（≥7.0），HbA1c 7.2%（≥6.5%），口渴多饮",
+        "assessment": "符合2型糖尿病诊断标准（初诊）",
+        "suggestion": "OGTT确认分型，生活方式干预3个月，若血糖不达标再启动药物治疗"
+      }
+    ],
+    "risk_alerts": [],
+    "treatment_effectiveness": {
+      "ai_summary": "初诊2型糖尿病，发现较早，尚无并发症。通过严格生活方式干预，有较大机会实现血糖逆转。3个月后复查。"
+    },
+    "recommended_orders": []
+  },
+  "P006": {
+    "overall_conclusion": {
+      "risk_level": "高风险",
+      "summary": "患者急性脑梗死3天，右侧肢体轻偏瘫，合并高血压3级、2型糖尿病、高脂血症。既往TIA发作1次，未规律抗血小板治疗。多重危险因素叠加，脑梗死复发风险极高。建议住院启动二级预防、病情监护与早期康复。"
+    },
+    "risk_assessments": [
+      {
+        "id": "p006_stroke",
+        "name": "脑梗死复发风险评估",
+        "level": "高风险",
+        "color": "danger",
+        "summary": "急性脑梗死+TIA史+高血压+糖尿病+高脂血症+未规律抗血小板，复发风险极高。需严格二级预防。",
+        "evidence": "急性脑梗死3天+TIA史+高血压3级+糖尿病+高脂血症",
+        "assessment": "多重危险因素叠加，脑梗死复发风险极高",
+        "suggestion": "双联抗血小板21天，强化他汀至LDL-C<1.8"
+      },
+      {
+        "id": "p006_prognosis",
+        "name": "专病预后预警评估",
+        "level": "中风险",
+        "color": "warning",
+        "summary": "右侧偏瘫、言语不清，发病3天内为功能恢复关键窗口，需尽早启动康复并评估预后分层。",
+        "evidence": "右上肢/下肢肌力4级，言语含糊，NIHSS需动态评估",
+        "assessment": "急性期预后中等偏高风险，早期康复可改善远期功能结局",
+        "suggestion": "完善NIHSS评分，尽早康复科会诊，制定二级预防与康复计划"
+      },
+      {
+        "id": "p006_thrombolysis",
+        "name": "溶栓适配评估",
+        "level": "中风险",
+        "color": "info",
+        "summary": "发病已3天，超出静脉溶栓时间窗；需评估是否具备血管内治疗或其他再灌注机会。",
+        "evidence": "发病约72小时，症状持续，既往TIA史",
+        "assessment": "已过rt-PA时间窗，重点评估抗血小板与血压管理策略",
+        "suggestion": "复查头颅影像排除出血转化，按指南启动双联抗血小板与血压管理"
+      }
+    ],
+    "risk_alerts": [
+      {
+        "id": "alert_stroke_recurrence",
+        "name": "脑梗死复发风险",
+        "level": "高风险",
+        "color": "danger",
+        "summary": "发病3天内为复发高峰期，需紧急启动二级预防。"
+      },
+      {
+        "id": "alert_hypertension_crisis",
+        "name": "血压危象预警",
+        "level": "高风险",
+        "color": "danger",
+        "summary": "血压158/96mmHg，脑梗死后目标<130/80，需紧急降压处理。"
+      },
+      {
+        "id": "alert_glucose_uncontrolled",
+        "name": "血糖失控预警",
+        "level": "中风险",
+        "color": "warning",
+        "summary": "HbA1c 7.8%，空腹血糖8.2mmol/L，均未达标。"
+      }
+    ],
+    "treatment_effectiveness": {
+      "ai_summary": "患者为急性脑梗死，需紧急启动二级预防：双联抗血小板、强化降脂、严格控制血压和血糖。急性期后尽早启动康复训练。"
+    },
+    "recommended_orders": [
+      {
+        "drug": "氯吡格雷片",
+        "dose": "75mg",
+        "freq": "qd",
+        "route": "口服",
+        "basis": "抗血小板聚集，脑梗死二级预防"
+      },
+      {
+        "drug": "阿司匹林肠溶片",
+        "dose": "100mg",
+        "freq": "qd",
+        "route": "口服",
+        "basis": "双联抗血小板（21天），预防早期复发"
+      },
+      {
+        "drug": "阿托伐他汀钙片",
+        "dose": "40mg",
+        "freq": "qn",
+        "route": "口服",
+        "basis": "强化降脂，LDL-C目标<1.8mmol/L"
+      },
+      {
+        "drug": "氨氯地平片",
+        "dose": "5mg",
+        "freq": "qd",
+        "route": "口服",
+        "basis": "CCB降压，目标<130/80mmHg"
+      }
+    ]
+  }
+}

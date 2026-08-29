@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "Actor": {
+      "properties": {
+        "user_id": {
+          "title": "User Id",
+          "type": "string"
+        },
+        "role": {
+          "default": "outpatient_doctor",
+          "title": "Role",
+          "type": "string"
+        },
+        "organization_id": {
+          "default": "pkuih",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "department_id": {
+          "title": "Department Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "department_id"
+      ],
+      "title": "Actor",
+      "type": "object"
+    },
+    "ContextRef": {
+      "properties": {
+        "context_version": {
+          "title": "Context Version",
+          "type": "string"
+        },
+        "data_cutoff_at": {
+          "format": "date-time",
+          "title": "Data Cutoff At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "context_version",
+        "data_cutoff_at"
+      ],
+      "title": "ContextRef",
+      "type": "object"
+    },
+    "InteractionContext": {
+      "properties": {
+        "supplemental_observations": {
+          "items": {
+            "$ref": "#/$defs/SupplementalObservation"
+          },
+          "maxItems": 30,
+          "title": "Supplemental Observations",
+          "type": "array"
+        }
+      },
+      "title": "InteractionContext",
+      "type": "object"
+    },
+    "Subject": {
+      "properties": {
+        "patient_id": {
+          "title": "Patient Id",
+          "type": "string"
+        },
+        "encounter_id": {
+          "title": "Encounter Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "patient_id",
+        "encounter_id"
+      ],
+      "title": "Subject",
+      "type": "object"
+    },
+    "SupplementalObservation": {
+      "properties": {
+        "observation_id": {
+          "title": "Observation Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "source": {
+          "default": "doctor_selected",
+          "enum": [
+            "doctor_selected",
+            "doctor_entered"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "observation_id",
+        "text",
+        "occurred_at"
+      ],
+      "title": "SupplementalObservation",
+      "type": "object"
+    },
+    "Trigger": {
+      "properties": {
+        "source": {
+          "default": "user_action",
+          "title": "Source",
+          "type": "string"
+        },
+        "event": {
+          "title": "Event",
+          "type": "string"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event",
+        "occurred_at"
+      ],
+      "title": "Trigger",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "task_request_v1",
+      "default": "task_request_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "request_id": {
+      "title": "Request Id",
+      "type": "string"
+    },
+    "idempotency_key": {
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "task_type": {
+      "enum": [
+        "voice_interview",
+        "condition_summary",
+        "record_generation",
+        "differential_diagnosis",
+        "diagnosis_management",
+        "risk_management",
+        "comorbidity_management"
+      ],
+      "title": "Task Type",
+      "type": "string"
+    },
+    "runtime_mode": {
+      "default": "mock",
+      "enum": [
+        "mock",
+        "agentscope"
+      ],
+      "title": "Runtime Mode",
+      "type": "string"
+    },
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "subject": {
+      "$ref": "#/$defs/Subject"
+    },
+    "trigger": {
+      "$ref": "#/$defs/Trigger"
+    },
+    "context_ref": {
+      "$ref": "#/$defs/ContextRef"
+    },
+    "interaction_context": {
+      "$ref": "#/$defs/InteractionContext"
+    },
+    "expected_result_type": {
+      "title": "Expected Result Type",
+      "type": "string"
+    },
+    "locale": {
+      "const": "zh-CN",
+      "default": "zh-CN",
+      "title": "Locale",
+      "type": "string"
+    },
+    "trace_id": {
+      "title": "Trace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "request_id",
+    "idempotency_key",
+    "task_type",
+    "actor",
+    "subject",
+    "trigger",
+    "context_ref",
+    "expected_result_type",
+    "trace_id"
+  ],
+  "title": "TaskRequestV1",
+  "type": "object"
+}

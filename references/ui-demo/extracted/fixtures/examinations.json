@@ -1,0 +1,174 @@
+{
+  "P001": [
+    {
+      "id": "e1",
+      "name": "12导联心电图",
+      "type": "心电图",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "窦性心律，HR 76次/分，ST段V4-V6轻度压低（0.5mm），T波低平，提示心肌供血不足可能",
+      "conclusion": "异常：心肌供血不足可能"
+    },
+    {
+      "id": "e2",
+      "name": "双眼底照相",
+      "type": "眼科",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "双眼糖尿病视网膜病变（NPDR轻度），微动脉瘤（+），硬性渗出少量，无新生血管",
+      "conclusion": "异常：NPDR 轻度"
+    },
+    {
+      "id": "e3",
+      "name": "颈动脉超声",
+      "type": "超声",
+      "date": "2026-06-10",
+      "status": "已完成",
+      "abnormal": false,
+      "result": "双侧颈动脉内膜-中膜厚度0.9mm，左侧可见1枚小钙化斑块（2mm×1mm），无血流动力学意义",
+      "conclusion": "大致正常"
+    }
+  ],
+  "P002": [
+    {
+      "id": "e2-1",
+      "name": "12导联心电图",
+      "type": "心电图",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "窦性心律，HR 82次/分，V4-V6 ST段压低 0.1mV，提示心肌缺血可能",
+      "conclusion": "异常：心肌缺血可能"
+    },
+    {
+      "id": "e2-2",
+      "name": "心肌酶谱",
+      "type": "检验相关",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": false,
+      "result": "cTnI、CK-MB 在参考范围内",
+      "conclusion": "大致正常"
+    },
+    {
+      "id": "e2-3",
+      "name": "心脏彩超",
+      "type": "超声",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "左室舒张功能减退，EF 58%，室壁运动尚可",
+      "conclusion": "异常：舒张功能减退"
+    }
+  ],
+  "P003": [
+    {
+      "id": "e3-1",
+      "name": "甲状腺超声",
+      "type": "超声",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "甲状腺Ⅰ度肿大，回声欠均匀，未见明显结节",
+      "conclusion": "异常：甲状腺肿大"
+    },
+    {
+      "id": "e3-2",
+      "name": "12导联心电图",
+      "type": "心电图",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "窦性心动过速，HR 96次/分",
+      "conclusion": "异常：窦速"
+    }
+  ],
+  "P004": [
+    {
+      "id": "e4-1",
+      "name": "头颅CT平扫",
+      "type": "影像",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": false,
+      "result": "未见颅内出血及明显梗塞灶，脑沟裂稍增宽",
+      "conclusion": "大致正常"
+    },
+    {
+      "id": "e4-2",
+      "name": "颈动脉超声",
+      "type": "超声",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "双侧颈动脉内膜增厚，右侧斑块形成，狭窄约30%",
+      "conclusion": "异常：颈动脉斑块"
+    },
+    {
+      "id": "e4-3",
+      "name": "12导联心电图",
+      "type": "心电图",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "窦性心律，左室高电压，ST-T改变",
+      "conclusion": "异常：左室高电压"
+    }
+  ],
+  "P005": [
+    {
+      "id": "e5-1",
+      "name": "空腹血糖+HbA1c",
+      "type": "检验相关",
+      "date": "2026-06-10",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "空腹血糖 7.8mmol/L，HbA1c 7.2%，达糖尿病诊断阈值",
+      "conclusion": "异常：血糖升高"
+    },
+    {
+      "id": "e5-2",
+      "name": "12导联心电图",
+      "type": "心电图",
+      "date": "2026-06-17",
+      "status": "已完成",
+      "abnormal": false,
+      "result": "窦性心律，大致正常心电图",
+      "conclusion": "大致正常"
+    }
+  ],
+  "P006": [
+    {
+      "id": "e6-1",
+      "name": "头颅MRI+DWI",
+      "type": "影像",
+      "date": "2026-06-20",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "左侧基底节区急性梗死灶，DWI高信号",
+      "conclusion": "异常：急性脑梗死"
+    },
+    {
+      "id": "e6-2",
+      "name": "颈部血管超声",
+      "type": "超声",
+      "date": "2026-06-20",
+      "status": "已完成",
+      "abnormal": true,
+      "result": "双侧颈动脉内膜增厚，右侧斑块形成",
+      "conclusion": "异常：动脉粥样硬化"
+    },
+    {
+      "id": "e6-3",
+      "name": "12导联心电图",
+      "type": "心电图",
+      "date": "2026-06-20",
+      "status": "已完成",
+      "abnormal": false,
+      "result": "窦性心律，未见明显ST段抬高",
+      "conclusion": "大致正常"
+    }
+  ]
+}

@@ -1,0 +1,142 @@
+{
+  "source": "AI-HIS门诊模块V4.3.html",
+  "expectedMd5": "df95a09bb3711a20a2ed8bbdb0a86264",
+  "css": {
+    "total": 3788,
+    "tokens": 6,
+    "app": 1219,
+    "elementPlus": 2563
+  },
+  "fixtures": [
+    {
+      "file": "patients.json",
+      "anchor": "=[{id:\"P001\"",
+      "open": "[",
+      "note": "候诊/患者主数据，7 例",
+      "status": "ok",
+      "entries": 7
+    },
+    {
+      "file": "drugs.json",
+      "anchor": "=[{id:\"D001\"",
+      "open": "[",
+      "note": "药品字典",
+      "status": "ok",
+      "entries": 18
+    },
+    {
+      "file": "assessments.json",
+      "anchor": {},
+      "open": "{",
+      "note": "智慧诊疗：结论、风险评估、风险预警、疗效、推荐医嘱",
+      "status": "ok",
+      "entries": 6
+    },
+    {
+      "file": "record-content.json",
+      "anchor": {},
+      "open": "{",
+      "note": "病历七段基线文本",
+      "status": "ok",
+      "entries": 6
+    },
+    {
+      "file": "comorbidity.json",
+      "anchor": {},
+      "open": "{",
+      "note": "共病识别结果",
+      "status": "ok",
+      "entries": 2
+    },
+    {
+      "file": "dialog-script.json",
+      "anchor": {},
+      "open": "{",
+      "note": "医患对话脚本",
+      "status": "ok",
+      "entries": 6
+    },
+    {
+      "file": "timeline.json",
+      "anchor": {},
+      "open": "{",
+      "note": "接诊时间轴事件",
+      "status": "ok",
+      "entries": 6
+    },
+    {
+      "file": "examinations.json",
+      "anchor": {},
+      "open": "{",
+      "note": "检查报告",
+      "status": "ok",
+      "entries": 6
+    }
+  ],
+  "routes": [
+    {
+      "path": "/login",
+      "name": "Login",
+      "title": "登录"
+    },
+    {
+      "path": "/outpatient",
+      "name": "OutpatientHome",
+      "title": "门诊工作站"
+    },
+    {
+      "path": "/outpatient/list",
+      "name": "OutpatientList",
+      "title": "候诊列表"
+    },
+    {
+      "path": "/outpatient/manage",
+      "name": "PatientManage",
+      "title": "患者管理"
+    },
+    {
+      "path": "/outpatient/:patientId",
+      "name": "OutpatientWorkstation",
+      "title": "门诊工作站"
+    }
+  ],
+  "componentNames": [
+    "App",
+    "Login",
+    "AiEmrFloat",
+    "OutpatientWorkstation",
+    "OutpatientList",
+    "PatientManage"
+  ],
+  "endpoints": [
+    "/api/config",
+    "/api/emr/comorbidity/check",
+    "/api/emr/comorbidity/consultation",
+    "/api/emr/copilot/chat",
+    "/api/emr/generate-record-auto",
+    "/api/emr/generate-record-field",
+    "/api/emr/report-summary/",
+    "/api/emr/voice/complete",
+    "/api/emr/voice/history/",
+    "/api/emr/voice/init/",
+    "/api/emr/voice/turn",
+    "/api/his/admission",
+    "/api/his/drugs",
+    "/api/his/exams",
+    "/api/his/orders",
+    "/api/his/patient/",
+    "/api/his/patients",
+    "/api/his/patients/manage",
+    "/api/his/patients/remind",
+    "/api/his/referral"
+  ],
+  "sseEvents": [
+    "prompt_done",
+    "prompt_token",
+    "record_done",
+    "record_node_done",
+    "record_node_start",
+    "record_token",
+    "token"
+  ]
+}

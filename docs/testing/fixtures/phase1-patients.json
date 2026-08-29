@@ -1,0 +1,95 @@
+{
+  "schema_version": "doctor_agent_fixture_v1",
+  "data_classification": "MOCK_ONLY_NO_REAL_PATIENT_DATA",
+  "generated_at": "2026-08-28T00:00:00+08:00",
+  "fixtures": [
+    {
+      "fixture_id": "IM-001",
+      "specialty": "内科-内分泌代谢",
+      "scenario": "2型糖尿病复诊、血糖控制不佳及早期并发症",
+      "patient": {"patient_id": "MOCK-IM-001", "name": "王某某", "gender": "女", "age": 58},
+      "encounter": {"encounter_id": "ENC-IM-001", "chief_complaint": "血糖控制不佳，口渴多饮2周", "allergy": "无已知药物过敏"},
+      "facts": {
+        "diagnoses": ["2型糖尿病5年", "原发性高血压3年", "高脂血症2年"],
+        "medications": ["二甲双胍缓释片0.5g bid", "阿卡波糖50mg tid", "厄贝沙坦150mg qd", "阿托伐他汀20mg qn"],
+        "labs": {"fasting_glucose_mmol_l": 8.5, "hba1c_percent": 8.6, "uacr_mg_g": 45, "egfr_ml_min": 78},
+        "exams": ["眼底：NPDR轻度"]
+      },
+      "expected": {
+        "summary_problems": ["血糖控制不佳", "早期糖尿病肾病风险", "视网膜病变", "高血压", "血脂异常", "超重"],
+        "critical_or_warning_risks": ["血糖长期不达标", "糖尿病肾病风险", "视网膜病变进展风险"],
+        "differential_candidates": ["2型糖尿病（血糖控制不佳）", "糖尿病肾病（早期）", "糖尿病视网膜病变（NPDR轻度）"],
+        "comorbidities": ["原发性高血压", "高脂血症", "超重"]
+      }
+    },
+    {
+      "fixture_id": "IM-002",
+      "specialty": "内科-内分泌代谢",
+      "scenario": "来源冲突、关键数据缺失与低血糖红旗",
+      "patient": {"patient_id": "MOCK-IM-002", "name": "周某", "gender": "男", "age": 67},
+      "encounter": {"encounter_id": "ENC-IM-002", "chief_complaint": "晨起出汗、心慌3次", "allergy": "信息缺失"},
+      "facts": {
+        "conflicts": ["HIS过敏史记录青霉素过敏，预问诊记录否认过敏", "患者自述胰岛素剂量与处方记录不一致"],
+        "missing": ["最近一次HbA1c", "低血糖发生时血糖值", "肾功能"],
+        "red_flags": ["疑似反复低血糖"]
+      },
+      "expected": {"must_clarify": ["过敏史", "胰岛素实际剂量", "低血糖时血糖值"], "write_back_blocked": true}
+    },
+    {
+      "fixture_id": "ORT-001",
+      "specialty": "普通骨科",
+      "scenario": "膝骨关节炎伴糖尿病和抗凝用药",
+      "patient": {"patient_id": "MOCK-ORT-001", "name": "李某某", "gender": "男", "age": 63},
+      "encounter": {"encounter_id": "ENC-ORT-001", "chief_complaint": "右膝疼痛6个月，加重2周", "allergy": "无已知药物过敏"},
+      "facts": {
+        "symptoms": ["活动后疼痛", "上下楼加重", "晨僵小于30分钟"],
+        "diagnoses": ["2型糖尿病", "房颤"],
+        "medications": ["利伐沙班"],
+        "exams": ["膝关节X线：内侧间隙变窄、骨赘形成"]
+      },
+      "expected": {
+        "differential_candidates": ["膝骨关节炎", "半月板损伤", "炎性关节病待排"],
+        "comorbidity_interactions": ["抗凝影响关节穿刺/手术计划", "糖尿病影响感染与愈合风险"]
+      }
+    },
+    {
+      "fixture_id": "ORT-002",
+      "specialty": "普通骨科",
+      "scenario": "腰痛伴马尾受压红旗",
+      "patient": {"patient_id": "MOCK-ORT-002", "name": "赵某某", "gender": "男", "age": 49},
+      "encounter": {"encounter_id": "ENC-ORT-002", "chief_complaint": "腰痛伴双下肢麻木、排尿困难1天", "allergy": "无已知药物过敏"},
+      "facts": {"red_flags": ["鞍区感觉异常", "新发排尿困难", "双下肢进行性无力"], "missing": ["急诊MRI结果"]},
+      "expected": {"critical_risk": "疑似马尾综合征", "cannot_miss": ["马尾综合征", "脊髓/神经根严重受压"], "write_back_blocked": true}
+    },
+    {
+      "fixture_id": "GYN-001",
+      "specialty": "普通妇科",
+      "scenario": "围绝经期异常子宫出血伴贫血",
+      "patient": {"patient_id": "MOCK-GYN-001", "name": "陈某", "gender": "女", "age": 47},
+      "encounter": {"encounter_id": "ENC-GYN-001", "chief_complaint": "月经量增多3个月，头晕1周", "allergy": "无已知药物过敏"},
+      "facts": {
+        "labs": {"hemoglobin_g_l": 82},
+        "exams": ["超声：子宫内膜增厚", "妊娠试验阴性"],
+        "missing": ["末次宫颈筛查结果", "子宫内膜病理"]
+      },
+      "expected": {
+        "differential_candidates": ["异常子宫出血", "子宫内膜病变待排", "子宫肌瘤/腺肌病待排"],
+        "risks": ["中重度贫血", "子宫内膜病变漏诊风险"],
+        "comorbidities": ["贫血"]
+      }
+    },
+    {
+      "fixture_id": "GYN-002",
+      "specialty": "普通妇科",
+      "scenario": "育龄期腹痛出血、妊娠状态冲突与异位妊娠红旗",
+      "patient": {"patient_id": "MOCK-GYN-002", "name": "孙某某", "gender": "女", "age": 31},
+      "encounter": {"encounter_id": "ENC-GYN-002", "chief_complaint": "停经6周，下腹痛伴阴道流血", "allergy": "头孢类皮疹"},
+      "facts": {
+        "conflicts": ["预问诊填报未妊娠，检验β-hCG阳性"],
+        "red_flags": ["单侧下腹痛", "阴道流血", "β-hCG阳性", "超声宫内未见孕囊"],
+        "missing": ["生命体征复测", "盆腔积液情况"]
+      },
+      "expected": {"critical_risk": "异位妊娠待排", "cannot_miss": ["异位妊娠破裂"], "must_clarify": ["妊娠状态", "生命体征", "晕厥/肩痛"], "write_back_blocked": true}
+    }
+  ]
+}

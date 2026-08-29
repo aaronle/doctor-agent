@@ -1,8 +1,8 @@
 # Doctor Agent 项目交接手册
 
-更新时间：2026-08-28（Asia/Shanghai）  
+更新时间：2026-08-29（Asia/Shanghai）
 项目目录：`/Users/leying/Documents/北大医疗/AI Native Systems/projects/doctor-agent`  
-项目状态：一期产品定义与技术准备
+项目状态：一期七功能、六个版本化 Mock Agent 和广州单容器部署定义已完成；尚未发布到 `da.aaronhealth.cn`
 
 本文件是 Doctor Agent 项目的当前接手入口。正式需求、接口、评测标准和发布规则应保存在本仓库，并随项目决策及时更新。
 
@@ -68,6 +68,11 @@ doctor-agent/
 ├── AGENTS.md
 ├── HANDOVER.md
 ├── README.md
+├── apps/
+│   ├── web/                    # Vue 3 医生工作站
+│   └── api/                    # FastAPI 产品 API 与 Agent Gateway
+├── packages/contracts/        # OpenAPI 与 JSON Schema
+├── scripts/                   # 契约生成等项目脚本
 └── docs/
     ├── 00-一期研发总纲.md
     ├── README.md
@@ -81,13 +86,18 @@ doctor-agent/
 - `docs/agent-integration/`：AgentScope、Skills、MCP、数据上下文、接口协议、卡片和展现协议。
 - `docs/agent-roles-and-evaluation/`：岗位定义、调用规则、输出规范、评测集、指标和调优记录。
 - `docs/implementation/`：快速开发、纵向薄切、环境、测试和迭代计划。
-- `references/ui-demo/`：原始 HTML Demo，只作为 UI/UX 参考，不作为生产代码基线。
+- `references/ui-demo/AI-HIS门诊模块V4.3.html`：不可修改的最早 HTML 原件。
+- `design/current/AI-HIS医生智能体一期.html`：视觉与主体交互参考基线。当前代码的入口流程已按最新确认调整为：本地演示无需登录，默认进入 `/outpatient/list`；点击患者后进入 `/outpatient` 并自动展开医生智能体。正式环境仍须接入医院 SSO。
 
-后续增加源码、自动化测试和部署文件时，再按实际技术栈创建 `src/`、`tests/`、`deploy/` 等目录，不预设空架构。
+当前源码、自动化测试和契约已按实际技术栈建立；运行和测试方式见 `docs/implementation/02-本地开发与架构说明.md`。
+
+一期七功能均已具备可操作的产品级演示数据和交互效果：语音录制/转写校正、病情概况、段落级病历草稿、鉴别诊断决策、诊断管理与演示写回、风险处置闭环、共病分组与随访草稿。医生界面默认生成正常结果，不显示运行场景选择器或“Mock 效果”标签；需要澄清、数据冲突、降级、运行失败和 Schema 拒绝仍通过测试接口注入验证。F06 已按红色“必须处置并阻断”、黄色“处理或留痕”实现分级；智慧诊疗必须排除项提供“风险预警/查看详细”入口，风险详情逐项折叠并展示证据、来源、阈值与不确定性。中间区域增加五类助手、33 项专项能力的技能目录，五个分组默认折叠，具体 Worker/Sub-Agent 拆分待讨论，不改变一期七功能、六 Agent 范围。当前基线已通过 21 条前端测试、21 条 API 测试、类型检查、生产构建和九个页面入口的本机浏览器验收；详见 `docs/testing/02-一期七功能Mock产品测试报告.md`。
+
+2026-08-29 参考 Ticket System 广州生产 1.33.1 的服务端 Agent、审计、健康指纹、回环端口、Docker 健康检查和日志滚动方式，将七类任务收敛为六个 `mvp-0.2.0` Mock Agent。广州部署定义位于 `deploy/tencent-guangzhou/`，采用 Vue 静态产物 + FastAPI + SQLite 的单容器架构，计划只绑定 `127.0.0.1:3400`。本地最新验证通过 21 条前端测试、21 条 API 测试、类型检查、生产构建和 FastAPI 同源静态服务；本机未安装 Docker CLI，镜像构建须在广州候选环境验证。
 
 ## 6. 当前待决策事项
 
-1. 产品技术栈以及与现有 AI-HIS Demo 的继承方式。
+1. 医院是否要求替换当前 Vue 3/FastAPI/PostgreSQL 兼容技术栈；无新要求时按当前实现继续。
 2. AgentScope 的调用协议、鉴权、超时、重试、流式输出和审计机制。
 3. Skills、MCP 与临床数据源清单及最小权限。
 4. Worker、智能体岗位与 Sub-agent 的定义和运行边界（待讨论）。
