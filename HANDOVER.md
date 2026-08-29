@@ -10,9 +10,14 @@
 ## 1. 接手顺序
 
 1. 阅读本文件。
-2. 阅读 [`docs/product/09-一期需求规划说明书.md`](docs/product/09-一期需求规划说明书.md) —— 一期的执行契约。
-3. 阅读 [`docs/product/08-V4.3界面基准与后端API契约.md`](docs/product/08-V4.3界面基准与后端API契约.md) —— 界面与 API 的唯一事实源。
-4. 根据任务所属条线阅读对应详细 Markdown。
+2. 阅读 [`docs/product/10-V4.3反向需求规格说明书.md`](docs/product/10-V4.3反向需求规格说明书.md)
+   —— **从 V4.3 逐屏倒推的完整需求书**，覆盖五个页面、八个标签页、对话框清单、
+   数据契约、功能增强清单与遗留缺口。每条都标了【原件】/【增强】/【缺口】。
+   从下一次开始，流程按「需求 Markdown → UI/UX → 测试用例 → 编码 → 测试 → 部署」
+   正向走，这份文档是起点。
+3. 阅读 [`docs/product/09-一期需求规划说明书.md`](docs/product/09-一期需求规划说明书.md) —— 一期的执行契约。
+4. 阅读 [`docs/product/08-V4.3界面基准与后端API契约.md`](docs/product/08-V4.3界面基准与后端API契约.md) —— 界面与 API 的唯一事实源。
+5. 根据任务所属条线阅读对应详细 Markdown。
 
 ```sh
 cd "/Users/leying/Documents/北大医疗/AI Native Systems/projects/doctor-agent"
