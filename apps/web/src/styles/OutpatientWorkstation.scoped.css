@@ -142,3 +142,7 @@
 .bo-drug{font-size:14px;font-weight:700;color:#1a2a4a;margin-bottom:6px}
 .bo-spec{display:flex;gap:6px;align-items:center;margin-bottom:4px}
 .bo-basis{font-size:11px;color:#909399}
+
+/* 对话框底部说明。写在这里而不是 app-overrides：它是本页新增的元素，
+   V4.3 没有对应类名，不属于还原范围。 */
+.dialog-hint{float:left;font-size:11px;color:var(--gray-2);line-height:32px}

@@ -123,6 +123,85 @@ async function submitOrder() {
   }
 }
 
+// ---------------------------------------------------------------- 转诊 / 住院 / 检查
+
+const referralDialog = ref(false)
+const admissionDialog = ref(false)
+const examDialog = ref(false)
+
+const DEPARTMENTS = [
+  '内分泌科', '心内科', '神经内科', '肾内科', '消化内科', '呼吸内科',
+  '血液科', '风湿免疫科', '普外科', '骨科', '妇科', '眼科',
+  '营养科', '康复科', '精神心理科', '全科医学科',
+]
+
+const newReferral = ref({ target_dept: '', reason: '', urgent: false })
+const newAdmission = ref({ target_dept: '', indication: '', urgent: false })
+const newExam = ref({ name: '', type: '检查', route: '门诊', freq: '一次' })
+
+async function submitReferral() {
+  if (!newReferral.value.target_dept) {
+    ElMessage.warning('请选择转入科室')
+    return
+  }
+  submitting.value = true
+  try {
+    const result = await api.createReferral({ patient_id: ws.patientId, ...newReferral.value })
+    ElMessage.success(result.message)
+    referralDialog.value = false
+    newReferral.value = { target_dept: '', reason: '', urgent: false }
+  } catch (error) {
+    ElMessage.error(`提交失败：${(error as Error).message}`)
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function submitAdmission() {
+  if (!newAdmission.value.target_dept) {
+    ElMessage.warning('请选择入院科室')
+    return
+  }
+  if (ws.writeBackBlocked) {
+    ElMessage.warning(`${ws.openRedAlerts.length} 条红色风险未处置，已阻断住院申请`)
+    return
+  }
+  submitting.value = true
+  try {
+    const result = await api.createAdmission({
+      patient_id: ws.patientId,
+      patient_name: patient.value?.name ?? '',
+      ...newAdmission.value,
+    })
+    ElMessage.success(result.message)
+    admissionDialog.value = false
+    newAdmission.value = { target_dept: '', indication: '', urgent: false }
+  } catch (error) {
+    ElMessage.error(`提交失败：${(error as Error).message}`)
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function submitExam() {
+  if (!newExam.value.name) {
+    ElMessage.warning('请填写项目名称')
+    return
+  }
+  submitting.value = true
+  try {
+    await api.createExam({ patient_id: ws.patientId, ...newExam.value })
+    ElMessage.success(`${newExam.value.type}已开立（写入本地库，未触达真实 HIS）`)
+    examDialog.value = false
+    newExam.value = { name: '', type: '检查', route: '门诊', freq: '一次' }
+    ws.patient = await api.patient(ws.patientId)
+  } catch (error) {
+    ElMessage.error(`开立失败：${(error as Error).message}`)
+  } finally {
+    submitting.value = false
+  }
+}
+
 /** 提交病历。红色风险未逐条处置时按 F06 规格阻断。 */
 async function submitRecord() {
   if (ws.writeBackBlocked) {
@@ -183,6 +262,9 @@ onMounted(async () => {
         <el-tag v-if="ws.isDegraded" size="small" type="warning" effect="light">
           {{ ws.degradedAgents.length }} 个智能体已降级
         </el-tag>
+        <el-button text size="small" @click="referralDialog = true">转诊</el-button>
+        <el-button text size="small" @click="admissionDialog = true">住院</el-button>
+        <el-button text size="small" @click="router.push('/admin')">Agent 控制台</el-button>
         <el-button text size="small" @click="router.push('/outpatient/manage')">患者管理</el-button>
         <el-button text type="danger" size="small" @click="logout">退出</el-button>
       </div>
@@ -332,7 +414,14 @@ onMounted(async () => {
         <div class="his-orders-panel">
           <div class="panel-title-bar">
             <span class="pt-title">💊 医嘱</span>
-            <el-button type="primary" size="small" :icon="Plus" @click="openOrderDialog">开嘱</el-button>
+            <el-button
+              type="primary"
+              size="small"
+              :icon="Plus"
+              @click="orderTab === 'drug' ? openOrderDialog() : (examDialog = true)"
+            >
+              开嘱
+            </el-button>
           </div>
 
           <div class="order-sub-tabs">
@@ -398,6 +487,67 @@ onMounted(async () => {
     </div>
 
     <AiEmrFloat v-if="patient" />
+
+    <el-dialog v-model="referralDialog" title="挂转诊号" width="460px">
+      <el-form label-width="80px" size="small">
+        <el-form-item label="转入科室">
+          <el-select v-model="newReferral.target_dept" filterable placeholder="选择科室" style="width: 100%">
+            <el-option v-for="d in DEPARTMENTS" :key="d" :label="d" :value="d" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="转诊理由">
+          <el-input v-model="newReferral.reason" type="textarea" :rows="3" placeholder="病情摘要与转诊目的" />
+        </el-form-item>
+        <el-form-item label="加急"><el-switch v-model="newReferral.urgent" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-hint">写入本地库并留审计，不触达真实 HIS</span>
+        <el-button @click="referralDialog = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitReferral">确认挂号</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="admissionDialog" title="住院申请" width="460px">
+      <el-form label-width="80px" size="small">
+        <el-form-item label="入院科室">
+          <el-select v-model="newAdmission.target_dept" filterable placeholder="选择科室" style="width: 100%">
+            <el-option v-for="d in DEPARTMENTS" :key="d" :label="d" :value="d" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="入院指征">
+          <el-input v-model="newAdmission.indication" type="textarea" :rows="3" placeholder="需要住院的临床依据" />
+        </el-form-item>
+        <el-form-item label="加急"><el-switch v-model="newAdmission.urgent" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-hint">
+          {{ ws.writeBackBlocked ? `${ws.openRedAlerts.length} 条红色风险未处置，已阻断` : '写入本地库并留审计' }}
+        </span>
+        <el-button @click="admissionDialog = false">取消</el-button>
+        <el-button type="primary" :disabled="ws.writeBackBlocked" :loading="submitting" @click="submitAdmission">
+          提交住院申请
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="examDialog" title="开立检查/检验" width="460px">
+      <el-form label-width="80px" size="small">
+        <el-form-item label="类别">
+          <el-radio-group v-model="newExam.type">
+            <el-radio value="检查">🔬 检查</el-radio>
+            <el-radio value="检验">🧪 检验</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="项目名称"><el-input v-model="newExam.name" placeholder="如 糖化血红蛋白" /></el-form-item>
+        <el-form-item label="途径"><el-input v-model="newExam.route" /></el-form-item>
+        <el-form-item label="频次"><el-input v-model="newExam.freq" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-hint">写入本地库并留审计，不触达真实 HIS</span>
+        <el-button @click="examDialog = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitExam">确认开立</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="orderDialog" title="开立医嘱" width="480px">
       <el-form label-width="72px" size="small">
