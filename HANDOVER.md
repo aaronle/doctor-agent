@@ -115,6 +115,27 @@ doctor-agent/
 
 改动界面后跑 `node scripts/compare-v43-fidelity.mjs` 做数值回归（需先起 `npm run dev`）。
 
+## 4.1 设计资产
+
+Figma：**AI 门诊工作站 · 一期设计系统**
+`https://www.figma.com/design/c79Yrkq4MOgwjN3dulIvO7`
+
+| 页面 | 内容 |
+| --- | --- |
+| 00 · 设计令牌 | 23 个颜色令牌 + 13 个尺寸/字号令牌，均为 Figma Variables |
+| 01 · 组件库 | 待建 |
+| 02 · 页面骨架 | 待建 |
+
+令牌取值**全部来自 V4.3 编译产物**（`scripts/extract-v43-assets.mjs`），不是取色器估的。
+其中 `字号/base = 12` 标了重点：那是 `--el-font-size-base`，不是 Element Plus 默认的 14px。
+
+**Figma 的定位是「设计语言的沉淀」，不是 V4.3 的像素级重绘。** 原件就在仓库里，
+`npm run fidelity` 已经逐元素比对到零差异，再画一遍只会引入偏差。Figma 的价值在
+后续新增界面 —— 一期是复刻已有设计，二期开始才是设计新界面。
+
+注意：当前 Figma 席位是 `View`（student 层级）。建文件与写入实测可用，
+但如需多人协作编辑可能要升级席位。
+
 ## 5. 安全红线
 
 零容忍门禁，任一不为 0 即阻断发布：伪造事实、未确认写回、红色风险漏报、越权、非法 Schema。
