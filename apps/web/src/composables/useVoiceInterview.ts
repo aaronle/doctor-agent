@@ -3,12 +3,22 @@ import { computed, getCurrentInstance, onUnmounted, ref } from 'vue'
 import { api, streamSse } from '../api'
 
 /**
- * 语音问诊（F01）。对齐 V4.3 的交互模型。
+ * 语音问诊（F01）。
  *
- * 状态机：idle → playing →（可 paused）→ ended
- *   - idle    ：显示「● 语音问诊」
- *   - playing ：按脚本逐条播放医患对话，显示「⏸ 暂停问诊」「📋 补充观察」
- *   - ended   ：播放完毕，显示「🔄 重新问诊」
+ * 状态机：idle → playing ⇄ paused → awaiting →（医生点结束）→ ended
+ *   - idle     ：显示「● 语音问诊」
+ *   - playing  ：逐条推进医患对话
+ *   - paused   ：医生暂停
+ *   - awaiting ：**内容播完，但问诊还没结束** —— 医生可继续手动补问，或点「结束问诊」
+ *   - ended    ：医生已结束，问诊小结已生成
+ *
+ * 为什么「播完」不等于「结束」：
+ *   1. 正式环境是连续音频流，根本没有「播完」这个事件。靠静音判断会把医生
+ *      查体、思考、敲字的停顿误判成结束，把问诊拦腰切断。
+ *   2. 结束是有后果的动作 —— 它触发问诊小结，而小结要进病历。本项目里每个
+ *      有后果的动作都要医生确认，这里不该例外。
+ *   把结束交给医生点，MVP 的状态机就和正式环境一致了：接 ASR 时只是把
+ *   「脚本推进」换成「音频流推进」，结束仍然是医生点的。
  *
  * 播放过程中：
  *   - 「AI 追问提示」清单随对话推进逐条划掉（浮层 pending-float）
@@ -18,7 +28,7 @@ import { api, streamSse } from '../api'
  * 播放结束后医生仍可手动补问，走 voice/turn。
  */
 
-export type VoiceState = 'idle' | 'playing' | 'paused' | 'ended'
+export type VoiceState = 'idle' | 'playing' | 'paused' | 'awaiting' | 'ended'
 
 export interface VoiceTurnMessage {
   role: 'doctor' | 'patient'
@@ -45,7 +55,11 @@ export function useVoiceInterview(getPatientId: () => string) {
 
   let timer: ReturnType<typeof setInterval> | null = null
 
-  const active = computed(() => state.value === 'playing' || state.value === 'paused')
+  /**
+   * 问诊是否仍在进行。awaiting 也算 —— 内容播完但医生还没点结束，
+   * 追问清单浮层要继续留着，让医生看到还有哪几条没问到。
+   */
+  const active = computed(() => state.value !== 'idle' && state.value !== 'ended')
 
   /**
    * 追问清单的完成判定：**语义判定**，不是按轮次顺序划掉。
@@ -156,8 +170,9 @@ export function useVoiceInterview(getPatientId: () => string) {
   function tick() {
     if (playedCount.value >= script.value.length) {
       stopTimer()
-      state.value = 'ended'
-      // 播完再判一次，兜住奇数轮结尾
+      // 播完进 awaiting 而不是 ended：问诊由医生点「结束问诊」才算结束
+      state.value = 'awaiting'
+      // 再判一次，兜住奇数轮结尾
       void judgeCoverage()
       return
     }
@@ -207,7 +222,7 @@ export function useVoiceInterview(getPatientId: () => string) {
 
       if (!script.value.length) {
         // 没有演示脚本的患者：不假装播放，直接进入可手动补问的状态
-        state.value = 'ended'
+        state.value = 'awaiting'
         error.value = '该患者没有演示对话脚本，可在下方手动录入患者所述。'
         return
       }
@@ -234,6 +249,11 @@ export function useVoiceInterview(getPatientId: () => string) {
     void start()
   }
 
+  /** 手动补问会让问诊从 awaiting 回到「进行中」的语义，但不重启播放 */
+  function ensureOpen() {
+    if (state.value === 'ended') state.value = 'awaiting'
+  }
+
   function toggleObservation(item: string) {
     const next = new Set(pickedObservations.value)
     next.has(item) ? next.delete(item) : next.add(item)
@@ -248,6 +268,7 @@ export function useVoiceInterview(getPatientId: () => string) {
     const text = patientText.trim()
     if (!patientId || !text || manualThinking.value) return
 
+    ensureOpen()
     messages.value = [...messages.value, { role: 'patient', text }]
     messages.value = [...messages.value, { role: 'doctor', text: '' }]
     const index = messages.value.length - 1
@@ -275,11 +296,16 @@ export function useVoiceInterview(getPatientId: () => string) {
       messages.value[index].text = `（追问建议获取失败：${(exc as Error).message}）`
     } finally {
       manualThinking.value = false
+      void judgeCoverage()
     }
   }
 
+  const finishing = ref(false)
+
+  /** 医生点「结束问诊」：生成问诊小结并收尾。这是本功能唯一的结束入口。 */
   async function finish() {
     stopTimer()
+    finishing.value = true
     const patientId = getPatientId()
 
     if (patientId && messages.value.length) {
@@ -319,6 +345,7 @@ export function useVoiceInterview(getPatientId: () => string) {
     pickedObservations,
     showObservations,
     manualThinking,
+    finishing,
     error,
     degraded,
     start,

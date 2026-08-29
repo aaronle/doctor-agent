@@ -67,14 +67,54 @@ describe('语音问诊', () => {
     expect(voice.messages.value).toHaveLength(3)
   })
 
-  it('播完转 ended', async () => {
+  it('内容播完只进 awaiting，不算问诊结束', async () => {
     stubInit()
     const voice = useVoiceInterview(() => 'P006')
     await play(voice, DIALOG.length)
     await vi.advanceTimersByTimeAsync(1400)
 
-    expect(voice.state.value).toBe('ended')
+    // 「播完」不等于「结束」：正式环境是连续音频流，根本没有播完这个事件；
+    // 而结束会触发问诊小结进病历，属于有后果的动作，必须医生点。
+    expect(voice.state.value).toBe('awaiting')
     expect(voice.messages.value).toHaveLength(DIALOG.length)
+  })
+
+  it('awaiting 时问诊仍算进行中，追问清单浮层继续留着', async () => {
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006')
+    await play(voice, DIALOG.length)
+    await vi.advanceTimersByTimeAsync(1400)
+
+    expect(voice.state.value).toBe('awaiting')
+    // active 决定浮层是否显示 —— 医生还没结束，就该看得到哪几条没问到
+    expect(voice.active.value).toBe(true)
+  })
+
+  it('只有医生点结束才转 ended', async () => {
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006')
+    await play(voice, DIALOG.length)
+    await vi.advanceTimersByTimeAsync(1400)
+    expect(voice.state.value).toBe('awaiting')
+
+    await voice.finish()
+    expect(voice.state.value).toBe('ended')
+    expect(voice.active.value).toBe(false)
+  })
+
+  it('结束后手动补问会回到 awaiting，不是重开一场', async () => {
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006')
+    await play(voice, DIALOG.length)
+    await vi.advanceTimersByTimeAsync(1400)
+    await voice.finish()
+    expect(voice.state.value).toBe('ended')
+
+    const before = voice.messages.value.length
+    await voice.askManual('还有点头晕')
+    expect(voice.state.value).toBe('awaiting')
+    // 补问是接着说，不是清空重来
+    expect(voice.messages.value.length).toBeGreaterThan(before)
   })
 
   it('追问清单按语义判定划掉，不是按轮次顺序', async () => {
@@ -185,7 +225,7 @@ describe('语音问诊', () => {
     const voice = useVoiceInterview(() => 'P006')
     await voice.start()
 
-    expect(voice.state.value).toBe('ended')
+    expect(voice.state.value).toBe('awaiting')
     expect(voice.messages.value).toHaveLength(0)
     expect(voice.error.value).toContain('没有演示对话脚本')
   })

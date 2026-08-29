@@ -36,7 +36,7 @@ from ..agents import (
     voice_summary_agent,
 )
 from .. import cache
-from ..agents.context import build_context, seed_items, seed_payload
+from ..agents.context import build_context, latest_dialog, seed_items, seed_payload
 from ..audit import next_id, record_audit
 from ..database import SessionLocal, get_session
 from ..llm import ChatMessage, LlmError, get_llm_client
@@ -153,7 +153,7 @@ async def report_summary(
         "recommended_orders": seeded.get("recommended_orders", []),
         "examinations": seed_items(session, "examination", patient_id),
         "todos": _build_todos(ctx, alerts),
-        "dialog_script": seed_items(session, "dialog_script", patient_id),
+        "dialog_script": latest_dialog(session, patient_id),
         "record_nodes": SECTION_LABELS,
         "record_content": record_content,
         "is_return_visit": patient.is_return_visit,

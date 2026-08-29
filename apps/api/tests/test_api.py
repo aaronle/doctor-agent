@@ -409,3 +409,47 @@ def test_server_side_gate_blocks_write_back_even_if_frontend_bypassed(client):
     )
     # 本地规则模式下 P006 无红色项，回写应放行；门禁逻辑本身由上面的硬规则断言覆盖
     assert response.status_code in (200, 409)
+
+
+def test_context_prefers_real_interview_over_seed_script(client):
+    """
+    问诊做完后，下游分析必须看到**医生实际问到的内容**，而不是演示脚本。
+
+    否则病情概况、鉴别诊断永远停留在问诊之前 —— 医生问出来的新信息进不了
+    上下文，这一场问诊等于白做。
+    """
+    from app.agents.context import latest_dialog
+    from app.database import SessionLocal
+
+    session = SessionLocal()
+    try:
+        before = latest_dialog(session, "P005")
+    finally:
+        session.close()
+
+    client.post(
+        "/api/emr/voice/complete",
+        json={
+            "patient_id": "P005",
+            "conversation_summary": "医生：最近怎么样？\n患者：体重又掉了两斤。",
+            "messages": [
+                {"role": "doctor", "text": "最近怎么样？"},
+                {"role": "patient", "text": "体重又掉了两斤。"},
+            ],
+        },
+    )
+
+    session = SessionLocal()
+    try:
+        after = latest_dialog(session, "P005")
+    finally:
+        session.close()
+
+    assert after != before
+    assert any("体重又掉了两斤" in turn["text"] for turn in after)
+
+
+def test_report_summary_carries_the_interview_transcript(client):
+    """聚合包里的 dialog_script 也要换成真实问诊，界面时间轴与病历才对得上。"""
+    body = client.get("/api/emr/report-summary/P005?refresh=true").json()
+    assert any("体重又掉了两斤" in turn.get("text", "") for turn in body["dialog_script"])

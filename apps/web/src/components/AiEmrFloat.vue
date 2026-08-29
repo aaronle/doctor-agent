@@ -393,6 +393,45 @@ async function sendChat(preset?: string) {
   }
 }
 
+// ---------------------------------------------------------------- 一键生成
+
+const generatingAll = ref(false)
+const generateStep = ref('')
+
+/**
+ * 「生成」：把本次问诊的内容灌进下游全部 AI 产出。
+ *
+ * 为什么必须有这个动作：病情概况、鉴别诊断、风险、共病都是**打开工作站时**
+ * 算好的，也就是在问诊之前。医生问出来的新信息不会自动回流到那些面板 ——
+ * 不点这一下，问诊就白做了。
+ *
+ * 步骤：先把问诊记录落库（后续上下文装配会优先取它而不是演示脚本），
+ * 再强制刷新聚合分析，最后重新起草病历。
+ */
+async function generateAll() {
+  if (!ws.patientId || generatingAll.value) return
+  generatingAll.value = true
+  try {
+    if (voice.messages.value.length && voice.state.value !== 'ended') {
+      generateStep.value = '落库问诊记录…'
+      await voice.finish()
+    }
+
+    generateStep.value = '重新分析病情、诊断与风险…'
+    await ws.loadSummary(true)
+
+    generateStep.value = '起草病历…'
+    await generateRecord()
+
+    ElMessage.success('已按本次问诊内容重新生成病历与分析')
+  } catch (error) {
+    ElMessage.error(`生成失败：${(error as Error).message}`)
+  } finally {
+    generatingAll.value = false
+    generateStep.value = ''
+  }
+}
+
 // ---------------------------------------------------------------- 接诊流转
 
 /**
@@ -1008,6 +1047,7 @@ onMounted(async () => {
               <div class="bubble-content">{{ message.content || '…' }}</div>
             </div>
 
+            <div v-if="generateStep" class="voice-ready-hint">⚡ {{ generateStep }}</div>
             <div v-if="voice.error.value" class="voice-ready-hint">{{ voice.error.value }}</div>
           </div>
 
@@ -1015,21 +1055,50 @@ onMounted(async () => {
             <el-button v-if="voice.state.value === 'idle'" type="primary" size="small" @click="voice.start()">
               ● 语音问诊
             </el-button>
-            <template v-else-if="voice.state.value === 'playing'">
-              <el-button type="warning" size="small" @click="voice.pause()">⏸ 暂停问诊</el-button>
-              <el-button size="small" plain class="obs-toggle-btn" @click="voice.showObservations.value = true">
-                📋 补充观察
-              </el-button>
-            </template>
-            <template v-else-if="voice.state.value === 'paused'">
-              <el-button type="primary" size="small" @click="voice.resume()">▶ 继续问诊</el-button>
-              <el-button size="small" plain class="obs-toggle-btn" @click="voice.showObservations.value = true">
-                📋 补充观察
-              </el-button>
-            </template>
+
             <template v-else>
-              <el-button size="small" @click="voice.restart()">🔄 重新问诊</el-button>
-              <el-button type="primary" size="small" @click="voice.finish()">生成问诊小结</el-button>
+              <!-- 播放中 / 暂停：控制推进 -->
+              <el-button v-if="voice.state.value === 'playing'" type="warning" size="small" @click="voice.pause()">
+                ⏸ 暂停问诊
+              </el-button>
+              <el-button v-else-if="voice.state.value === 'paused'" type="primary" size="small" @click="voice.resume()">
+                ▶ 继续问诊
+              </el-button>
+              <el-button v-else size="small" @click="voice.restart()">🔄 重新问诊</el-button>
+
+              <el-button size="small" plain class="obs-toggle-btn" @click="voice.showObservations.value = true">
+                📋 补充观察
+              </el-button>
+
+              <!--
+                结束问诊只有这一个入口，且只能由医生点。
+                内容播完只是进入 awaiting，不代表问诊结束 —— 结束会生成问诊小结，
+                小结要进病历，属于有后果的动作，必须医生确认。
+              -->
+              <el-button
+                v-if="voice.state.value !== 'ended'"
+                type="danger"
+                size="small"
+                :loading="voice.finishing.value"
+                @click="voice.finish()"
+              >
+                ■ 结束问诊
+              </el-button>
+
+              <!--
+                生成：把问诊内容灌进下游全部 AI 产出。
+                病情概况/鉴别诊断/风险/共病都是打开工作站时算好的（问诊之前），
+                不点这一下，医生问出来的新信息就进不了那些面板。
+              -->
+              <el-button
+                v-if="voice.messages.value.length"
+                type="success"
+                size="small"
+                :loading="generatingAll"
+                @click="generateAll"
+              >
+                ⚡ 生成
+              </el-button>
             </template>
           </div>
 

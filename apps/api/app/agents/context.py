@@ -11,7 +11,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import Patient, SeedDocument
+from ..models import Patient, SeedDocument, VoiceSession
 
 # 临床推理所需的最小充分集合。刻意排除 id_no、phone 等身份信息。
 CLINICAL_FIELDS = (
@@ -71,11 +71,32 @@ def build_context(session: Session, patient: Patient, *, include_dialog: bool = 
         ctx["examinations"] = examinations
 
     if include_dialog:
-        dialog = seed_items(session, "dialog_script", patient.id)
-        if dialog:
-            ctx["dialog_script"] = dialog
+        ctx["dialog_script"] = latest_dialog(session, patient.id)
 
     return ctx
+
+
+def latest_dialog(session: Session, patient_id: str) -> list:
+    """
+    取本次就诊的问诊对话。
+
+    优先用**医生实际做过的那场问诊**，没有才退回演示脚本。
+    不这么做的话，病情概况、鉴别诊断这些分析永远停留在问诊之前 ——
+    医生问出来的新信息进不了上下文，等于白问。
+    """
+    latest = session.scalar(
+        select(VoiceSession)
+        .where(VoiceSession.patient_id == patient_id)
+        .order_by(VoiceSession.ended_at.desc())
+        .limit(1)
+    )
+    if latest and latest.messages:
+        return [
+            {"role": m.get("role", ""), "text": m.get("text", "")}
+            for m in latest.messages
+            if isinstance(m, dict) and m.get("text")
+        ]
+    return seed_items(session, "dialog_script", patient_id)
 
 
 def abnormal_labs(ctx: dict) -> list[dict]:
