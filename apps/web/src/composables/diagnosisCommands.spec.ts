@@ -152,3 +152,29 @@ describe('诊断聊天命令', () => {
     expect(state).toEqual(snapshot)
   })
 })
+
+describe('回复文案', () => {
+  const PROBES = [
+    '查看诊断', '清空诊断', '确认诊断',
+    '添加诊断：肺炎', '删除诊断：高血压3级', '设为主诊断：高血压3级',
+    '修改诊断：2型糖尿病 为 糖尿病', '修改诊断：2型糖尿病', '删除诊断：不存在的病',
+  ]
+
+  it('一律纯文本，不含 HTML —— 气泡按文本渲染，标签会原样显示给医生', () => {
+    // 这个 bug 是公网验收时发现的：照抄原件的 <strong>，医生看到的是
+    // 「已添加 <strong>糖尿病足筛查异常</strong>」。
+    for (const text of PROBES) {
+      const r = runDiagnosisCommand(text, base())
+      if (!r) continue
+      expect(r.reply, `命令「${text}」的回复含 HTML`).not.toMatch(/<\/?[a-z]/i)
+    }
+  })
+
+  it('每条回复都说清楚发生了什么，不返回空串', () => {
+    for (const text of PROBES) {
+      const r = runDiagnosisCommand(text, base())
+      if (!r) continue
+      expect(r.reply.trim().length, `命令「${text}」回复为空`).toBeGreaterThan(4)
+    }
+  })
+})

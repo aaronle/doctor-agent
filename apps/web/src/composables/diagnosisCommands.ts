@@ -20,7 +20,14 @@ export type DiagnosisState = {
 }
 
 export type CommandResult = {
-  /** 回给医生的话，允许少量 <strong> 标记，与原件一致 */
+  /**
+   * 回给医生的话。**纯文本，不含 HTML。**
+   *
+   * 原件用 <strong> 加粗，因为它的气泡渲染 HTML。我们的气泡渲染纯文本，
+   * 直接照抄会把标签原样显示给医生（公网验收时就是这么发现的）。
+   * 改用 v-html 更糟 —— 回复里插着诊断名，而名字来自医生输入与模型输出，
+   * 等于开一个 XSS 口子。中文用「」强调足够。
+   */
   reply: string
   /** 命令执行后的新状态（不改传入对象） */
   state: DiagnosisState
@@ -35,7 +42,7 @@ const ADD = /^添加诊断\s*[:：]?\s*(.+)/
 const REMOVE = /^删除诊断\s*[:：]?\s*(.+)/
 const PRIMARY = /^设为主诊断\s*[:：]?\s*(.+)/
 const RENAME = /^修改诊断\s*[:：]?\s*(.+?)\s*为\s*(.+)/
-/** 「修改诊断」开头但没写「为」，要给提示而不是当成普通对话放过去 */
+/**「修改诊断」开头但没写「为」，要给提示而不是当成普通对话放过去 */
 const RENAME_LOOSE = /^修改诊断/
 
 /** ICD 码形如 E11.9 / I10：一个字母跟一个数字起头 */
@@ -59,7 +66,7 @@ function findIndex(list: DiagnosisEntry[], query: string): number {
   return list.findIndex((d) => d.name.includes(q) || q.includes(d.name))
 }
 
-const EMPTY_HINT = '当前没有选中的诊断。输入 <strong>添加诊断：高血压</strong> 来添加。'
+const EMPTY_HINT = '当前没有选中的诊断。输入「添加诊断：高血压」来添加。'
 
 export function runDiagnosisCommand(input: string, current: DiagnosisState): CommandResult | null {
   const text = input.trim()
@@ -69,11 +76,11 @@ export function runDiagnosisCommand(input: string, current: DiagnosisState): Com
     if (!state.selected.length) return { reply: EMPTY_HINT, state }
     if (!state.primary) {
       return {
-        reply: '尚未指定主诊断。输入 <strong>设为主诊断：xxx</strong> 后再回写。',
+        reply: '尚未指定主诊断。输入「设为主诊断：xxx」后再回写。',
         state,
       }
     }
-    return { reply: `正在回写 ${state.selected.length} 条诊断，主诊断为 <strong>${state.primary}</strong>。`, state, writeBack: true }
+    return { reply: `正在回写 ${state.selected.length} 条诊断，主诊断为「${state.primary}」。`, state, writeBack: true }
   }
 
   if (VIEW.test(text)) {
@@ -82,17 +89,17 @@ export function runDiagnosisCommand(input: string, current: DiagnosisState): Com
       const star = d.name === state.primary ? '★ ' : ''
       const icd = d.icd ? ` (ICD: ${d.icd})` : ''
       const tag = d.name === state.primary ? ' — 主诊断' : ''
-      return `${i + 1}. ${star}<strong>${d.name}</strong>${icd}${tag}`
+      return `${i + 1}. ${star}「${d.name}」${icd}${tag}`
     })
     const usage = [
       '可输入：',
-      '• <strong>添加诊断：xxx</strong> 添加新诊断',
-      '• <strong>删除诊断：xxx</strong> 删除诊断',
-      '• <strong>设为主诊断：xxx</strong> 设置主诊断',
-      '• <strong>修改诊断：A 为 B</strong> 修改名称',
-      '• <strong>确认诊断回写</strong> 回写 HIS',
+      '•「添加诊断：xxx」添加新诊断',
+      '•「删除诊断：xxx」删除诊断',
+      '•「设为主诊断：xxx」设置主诊断',
+      '•「修改诊断：A 为 B」修改名称',
+      '•「确认诊断回写」回写 HIS',
     ]
-    return { reply: [`当前诊断（${state.selected.length} 条）：`, ...lines, '', ...usage].join('<br>'), state }
+    return { reply: [`当前诊断（${state.selected.length} 条）：`, ...lines, '', ...usage].join('\n'), state }
   }
 
   if (CLEAR.test(text)) {
@@ -104,15 +111,15 @@ export function runDiagnosisCommand(input: string, current: DiagnosisState): Com
   if (rename) {
     const [, from, to] = rename
     const index = findIndex(state.selected, from)
-    if (index < 0) return { reply: `未找到诊断「${from.trim()}」。输入 <strong>查看诊断</strong> 查看当前列表。`, state }
+    if (index < 0) return { reply: `未找到诊断「${from.trim()}」。输入「查看诊断」查看当前列表。`, state }
     const wasPrimary = state.selected[index].name === state.primary
     const next = to.trim()
     state.selected[index].name = next
     if (wasPrimary) state.primary = next
-    return { reply: `已将「${from.trim()}」修改为 <strong>${next}</strong>。`, state }
+    return { reply: `已将「${from.trim()}」修改为「${next}」。`, state }
   }
   if (RENAME_LOOSE.test(text)) {
-    return { reply: '格式是 <strong>修改诊断：原名 为 新名</strong>，中间的「为」不能省。', state }
+    return { reply: '格式是「修改诊断：原名 为 新名」，中间的「为」不能省。', state }
   }
 
   const add = text.match(ADD)
@@ -126,18 +133,18 @@ export function runDiagnosisCommand(input: string, current: DiagnosisState): Com
     state.selected.push(icd ? { name, icd } : { name })
     // 第一条自动成为主诊断：回写必须有主诊断，让医生少一步
     if (!state.primary) state.primary = name
-    return { reply: `已添加 <strong>${name}</strong>${icd ? `（ICD: ${icd}）` : ''}。`, state }
+    return { reply: `已添加「${name}」${icd ? `（ICD: ${icd}）` : ''}。`, state }
   }
 
   const remove = text.match(REMOVE)
   if (remove) {
     const query = remove[1].trim()
     const index = findIndex(state.selected, query)
-    if (index < 0) return { reply: `未找到诊断「${query}」。输入 <strong>查看诊断</strong> 查看当前列表。`, state }
+    if (index < 0) return { reply: `未找到诊断「${query}」。输入「查看诊断」查看当前列表。`, state }
     const [gone] = state.selected.splice(index, 1)
     // 主诊断被删掉就清空，不能留一个指向已删条目的悬空引用
     if (gone.name === state.primary) state.primary = ''
-    return { reply: `已删除 <strong>${gone.name}</strong>。`, state }
+    return { reply: `已删除「${gone.name}」。`, state }
   }
 
   const primary = text.match(PRIMARY)
@@ -145,10 +152,10 @@ export function runDiagnosisCommand(input: string, current: DiagnosisState): Com
     const query = primary[1].trim()
     const index = findIndex(state.selected, query)
     if (index < 0) {
-      return { reply: `未找到诊断「${query}」。请先添加该诊断，或输入 <strong>查看诊断</strong> 查看当前列表。`, state }
+      return { reply: `未找到诊断「${query}」。请先添加该诊断，或输入「查看诊断」查看当前列表。`, state }
     }
     state.primary = state.selected[index].name
-    return { reply: `已将 <strong>${state.primary}</strong> 设为主诊断。`, state }
+    return { reply: `已将「${state.primary}」设为主诊断。`, state }
   }
 
   return null
