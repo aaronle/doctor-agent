@@ -141,6 +141,18 @@ const TARGETS = [
     },
   },
 
+  // 阳性结果展开态：点某一条，列表让位给该条详情
+  {
+    key: '44-result-detail',
+    hash: '#/outpatient/P001',
+    root: '.result-detail',
+    steps: async (page) => {
+      await closeAiFloat(page);
+      await page.locator('.result-list-item').first().click();
+      await page.waitForTimeout(600);
+    },
+  },
+
   // 质控明细：点「查看全部 N 处遗漏」才展开，默认只有摘要
   {
     key: '43-qc-detail',

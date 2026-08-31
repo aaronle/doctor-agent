@@ -44,19 +44,60 @@ const drugOrders = computed(() => allOrders.value.filter((o) => o.category !== '
 const examOrders = computed(() => allOrders.value.filter((o) => o.category === 'exam' && o.exam_type !== '检验'))
 const labResults = computed<LabResult[]>(() => patient.value?.lab_results ?? [])
 
-/** 阳性结果：异常检验 + 结论异常的检查报告，与 V4.3 的 result-panel 一致。 */
-const positiveResults = computed(() => {
+/**
+ * 阳性结果：异常检验 + 异常检查，与 V4.3 的 result-panel 一致。
+ *
+ * 字段名与形状对齐原件（id / type / label / detail / extra）—— detail 是展开态
+ * 要显示的内容，早先的实现没有它，所以点开只能重复一遍名字。
+ * 顺序也按原件：检查在前，检验在后。
+ */
+type PositiveResult = { id: string; type: 'exam' | 'lab'; label: string; detail: string; extra: string }
+
+const positiveResults = computed<PositiveResult[]>(() => {
   const labs = labResults.value
     .filter((l) => l.abnormal)
-    .map((l) => ({ kind: 'lab' as const, name: l.name, extra: l.diff_note || `${l.value}${l.unit ?? ''}（参考 ${l.ref ?? '—'}）` }))
+    .map((l) => ({
+      id: `lab-${l.name}`,
+      type: 'lab' as const,
+      label: l.name,
+      detail: `${l.value} ${l.unit ?? ''}（参考: ${l.ref ?? '—'}）`,
+      extra: l.diff_note || '偏高',
+    }))
   const exams = (summary.value?.examinations ?? [])
-    .filter((e) => String((e as Record<string, string>).conclusion ?? '').includes('异常'))
-    .map((e) => {
+    .filter((e) => {
+      const row = e as Record<string, unknown>
+      // 优先用结构化的 abnormal；没有该字段时退回结论文本判断
+      return row.abnormal === true || String(row.conclusion ?? '').includes('异常')
+    })
+    .map((e, i) => {
       const row = e as Record<string, string>
-      return { kind: 'exam' as const, name: row.name, extra: row.conclusion }
+      return {
+        id: String(row.id ?? `exam-${i}`),
+        type: 'exam' as const,
+        label: row.name,
+        detail: row.result ?? row.conclusion ?? '',
+        extra: row.conclusion ?? '',
+      }
     })
   return [...exams, ...labs]
 })
+
+/** 展开查看的那一条。null 表示看列表。 */
+const openedResult = ref<PositiveResult | null>(null)
+
+/** 再点同一条即收起 —— 与原件一致 */
+function toggleResult(item: PositiveResult) {
+  openedResult.value = openedResult.value?.id === item.id ? null : item
+}
+
+/** 结论里出现「异常」「偏高」即标红 */
+const openedAbnormal = computed(() => {
+  const extra = openedResult.value?.extra ?? ''
+  return extra.includes('异常') || extra.includes('偏高')
+})
+
+// 换患者时收起展开态，否则会把上一位患者的结果留在面板里
+watch(() => ws.patientId, () => { openedResult.value = null })
 
 const allergyText = computed(() => {
   const value = patient.value?.allergies
@@ -303,10 +344,11 @@ onMounted(async () => {
             :key="item.id"
             class="sa-avatar"
             :class="{ active: item.id === ws.patientId }"
-            :title="`${item.name} · ${item.dept}`"
+            :title="`${item.name ?? '—'} · ${item.dept ?? ''}`"
             @click="switchPatient(item.id)"
           >
-            {{ item.name.charAt(0) }}
+            <!-- 缺名字不能让 charAt 抛错：渲染函数一抛，整个工作站白屏 -->
+            {{ (item.name ?? '?').charAt(0) }}
           </div>
         </div>
       </div>
@@ -469,13 +511,34 @@ onMounted(async () => {
 
           <div class="result-panel">
             <div class="result-panel-header">
-              <span class="rp-title"><span>⚠ 阳性结果 ({{ positiveResults.length }})</span></span>
+              <span class="rp-title">
+                <span v-if="openedResult">📊 {{ openedResult.label }}</span>
+                <span v-else>⚠ 阳性结果 ({{ positiveResults.length }})</span>
+              </span>
+              <el-button v-if="openedResult" link size="small" type="primary" @click="openedResult = null">
+                ← 查看全部
+              </el-button>
             </div>
-            <div class="result-list-wrap">
-              <div class="result-list">
-                <div v-for="item in positiveResults" :key="item.kind + item.name" class="result-list-item" :class="item.kind">
-                  <span class="rli-badge">{{ item.kind === 'lab' ? '检验' : '检查' }}</span>
-                  <span class="rli-name">{{ item.name }}</span>
+
+            <!-- 展开某一条时列表让位给详情；再点同一条或「查看全部」回到列表 -->
+            <div v-if="openedResult" class="result-detail">
+              <div class="rd-type">{{ openedResult.type === 'exam' ? '🔬 检查结果' : '🧪 检验结果' }}</div>
+              <div class="rd-content">{{ openedResult.detail }}</div>
+              <div class="rd-extra" :class="openedAbnormal ? 'abnormal' : 'normal'">{{ openedResult.extra }}</div>
+            </div>
+
+            <div v-else class="result-list-wrap">
+              <div v-if="!positiveResults.length" class="no-abnormal">暂无阳性结果</div>
+              <div v-else class="result-list">
+                <div
+                  v-for="item in positiveResults"
+                  :key="item.id"
+                  class="result-list-item"
+                  :class="item.type"
+                  @click="toggleResult(item)"
+                >
+                  <span class="rli-badge">{{ item.type === 'lab' ? '检验' : '检查' }}</span>
+                  <span class="rli-name">{{ item.label }}</span>
                   <span class="rli-extra">{{ item.extra }}</span>
                   <span class="rli-arrow">›</span>
                 </div>

@@ -40,7 +40,30 @@ const PROPS = ['fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor
  * 不能简单点一下就完事：两个 page 实例在所有场景间复用，切 hash 不会重挂载组件，
  * 上一个场景留下的展开态会让这一次的点击变成「收起」。所以先归零再展开。
  */
+/**
+ * 确保 AI 浮层是打开的。
+ *
+ * 两个 page 实例在所有场景间复用，切 hash 不会重挂载组件 —— 上一个场景把浮层
+ * 关掉（比如为了露出被盖住的阳性结果），下一个场景就点不到标签页，直接超时。
+ * 与其要求每个场景自己收尾，不如让依赖浮层的场景自己确保前置状态。
+ */
+async function ensureAiFloat(page) {
+  const round = page.locator('.ai-float-btn').first();
+  if (await round.isVisible().catch(() => false)) {
+    await round.click();
+    await page.waitForTimeout(400);
+  }
+  const toggle = page.locator('.panel-tips-toggle').first();
+  if (!(await page.locator('.tips-drawer').first().isVisible().catch(() => false))
+      && await toggle.isVisible().catch(() => false)) {
+    await toggle.click();
+    await page.waitForTimeout(400);
+  }
+  await page.locator('.tips-drawer').first().waitFor({ state: 'visible', timeout: 8000 });
+}
+
 async function openPlusMenu(page) {
+  await ensureAiFloat(page);
   if (await page.locator('.plus-menu').first().isVisible().catch(() => false)) {
     await page.locator('.tb-plus-btn').first().click();
     await page.waitForTimeout(250);
@@ -88,6 +111,7 @@ const PAGES = [
     hash: '#/outpatient/P001',
     path: '/outpatient/P001',
     prepare: async (page) => {
+      await ensureAiFloat(page);
       await page.locator('.ttab').filter({ hasText: tab }).first().click();
       await page.waitForTimeout(700);
       // 专项评估与就诊卡默认折叠，展开第一个才能取到内部元素
@@ -110,6 +134,7 @@ const PAGES = [
     // V4.3 的问诊数据是本地的，点完即播；重建版要先等 voiceInit 的真实模型
     // 调用返回，所以等浮层出现而不是死等固定时长。
     prepare: async (page) => {
+      await ensureAiFloat(page);
       await page.locator('.action-bar button', { hasText: '语音问诊' }).first().click();
       await page.locator('.pending-float').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
       await page.locator('.msg-bubble').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
@@ -122,10 +147,31 @@ const PAGES = [
   },
 
   {
+    name: '阳性结果展开态',
+    hash: '#/outpatient/P001',
+    path: '/outpatient/P001',
+    prepare: async (page) => {
+      // 阳性结果在 HIS 医嘱区下方，被 AI 浮层盖住，先关掉浮层
+      for (const sel of ['.tips-close', '.panel-close']) {
+        const btn = page.locator(sel).first();
+        if (await btn.isVisible().catch(() => false)) {
+          await btn.click();
+          await page.waitForTimeout(350);
+        }
+      }
+      await page.locator('.result-list-item').first().click();
+      await page.locator('.result-detail').first().waitFor({ state: 'visible', timeout: 8000 });
+      await page.waitForTimeout(300);
+    },
+    selectors: ['.result-detail', '.rd-type', '.rd-content', '.rd-extra'],
+  },
+
+  {
     name: '质控明细展开',
     hash: '#/outpatient/P001',
     path: '/outpatient/P001',
     prepare: async (page) => {
+      await ensureAiFloat(page);
       await page.locator('.ttab').filter({ hasText: '病历管理' }).first().click();
       await page.waitForTimeout(700);
       // 「查看全部 N 处遗漏」是风险卡里的第一个 rc-side-more

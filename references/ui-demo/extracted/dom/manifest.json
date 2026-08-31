@@ -190,6 +190,14 @@
       "classCount": 393
     },
     {
+      "key": "44-result-detail",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 270,
+      "outlineLines": 3,
+      "classCount": 83
+    },
+    {
       "key": "43-qc-detail",
       "hash": "#/outpatient/P001",
       "title": "门诊工作站 · 惠每AI门诊",
@@ -225,7 +233,7 @@
       "key": "53-solo-tips-open-btn",
       "hash": "#/outpatient/P001",
       "title": "门诊工作站 · 惠每AI门诊",
-      "domBytes": 25457,
+      "domBytes": 25461,
       "outlineLines": 327,
       "classCount": 118
     },

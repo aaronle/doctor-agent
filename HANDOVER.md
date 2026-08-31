@@ -4,7 +4,7 @@
 项目目录：`/Users/leying/Documents/北大医疗/AI Native Systems/projects/doctor-agent`
 远程仓库：`https://github.com/aaronle/doctor-agent`（**私有**）
 项目状态：一期七功能已按 V4.3 界面基准实现完毕，六个岗位接真实 Claude Haiku。
-界面还原度门禁覆盖 **140 个元素，零差异零缺失**。
+界面还原度门禁覆盖 **144 个元素，零差异零缺失**。
 **已上线公网：<https://da.aaronhealth.cn>**（2026-08-31）。证书 Let's Encrypt，有效期至
 2026-11-29，`certbot.timer` 自动续期，续期演练已通过。公网实测：真实模型端到端 17.8s
 零降级，五个入口与控制台全部 200，两个 SSE 端点真流式（块间隔 11.9ms / 20.9ms，与服务端
@@ -108,7 +108,7 @@ doctor-agent/
 │   └── extracted/               全部抽取产物，脚本可复现
 ├── scripts/
 │   ├── extract-v43-assets.mjs   静态抽取：CSS / 令牌 / fixture
-│   ├── extract-v43-dom.mjs      动态抽取：29 个界面状态的渲染 DOM
+│   ├── extract-v43-dom.mjs      动态抽取：30 个界面状态的渲染 DOM
 │   ├── split-v43-css.mjs        按组件作用域拆分 CSS
 │   └── compare-v43-fidelity.mjs 还原度数值比对
 └── deploy/tencent-guangzhou/    广州单容器部署定义

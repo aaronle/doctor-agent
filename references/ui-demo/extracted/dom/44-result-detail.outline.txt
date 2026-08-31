@@ -1,0 +1,3 @@
+div.rd-type  «🔬 检查结果»
+div.rd-content  «窦性心律，HR 76次/分，ST段V4-V6轻度压低（0.5mm），T波低平，提示心肌供血不足可能»
+div.rd-extra.abnormal  «异常：心肌供血不足可能»
