@@ -1224,3 +1224,55 @@ def test_reading_a_patient_with_no_saved_record_is_not_an_error(client):
     body = client.get("/api/emr/record/P005").json()
     assert body["latest"] is None or isinstance(body["latest"], dict)
     assert "submitted" in body
+
+
+def test_handling_a_red_alert_persists_and_leaves_an_audit(client):
+    """
+    红色风险处置必须落库 + 留痕。
+
+    此前这个动作只改前端内存，而确认按钮上写着「已处置并留痕」—— 留痕是没有的。
+    它又门控着病历提交，于是刷新一次页面，医生得把所有红线重新处置一遍。
+    """
+    from app.database import SessionLocal
+    from app.models import AuditLog
+
+    r = client.post(
+        "/api/emr/alerts/handle",
+        json={"patient_id": "P006", "alert_id": "A-TEST", "alert_name": "危急值"},
+    )
+    assert r.status_code == 200
+    assert "A-TEST" in r.json()["handled_alerts"]
+
+    # 聚合包要把它带回来，界面据此恢复
+    assert "A-TEST" in client.get("/api/emr/report-summary/P006").json()["handled_alerts"]
+
+    session = SessionLocal()
+    try:
+        assert session.query(AuditLog).filter(AuditLog.action == "handle_red_alert").count() >= 1
+    finally:
+        session.close()
+
+
+def test_handling_the_same_alert_twice_does_not_duplicate(client):
+    client.post("/api/emr/alerts/handle", json={"patient_id": "P005", "alert_id": "A-DUP", "alert_name": "x"})
+    body = client.post("/api/emr/alerts/handle", json={"patient_id": "P005", "alert_id": "A-DUP", "alert_name": "x"}).json()
+    assert body["handled_alerts"].count("A-DUP") == 1
+
+
+def test_qc_review_leaves_an_audit_but_changes_nothing_else(client):
+    """
+    质控审阅只留痕，不清除遗漏 —— 审阅代表看过，不代表病历改好了。
+    """
+    from app.database import SessionLocal
+    from app.models import AuditLog
+
+    before = client.post("/api/emr/record/quality", json={"patient_id": "P001", "fields": {}}).json()
+    client.post("/api/emr/record/qc-review", json={"patient_id": "P001", "gap_count": len(before["gaps"])})
+    after = client.post("/api/emr/record/quality", json={"patient_id": "P001", "fields": {}}).json()
+
+    assert len(after["gaps"]) == len(before["gaps"]), "审阅不该让遗漏消失"
+    session = SessionLocal()
+    try:
+        assert session.query(AuditLog).filter(AuditLog.action == "qc_review").count() >= 1
+    finally:
+        session.close()

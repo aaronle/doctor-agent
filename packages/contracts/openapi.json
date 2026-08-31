@@ -1000,6 +1000,94 @@
         }
       }
     },
+    "/api/emr/alerts/handle": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Handle Alert",
+        "description": "记录一次红色风险处置。\n\n此前这个动作只改前端内存，而确认按钮上写着「已处置并**留痕**」——\n留痕是没有的，刷新也就没了。红色风险处置又门控着病历提交，\n于是医生刷新一次页面，得把所有红线重新处置一遍。\n\n落在患者主档上（而不是只留审计），是因为**下次打开要能恢复**：\n审计是给事后查的，恢复现场需要能读回来的状态。",
+        "operationId": "handle_alert_api_emr_alerts_handle_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertHandleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Handle Alert Api Emr Alerts Handle Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/record/qc-review": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Qc Review",
+        "description": "记录一次质控审阅。\n\n审阅**不清除遗漏** —— 它只表示医生看过。留痕的意义在于：\n事后能查到「这些遗漏在提交前被谁、在什么时候看过」。\n此前这句「已记录本次质控审阅」同样只是前端的一个 ref。",
+        "operationId": "qc_review_api_emr_record_qc_review_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QcReviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Qc Review Api Emr Record Qc Review Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/emr/record/stash": {
       "post": {
         "tags": [
@@ -1850,6 +1938,34 @@
         ],
         "title": "AdmissionIn"
       },
+      "AlertHandleIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "alert_id": {
+            "type": "string",
+            "title": "Alert Id"
+          },
+          "alert_name": {
+            "type": "string",
+            "title": "Alert Name",
+            "default": ""
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "alert_id"
+        ],
+        "title": "AlertHandleIn"
+      },
       "ChatIn": {
         "properties": {
           "patient_id": {
@@ -2105,6 +2221,24 @@
           "patient_id"
         ],
         "title": "OrderIn"
+      },
+      "QcReviewIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "gap_count": {
+            "type": "integer",
+            "title": "Gap Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "QcReviewIn"
       },
       "RecordAutoIn": {
         "properties": {

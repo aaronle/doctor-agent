@@ -27,6 +27,7 @@ const SUMMARY = {
   risk_assessments: [], risk_alerts: [], recommended_orders: [],
   examinations: [{ id: 'e1', name: '双眼底照相', abnormal: true, result: '双眼NPDR轻度', conclusion: '异常: NPDR 轻度' }],
   todos: [], dialog_script: [], record_nodes: {}, record_content: {},
+    handled_alerts: [],
   is_return_visit: true, pre_consultation_done: true,
   suspected_diagnoses: [], differential_diagnosis: {}, visit_history: [],
   comorbidity: { detected: false, conditions: [] }, timeline: [],

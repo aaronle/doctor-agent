@@ -334,8 +334,8 @@ describe('病历质控提醒', () => {
     expect(wrapper.find('.qc-reviewed-btn').text()).toContain(label)
 
     await wrapper.find('.qc-reviewed-btn').trigger('click')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('.qc-item').exists()).toBe(false)
+    // 现在要先落库再收起 —— 没留痕就不该表现为「已完成」，所以是异步的
+    await vi.waitFor(() => expect(wrapper.find('.qc-item').exists()).toBe(false))
   })
 
   it('审阅是记录一次确认，不是把遗漏抹掉', async () => {
@@ -343,7 +343,7 @@ describe('病历质控提醒', () => {
     await wrapper.find('.rc-side-more').trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.qc-reviewed-btn').exists()).toBe(true))
     await wrapper.find('.qc-reviewed-btn').trigger('click')
-    await wrapper.vm.$nextTick()
+    await vi.waitFor(() => expect(wrapper.find('.qc-item').exists()).toBe(false))
 
     // 遗漏本身仍在 —— 审阅只代表医生看过，不代表病历改好了。
     // 抹掉它等于用一次点击把红线消音。

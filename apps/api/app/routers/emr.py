@@ -217,6 +217,8 @@ async def report_summary(
         "comorbidity": comorbidity_data,
         "timeline": seed_items(session, "timeline", patient_id),
         # 部分就绪的显式标记，前端据此显示降级标签
+        # 已处置的红色风险随聚合包带回，刷新后界面据此恢复，不用额外请求
+        "handled_alerts": list((patient.payload or {}).get("handled_alerts") or []),
         "_meta": {
             "degraded_agents": degraded,
             "hard_rule_alerts": len(hard_alerts),
@@ -735,6 +737,65 @@ def _assert_red_alerts_closed(session: Session, patient, handled: list[str], *, 
     open_red = sorted(all_red - set(handled or []))
     if open_red:
         raise HTTPException(status_code=409, detail=f"尚有 {len(open_red)} 条红色风险未处置，已阻断{action}")
+
+
+class AlertHandleIn(BaseModel):
+    patient_id: str
+    alert_id: str
+    alert_name: str = ""
+    note: str = ""
+
+
+@router.post("/alerts/handle")
+def handle_alert(body: AlertHandleIn, session: Session = Depends(get_session)) -> dict:
+    """
+    记录一次红色风险处置。
+
+    此前这个动作只改前端内存，而确认按钮上写着「已处置并**留痕**」——
+    留痕是没有的，刷新也就没了。红色风险处置又门控着病历提交，
+    于是医生刷新一次页面，得把所有红线重新处置一遍。
+
+    落在患者主档上（而不是只留审计），是因为**下次打开要能恢复**：
+    审计是给事后查的，恢复现场需要能读回来的状态。
+    """
+    patient = _patient_or_404(session, body.patient_id)
+    payload = patient.payload or {}
+    handled = list(payload.get("handled_alerts") or [])
+    if body.alert_id not in handled:
+        handled.append(body.alert_id)
+    payload["handled_alerts"] = handled
+    patient.payload = payload
+    flag_modified(patient, "payload")
+
+    record_audit(
+        session, action="handle_red_alert", entity="risk_alert", entity_id=body.alert_id,
+        patient_id=patient.id, detail={"name": body.alert_name, "note": body.note},
+    )
+    session.commit()
+    return {"ok": True, "handled_alerts": handled, "message": f"已记录「{body.alert_name or body.alert_id}」的处置"}
+
+
+class QcReviewIn(BaseModel):
+    patient_id: str
+    gap_count: int = 0
+
+
+@router.post("/record/qc-review")
+def qc_review(body: QcReviewIn, session: Session = Depends(get_session)) -> dict:
+    """
+    记录一次质控审阅。
+
+    审阅**不清除遗漏** —— 它只表示医生看过。留痕的意义在于：
+    事后能查到「这些遗漏在提交前被谁、在什么时候看过」。
+    此前这句「已记录本次质控审阅」同样只是前端的一个 ref。
+    """
+    patient = _patient_or_404(session, body.patient_id)
+    record_audit(
+        session, action="qc_review", entity="record_quality", entity_id=patient.id,
+        patient_id=patient.id, detail={"gap_count": body.gap_count},
+    )
+    session.commit()
+    return {"ok": True, "message": "已记录本次质控审阅，遗漏仍保留在清单中"}
 
 
 class RecordSaveIn(BaseModel):

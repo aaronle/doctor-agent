@@ -50,6 +50,11 @@ export const useWorkstation = defineStore('workstation', () => {
     handledAlerts.value = new Set([...handledAlerts.value, id])
   }
 
+  /** 从服务端带回的列表恢复已处置状态 —— 刷新不该让医生重新处置一遍红线 */
+  function restoreHandledAlerts(ids: string[]) {
+    handledAlerts.value = new Set([...handledAlerts.value, ...ids])
+  }
+
   /** 已处置的红色风险 id，回写时随请求上送供服务端二次校验 */
   const handledAlertIds = computed(() => [...handledAlerts.value])
 
@@ -84,6 +89,8 @@ export const useWorkstation = defineStore('workstation', () => {
     try {
       const result = await api.reportSummary(patientId.value, refresh)
       summary.value = result
+      // 服务端记着哪些红线已处置，刷新后据此恢复 —— 否则医生得重新处置一遍
+      restoreHandledAlerts(result.handled_alerts ?? [])
       // 病历基线来自种子的 record_content；AI 生成的草稿另存在 draft
       if (!Object.keys(record.value).length) {
         record.value = { ...(result.record_content ?? {}) }
@@ -122,6 +129,7 @@ export const useWorkstation = defineStore('workstation', () => {
     writeBackBlocked,
     markAlertHandled,
     handledAlertIds,
+    restoreHandledAlerts,
     loadQueue,
     selectPatient,
     loadSummary,

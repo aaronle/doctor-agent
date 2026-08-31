@@ -181,6 +181,8 @@ export interface ReportSummary {
     conditions: ComorbidityCondition[]
     nutrition?: { triggered: boolean; score: number; threshold: number; message: string }
   }
+  /** 已处置的红色风险 id，刷新后据此恢复 */
+  handled_alerts: string[]
   timeline: { time?: string; type?: string; category?: string; action?: string; detail?: string; result?: string; analysisHint?: string }[]
   _meta: { degraded_agents: string[]; hard_rule_alerts: number; model_conflicts: string[]; cached: boolean }
 }
@@ -423,6 +425,17 @@ export const api = {
       provider: string
       degraded: boolean
     }>(`/api/emr/voice/init/${id}`),
+  /** 记录一次红色风险处置。落患者主档 + 审计 —— 刷新后要能恢复。 */
+  handleAlert: (patientId: string, alertId: string, alertName: string) =>
+    post<{ ok: boolean; handled_alerts: string[]; message: string }>('/api/emr/alerts/handle', {
+      patient_id: patientId, alert_id: alertId, alert_name: alertName,
+    }),
+  /** 记录一次质控审阅。只留痕，不清除遗漏。 */
+  qcReview: (patientId: string, gapCount: number) =>
+    post<{ ok: boolean; message: string }>('/api/emr/record/qc-review', {
+      patient_id: patientId, gap_count: gapCount,
+    }),
+
   /** 暂存病历。不过红线门禁 —— 暂存的用途就是「还没弄完，先存着」。 */
   stashRecord: (patientId: string, fields: Record<string, string>) =>
     post<{ ok: boolean; version: number; message: string }>('/api/emr/record/stash', {

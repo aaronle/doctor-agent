@@ -442,8 +442,14 @@ async function handleAlert(alert: RiskItem) {
     `处置红色风险 · ${alert.name}`,
     { type: 'error', confirmButtonText: '已处置并留痕', cancelButtonText: '稍后处理' },
   )
-  ws.markAlertHandled(alert.id)
-  ElMessage.success(`已记录「${alert.name}」的处置`)
+  try {
+    const result = await api.handleAlert(ws.patientId, alert.id, alert.name)
+    ws.markAlertHandled(alert.id)
+    ElMessage.success(result.message)
+  } catch (error) {
+    // 没落库就不要标成已处置 —— 否则界面放行了提交，服务端门禁却仍会拦
+    ElMessage.error(`处置未能留痕：${(error as Error).message}`)
+  }
 }
 
 // ---------------------------------------------------------------- 病历生成
@@ -689,10 +695,15 @@ function focusRecordField(key: string) {
  * 只收起明细并记一次确认，**不清空遗漏** —— 审阅代表看过，不代表病历改好了。
  * 把遗漏一并抹掉，等于用一次点击给红线消音，下一个接手的人再也看不到。
  */
-function markQcReviewed() {
-  showAllGaps.value = false
-  qcReviewedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
-  ElMessage.success('已记录本次质控审阅，遗漏仍保留在清单中')
+async function markQcReviewed() {
+  try {
+    const result = await api.qcReview(ws.patientId, quality.value?.gaps?.length ?? 0)
+    showAllGaps.value = false
+    qcReviewedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+    ElMessage.success(result.message)
+  } catch (error) {
+    ElMessage.error(`审阅未能留痕：${(error as Error).message}`)
+  }
 }
 const showAllGaps = ref(false)
 
