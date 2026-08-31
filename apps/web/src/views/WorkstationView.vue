@@ -41,7 +41,40 @@ const summary = computed(() => ws.summary)
 
 const allOrders = computed<PatientOrder[]>(() => patient.value?.orders ?? [])
 const drugOrders = computed(() => allOrders.value.filter((o) => o.category !== 'exam'))
-const examOrders = computed(() => allOrders.value.filter((o) => o.category === 'exam' && o.exam_type !== '检验'))
+
+/**
+ * 「检查」子页：患者**已做的检查** + 本次**新开的检查**。
+ *
+ * 早先这一页只过滤「category === 'exam' 的医嘱」，而种子医嘱一条都没有 category ——
+ * 于是患者明明做过心电图、眼底照相、颈动脉超声，这一页却永远是空的（角标 0，
+ * 原件是 3）。检查记录的正主是 examinations，医嘱表里只有本次新开的那些。
+ *
+ * 列按原件：检查项目 / 类型 / 日期 / 结论。新开的还没有结果，结论写「待出结果」。
+ */
+type ExamRow = { id: string; name: string; type: string; date: string; conclusion: string }
+
+const examOrders = computed<ExamRow[]>(() => {
+  const done = (summary.value?.examinations ?? []).map((e, i) => {
+    const row = e as Record<string, string>
+    return {
+      id: String(row.id ?? `exam-${i}`),
+      name: row.name ?? '',
+      type: row.type ?? '检查',
+      date: row.date ?? '',
+      conclusion: row.conclusion ?? '',
+    }
+  })
+  const ordered = allOrders.value
+    .filter((o) => o.category === 'exam' && o.exam_type !== '检验')
+    .map((o) => ({
+      id: o.id,
+      name: o.name ?? '',
+      type: o.exam_type ?? '检查',
+      date: '',
+      conclusion: '待出结果',
+    }))
+  return [...done, ...ordered]
+})
 const labResults = computed<LabResult[]>(() => patient.value?.lab_results ?? [])
 
 /**
@@ -564,13 +597,17 @@ onMounted(async () => {
 
             <el-table v-else-if="orderTab === 'exam'" :data="examOrders" class="compact-table" size="small" border stripe height="100%">
               <el-table-column prop="name" label="检查项目" min-width="180" />
-              <el-table-column prop="route" label="途径" width="80" />
-              <el-table-column prop="freq" label="频次" width="80" />
-              <el-table-column prop="status" label="状态" width="80" />
+              <el-table-column prop="type" label="类型" width="90" />
+              <el-table-column prop="date" label="日期" width="110" />
+              <el-table-column label="结论" min-width="160">
+                <template #default="{ row }">
+                  <span :class="{ danger: String(row.conclusion).includes('异常') }">{{ row.conclusion || '—' }}</span>
+                </template>
+              </el-table-column>
             </el-table>
 
             <el-table v-else :data="labResults" class="compact-table" size="small" border stripe height="100%">
-              <el-table-column prop="name" label="检验项目" min-width="160" />
+              <el-table-column prop="name" label="指标名称" min-width="160" />
               <el-table-column label="结果" width="110">
                 <template #default="{ row }">
                   <span :class="{ danger: row.abnormal }">{{ row.value }}{{ row.unit ?? '' }}</span>

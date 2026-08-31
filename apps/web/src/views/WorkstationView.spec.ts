@@ -197,3 +197,54 @@ describe('候诊栏健壮性', () => {
     expect(wrapper.findAll('.sa-avatar')).toHaveLength(2)
   })
 })
+
+describe('医嘱三子页', () => {
+  it('角标计数：药品来自医嘱、检查来自检查记录、检验来自检验结果', async () => {
+    const wrapper = await render()
+    const badges = wrapper.findAll('.ostab-badge').map((b) => b.text())
+    // PATIENT 有 0 条药品医嘱、SUMMARY 有 1 条检查、3 条检验
+    expect(badges).toEqual(['0', '1', '3'])
+  })
+
+  it('「检查」页显示患者已做的检查，不是只显示新开的医嘱', async () => {
+    // 早先这一页的数据源接成了「category === exam 的医嘱」，
+    // 而种子医嘱都没有 category —— 于是患者明明做过心电图、眼底照相，
+    // 这一页却永远是空的。
+    const wrapper = await render()
+    await wrapper.findAll('.ostab')[1].trigger('click')
+
+    // 断言落在表格里，不是整页文本 —— 项目名在别处也出现，整页断言测不出东西
+    const rows = wrapper.findAll('.el-table__body .cell').map((c) => c.text())
+    expect(rows).toContain('双眼底照相')
+    expect(rows).toContain('异常: NPDR 轻度')
+  })
+
+  it('「检查」页的列头按原件：检查项目 / 类型 / 日期 / 结论', async () => {
+    const wrapper = await render()
+    await wrapper.findAll('.ostab')[1].trigger('click')
+    const heads = wrapper.findAll('.el-table__header th .cell').map((h) => h.text())
+    expect(heads).toEqual(['检查项目', '类型', '日期', '结论'])
+  })
+
+  it('「检验」页首列是「指标名称」，与原件一致', async () => {
+    const wrapper = await render()
+    await wrapper.findAll('.ostab')[2].trigger('click')
+    const heads = wrapper.findAll('.el-table__header th .cell').map((h) => h.text())
+    expect(heads).toEqual(['指标名称', '结果', '参考', '趋势'])
+  })
+
+  it('新开的检查也进这一页，标为待出结果', async () => {
+    const wrapper = await render()
+    const ws = useWorkstation()
+    ws.patient = {
+      ...PATIENT,
+      orders: [{ id: 'E001', name: '胸部CT', category: 'exam', exam_type: '检查', status: '新开' }],
+    } as never
+    await wrapper.vm.$nextTick()
+    await wrapper.findAll('.ostab')[1].trigger('click')
+
+    const rows = wrapper.findAll('.el-table__body .cell').map((c) => c.text())
+    expect(rows).toContain('胸部CT')
+    expect(rows).toContain('待出结果')
+  })
+})

@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit import next_id, record_audit
+from ..schemas import StrictIn
 from ..database import get_session
 from ..models import Admission, Drug, Order, Patient, Referral, Reminder
 
@@ -26,7 +27,7 @@ LIST_FIELDS = (
 )
 
 
-class OrderIn(BaseModel):
+class OrderIn(StrictIn):
     patient_id: str
     drug: str | None = None
     name: str | None = None
@@ -36,7 +37,7 @@ class OrderIn(BaseModel):
     days: str = ""
 
 
-class ExamIn(BaseModel):
+class ExamIn(StrictIn):
     patient_id: str
     name: str
     type: str = ""
@@ -44,7 +45,7 @@ class ExamIn(BaseModel):
     freq: str = ""
 
 
-class ReferralIn(BaseModel):
+class ReferralIn(StrictIn):
     patient_id: str
     target_dept: str = ""
     reason: str = ""
@@ -52,7 +53,7 @@ class ReferralIn(BaseModel):
     model_config = {"extra": "allow"}
 
 
-class AdmissionIn(BaseModel):
+class AdmissionIn(StrictIn):
     patient_id: str
     patient_name: str = ""
     target_dept: str = ""
@@ -60,7 +61,7 @@ class AdmissionIn(BaseModel):
     model_config = {"extra": "allow"}
 
 
-class RemindIn(BaseModel):
+class RemindIn(StrictIn):
     patient_ids: list[str] = Field(default_factory=list)
     patient_id: str | None = None
 
@@ -141,7 +142,7 @@ def manage_patients(session: Session = Depends(get_session)) -> dict:
     }
 
 
-class RequeueIn(BaseModel):
+class RequeueIn(StrictIn):
     patient_id: str
 
 

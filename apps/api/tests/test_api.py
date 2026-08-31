@@ -1330,3 +1330,102 @@ def test_requeue_is_idempotent(client):
 
 def test_requeue_unknown_patient_is_404(client):
     assert client.post("/api/his/patients/requeue", json={"patient_id": "P999"}).status_code == 404
+
+
+# ------------------------------------------------------------------ 时间轴反映真实操作
+
+
+def test_timeline_reflects_actions_taken_this_visit(client):
+    """
+    时间轴必须反映本次操作。
+
+    此前它纯粹取种子：医生开了医嘱、提交了病历，时间轴纹丝不动 ——
+    一条不反映当前操作的时间轴没有任何用处，只是一张装饰图。
+    而这些动作在审计日志里本来就全都有。
+    """
+    before = len(client.get("/api/emr/report-summary/P002?refresh=true").json()["timeline"])
+    client.post(
+        "/api/his/orders",
+        json={"patient_id": "P002", "drug": "时间轴测试", "dose": "1片", "freq": "qd", "route": "口服", "days": "7"},
+    )
+    after = client.get("/api/emr/report-summary/P002?refresh=true").json()["timeline"]
+    assert len(after) == before + 1
+
+    latest = [t for t in after if t.get("source") == "audit"][-1]
+    assert latest["action"] == "开立医嘱"
+    assert "时间轴测试" in latest["detail"]
+
+
+def test_timeline_writes_human_text_not_raw_json(client):
+    """详情要写成人看得懂的一句话，不是把审计的 JSON 贴上去。"""
+    client.post("/api/emr/record/stash", json={"patient_id": "P002", "fields": {"chief_complaint": "a", "advice": "b"}})
+    items = client.get("/api/emr/report-summary/P002?refresh=true").json()["timeline"]
+    stash = [t for t in items if t.get("action") == "暂存病历"][-1]
+    assert stash["detail"] == "共 2 段"
+    assert "{" not in stash["detail"]
+
+
+def test_timeline_only_includes_whitelisted_actions(client):
+    """
+    审计里还有内部记账，混进时间轴只会稀释信噪比 —— 只放表内的动作。
+    """
+    from app.routers.emr import AUDIT_TIMELINE_LABELS
+
+    items = client.get("/api/emr/report-summary/P002?refresh=true").json()["timeline"]
+    labels = {v[1] for v in AUDIT_TIMELINE_LABELS.values()}
+    for t in items:
+        if t.get("source") == "audit":
+            assert t["action"] in labels
+
+
+def test_seed_timeline_is_kept_as_history(client):
+    """种子是历史记录，不该被本次操作顶掉 —— 两段合起来才完整。"""
+    items = client.get("/api/emr/report-summary/P001?refresh=true").json()["timeline"]
+    assert any(t.get("source") != "audit" for t in items), "历史记录段不应消失"
+
+
+def test_timeline_whitelist_uses_real_action_names():
+    """
+    白名单里的 action 必须真实存在于代码中。
+
+    第一版白名单写了 comorbidity_consultation / nutrition_consultation，
+    而实际记的是 request_consultation —— 于是会诊永远上不了时间轴，
+    且不会有任何报错：拼错的键只是永远匹配不到。
+    """
+    import re
+    from pathlib import Path
+    from app.routers.emr import AUDIT_TIMELINE_LABELS
+
+    used = set()
+    for path in Path("apps/api/app").rglob("*.py"):
+        used |= set(re.findall(r'action="([a-z_]+)"', path.read_text(encoding="utf-8")))
+
+    unknown = set(AUDIT_TIMELINE_LABELS) - used
+    assert not unknown, f"白名单里这些 action 在代码中不存在，永远匹配不到：{sorted(unknown)}"
+
+
+def test_unknown_request_fields_are_rejected_not_silently_dropped(client):
+    """
+    未知字段必须报 422，不能静默丢弃。
+
+    Pydantic 默认丢掉它们 —— 前端把 patient_id 拼成 patientId，请求会 200
+    返回、字段用默认值，行为看着像「功能没生效」，排查时完全没有线索。
+    这个问题是排查共病会诊时撞上的：往接口塞了 target_dept，它既不生效也不报错。
+    """
+    r = client.post(
+        "/api/emr/comorbidity/consultation",
+        json={"patient_id": "P001", "target_dept": "肾内科"},
+    )
+    assert r.status_code == 422, "未知字段应被拒绝"
+
+
+def test_all_input_models_forbid_extra_fields():
+    """新加的入参模型也要继承 StrictIn，否则这道保护会随时间被绕开。"""
+    import re
+    from pathlib import Path
+
+    offenders = []
+    for path in Path("apps/api/app/routers").glob("*.py"):
+        for m in re.finditer(r"class (\w+)\(BaseModel\):", path.read_text(encoding="utf-8")):
+            offenders.append(f"{path.name}:{m.group(1)}")
+    assert not offenders, f"这些入参模型未继承 StrictIn：{offenders}"

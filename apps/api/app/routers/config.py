@@ -6,11 +6,12 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ..config import get_ai_settings
+from ..schemas import StrictIn
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 
-class ConfigIn(BaseModel):
+class ConfigIn(StrictIn):
     model_config = {"extra": "allow"}
 
 

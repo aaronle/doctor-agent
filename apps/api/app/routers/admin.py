@@ -27,6 +27,7 @@ from ..agents import base as agent_base
 from ..audit import DEMO_ACTOR, record_audit
 from ..agents.context import build_context
 from ..eval_cases import UNIVERSAL_CHECKS, cases_for
+from ..schemas import StrictIn
 from ..database import SessionLocal, get_session
 from ..models import AgentRun, AgentVersion, Patient
 
@@ -72,7 +73,7 @@ PARAM_BOUNDS = {
 }
 
 
-class DraftIn(BaseModel):
+class DraftIn(StrictIn):
     model_tier: str = "clinical_fast"
     role_prompt: str = ""
     params: dict = Field(default_factory=dict)
@@ -374,7 +375,7 @@ def list_runs(
 
 # ------------------------------------------------------------------ 试运行与调优
 
-class DryRunIn(BaseModel):
+class DryRunIn(StrictIn):
     patient_id: str
     #「用哪一版配置跑」：草稿或当前线上
     use: str = "draft"
@@ -505,7 +506,7 @@ def _diff(before: dict, after: dict) -> list[dict]:
 EVAL_CONCURRENCY = 3
 
 
-class EvalIn(BaseModel):
+class EvalIn(StrictIn):
     use: str = "draft"
 
 

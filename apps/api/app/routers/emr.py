@@ -38,9 +38,10 @@ from ..agents import (
 from .. import cache
 from ..agents.context import build_context, latest_dialog, seed_items, seed_payload
 from ..audit import next_id, record_audit
+from ..schemas import StrictIn
 from ..database import SessionLocal, get_session
 from ..llm import ChatMessage, LlmError, get_llm_client
-from ..models import Patient, RecordDraft, Referral, VoiceSession
+from ..models import AuditLog, Patient, RecordDraft, Referral, VoiceSession
 from ..record_quality import evaluate
 
 router = APIRouter(prefix="/api/emr", tags=["emr"])
@@ -215,7 +216,8 @@ async def report_summary(
         "voice_assessments": {},
         "assessment_triggers": [],
         "comorbidity": comorbidity_data,
-        "timeline": seed_items(session, "timeline", patient_id),
+        # 种子是历史记录，审计是本次操作 —— 两段合起来才是完整的时间线
+        "timeline": seed_items(session, "timeline", patient_id) + _timeline_from_audit(session, patient_id),
         # 部分就绪的显式标记，前端据此显示降级标签
         # 已处置的红色风险随聚合包带回，刷新后界面据此恢复，不用额外请求
         "handled_alerts": list((patient.payload or {}).get("handled_alerts") or []),
@@ -259,6 +261,70 @@ TODO_CATEGORY_ORDER = [
 
 # 营养筛查阳性阈值。与共病岗位的营养提醒同源，改一处两处都变。
 NUTRITION_THRESHOLD = 3
+
+
+# 审计动作 → 时间轴上的人话。表外的动作不进时间轴（多是内部记账）。
+AUDIT_TIMELINE_LABELS = {
+    "create_order": ("doctor", "开立医嘱"),
+    "create_exam": ("doctor", "开立检查检验"),
+    "submit_record": ("doctor", "提交病历"),
+    "stash_record": ("doctor", "暂存病历"),
+    "write_back_diagnosis": ("doctor", "确认并回写诊断"),
+    "handle_red_alert": ("doctor", "处置红色风险"),
+    "qc_review": ("doctor", "审阅质控提醒"),
+    "voice_complete": ("ai", "语音问诊完成"),
+    "request_consultation": ("doctor", "申请会诊"),
+    "generate_record": ("ai", "生成病历草稿"),
+    "create_referral": ("doctor", "提交转诊单"),
+    "create_admission": ("doctor", "提交住院申请"),
+}
+
+
+def _timeline_from_audit(session: Session, patient_id: str) -> list[dict]:
+    """
+    把本次就诊的真实操作接进时间轴。
+
+    此前时间轴纯粹取种子：医生开了医嘱、提交了病历，它纹丝不动 ——
+    一条**不反映当前操作的时间轴**没有任何用处，只是一张装饰图。
+    而这些动作在审计日志里本来就全都有，接上即可。
+
+    表外的 action 不进时间轴：审计里还有一些内部记账，混进来只会稀释信噪比。
+    """
+    rows = session.scalars(
+        select(AuditLog)
+        .where(AuditLog.patient_id == patient_id, AuditLog.action.in_(list(AUDIT_TIMELINE_LABELS)))
+        .order_by(AuditLog.id)
+    ).all()
+    items = []
+    for row in rows:
+        kind, label = AUDIT_TIMELINE_LABELS[row.action]
+        detail = row.detail if isinstance(row.detail, dict) else {}
+        items.append({
+            "time": row.created_at.strftime("%H:%M"),
+            "type": kind,
+            "action": label,
+            "detail": _audit_detail_text(row.action, detail),
+            # 标出来源，界面上可以区分「今天做的」与「历史记录」
+            "source": "audit",
+        })
+    return items
+
+
+def _audit_detail_text(action: str, detail: dict) -> str:
+    """把审计详情写成一句人看得懂的话，而不是把 JSON 贴上去。"""
+    if action == "create_order":
+        return f"{detail.get('drug', '')} {detail.get('dose', '')} {detail.get('freq', '')}".strip()
+    if action == "create_exam":
+        return f"{detail.get('name', '')}（{detail.get('type', '')}）"
+    if action in {"submit_record", "stash_record"}:
+        return f"共 {len(detail.get('fields') or [])} 段"
+    if action == "write_back_diagnosis":
+        return f"主诊断：{detail.get('primary', '—')}"
+    if action == "handle_red_alert":
+        return str(detail.get("name") or "")
+    if action == "qc_review":
+        return f"当时尚有 {detail.get('gap_count', 0)} 处遗漏"
+    return ""
 
 
 def _build_recommended_exams(ctx: dict) -> list[dict]:
@@ -374,7 +440,7 @@ def _build_todos(
 # ------------------------------------------------------------------ SSE：对话与病历
 
 
-class ChatIn(BaseModel):
+class ChatIn(StrictIn):
     patient_id: str
     messages: list[dict] = Field(default_factory=list)
     generate_record: bool = False
@@ -486,14 +552,14 @@ async def _stream_record(ctx: dict, patient_id: str, note_text: str = "") -> Asy
 # ------------------------------------------------------------------ 病历：非流式
 
 
-class RecordAutoIn(BaseModel):
+class RecordAutoIn(StrictIn):
     patient_id: str
     note_text: str = ""
     dialog: list = Field(default_factory=list)
     labs: list = Field(default_factory=list)
 
 
-class RecordFieldIn(BaseModel):
+class RecordFieldIn(StrictIn):
     patient_id: str
     field: str
     note_text: str = ""
@@ -525,7 +591,7 @@ async def generate_record_field(body: RecordFieldIn, session: Session = Depends(
 # ------------------------------------------------------------------ 病历质控
 
 
-class RecordQualityIn(BaseModel):
+class RecordQualityIn(StrictIn):
     patient_id: str
     fields: dict[str, str] = Field(default_factory=dict)
 
@@ -547,14 +613,14 @@ def record_quality(body: RecordQualityIn, session: Session = Depends(get_session
 # ------------------------------------------------------------------ 语音问诊
 
 
-class VoiceTurnIn(BaseModel):
+class VoiceTurnIn(StrictIn):
     patient_id: str
     patient_text: str = ""
     turn_index: int = 0
     conversation_history: list = Field(default_factory=list)
 
 
-class VoiceCompleteIn(BaseModel):
+class VoiceCompleteIn(StrictIn):
     patient_id: str
     conversation_summary: str = ""
     messages: list = Field(default_factory=list)
@@ -631,7 +697,7 @@ async def _stream_voice_turn(ctx: dict, **kwargs) -> AsyncIterator[str]:
     )
 
 
-class VoiceCoverageIn(BaseModel):
+class VoiceCoverageIn(StrictIn):
     patient_id: str
     # 只发还开着的问题：已覆盖的判定是单调的，不会回退，重复发只是浪费 token
     open_questions: list[str] = Field(default_factory=list)
@@ -714,7 +780,7 @@ def voice_history(patient_id: str, session: Session = Depends(get_session)) -> d
 # ------------------------------------------------------------------ 诊断回写
 
 
-class DiagnosisWriteBackIn(BaseModel):
+class DiagnosisWriteBackIn(StrictIn):
     patient_id: str
     diagnoses: list[str] = Field(default_factory=list)
     primary: str = ""
@@ -739,7 +805,7 @@ def _assert_red_alerts_closed(session: Session, patient, handled: list[str], *, 
         raise HTTPException(status_code=409, detail=f"尚有 {len(open_red)} 条红色风险未处置，已阻断{action}")
 
 
-class AlertHandleIn(BaseModel):
+class AlertHandleIn(StrictIn):
     patient_id: str
     alert_id: str
     alert_name: str = ""
@@ -775,7 +841,7 @@ def handle_alert(body: AlertHandleIn, session: Session = Depends(get_session)) -
     return {"ok": True, "handled_alerts": handled, "message": f"已记录「{body.alert_name or body.alert_id}」的处置"}
 
 
-class QcReviewIn(BaseModel):
+class QcReviewIn(StrictIn):
     patient_id: str
     gap_count: int = 0
 
@@ -798,7 +864,7 @@ def qc_review(body: QcReviewIn, session: Session = Depends(get_session)) -> dict
     return {"ok": True, "message": "已记录本次质控审阅，遗漏仍保留在清单中"}
 
 
-class RecordSaveIn(BaseModel):
+class RecordSaveIn(StrictIn):
     patient_id: str
     fields: dict = Field(default_factory=dict)
     handled_alerts: list[str] = Field(default_factory=list)
@@ -939,11 +1005,11 @@ async def diagnosis_write_back(body: DiagnosisWriteBackIn, session: Session = De
 # ------------------------------------------------------------------ 共病
 
 
-class ComorbidityIn(BaseModel):
+class ComorbidityIn(StrictIn):
     patient_id: str
 
 
-class ConsultationIn(BaseModel):
+class ConsultationIn(StrictIn):
     patient_id: str
     focus_nutrition: bool = False
 
