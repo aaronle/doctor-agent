@@ -406,3 +406,136 @@ describe('诊断命令接进界面', () => {
     })
   })
 })
+
+/** 覆盖三个分类、含高优先级红线的处置项 */
+const TODOS = [
+  { id: 't1', text: '危急值：血钾 6.8 mmol/L', priority: '高', source: '预警评估', done: false, action_type: 'qc_review', category: '病历文书' },
+  { id: 't2', text: '待确认诊断 3 条', priority: '高', source: '诊断智能体', done: false, action_type: 'diagnosis_confirm', category: '诊断' },
+  { id: 't3', text: '2 项检验异常需复查', priority: '中', source: '检验结果', done: false, action_type: 'order_exam', category: '辅助检查' },
+  { id: 't4', text: 'AI 病历草稿待审核', priority: '中', source: '病历生成', done: false, action_type: 'record_confirm', category: '病历文书' },
+]
+
+describe('AI 处置单', () => {
+  async function openTodo(todos: unknown[] = TODOS) {
+    // 必须从 report-summary 喂 —— 直接给 store 赋值会被组件自己的加载覆盖掉
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url)
+        if (u.includes('assessment')) return new Response(JSON.stringify({ categories: [] }), { status: 200 })
+        if (u.includes('report-summary')) {
+          return new Response(
+            JSON.stringify({ suspected_diagnoses: [], risk_alerts: [], risk_assessments: [], todos, _meta: {} }),
+            { status: 200 },
+          )
+        }
+        if (u.includes('record/quality')) {
+          return new Response(JSON.stringify({ completeness: 60, metrics: [], gaps: [] }), { status: 200 })
+        }
+        return new Response(JSON.stringify({}), { status: 200 })
+      }),
+    )
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    await ws.selectPatient('P001')
+    await vi.waitFor(() => expect(wrapper.find('.todo-card').exists()).toBe(true))
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('按分类分组，顺序照 V4.3 的固定表', async () => {
+    const wrapper = await openTodo()
+    const names = wrapper.findAll('.todo-cat-name').map((n) => n.text())
+    // 固定顺序：诊断 → 辅助检查 → … → 病历文书 …
+    expect(names).toEqual(['诊断', '辅助检查', '病历文书'])
+  })
+
+  it('同一分类下的多条并进一组，不各自成组', async () => {
+    const wrapper = await openTodo()
+    // qc_review 与 record_confirm 都归「病历文书」
+    const groups = wrapper.findAll('.todo-category')
+    expect(groups).toHaveLength(3)
+    const last = groups[2]
+    expect(last.findAll('.todo-item')).toHaveLength(2)
+  })
+
+  it('标题显示「已选/总数」，未选时不显示', async () => {
+    const wrapper = await openTodo()
+    expect(wrapper.find('.todo-card-title').text()).toContain('AI处置单')
+    expect(wrapper.find('.todo-count').exists()).toBe(false)
+
+    await wrapper.findAll('.todo-item-check input')[0].setValue(true)
+    expect(wrapper.find('.todo-count').text()).toBe('1/4')
+  })
+
+  it('分类级全选只勾本分类', async () => {
+    const wrapper = await openTodo()
+    // 「病历文书」是第三组，两条
+    await wrapper.findAll('.todo-cat-check input')[2].setValue(true)
+    expect(wrapper.find('.todo-count').text()).toBe('2/4')
+  })
+
+  it('每条按 action_type 给出对应的动作按钮文案', async () => {
+    const wrapper = await openTodo()
+    const labels = wrapper.findAll('.todo-item .todo-action-btn').map((b) => b.text())
+    expect(labels).toEqual(['确认诊断', '开检查', '审阅质控', '写病历'])
+  })
+
+  it('动作按钮带配色类，不同动作视觉可分', async () => {
+    const wrapper = await openTodo()
+    const btns = wrapper.findAll('.todo-item .todo-action-btn')
+    expect(btns[1].classes()).toContain('tab-exam')
+    expect(btns[3].classes()).toContain('tab-record')
+  })
+
+  it('分类可折叠，点表头切换', async () => {
+    const wrapper = await openTodo()
+    expect(wrapper.findAll('.todo-cat-items')[0].isVisible()).toBe(true)
+
+    await wrapper.findAll('.todo-cat-header')[0].trigger('click')
+    expect(wrapper.findAll('.todo-cat-items')[0].isVisible()).toBe(false)
+  })
+
+  it('勾选后本分类出现「一键执行」，未勾不出现', async () => {
+    const wrapper = await openTodo()
+    const batchOf = (i: number) => wrapper.findAll('.todo-category')[i].find('.todo-cat-batch')
+
+    expect(batchOf(1).classes()).toContain('invisible')
+    await wrapper.findAll('.todo-cat-check input')[1].setValue(true)
+    expect(batchOf(1).classes()).not.toContain('invisible')
+  })
+
+  it('「诊断」分类给的是「确认诊断」而不是「一键执行」', async () => {
+    const wrapper = await openTodo()
+    const diag = wrapper.findAll('.todo-category')[0]
+    expect(diag.find('.todo-cat-right').text()).toContain('确认诊断')
+    expect(diag.find('.todo-cat-batch').exists()).toBe(false)
+  })
+
+  it('空列表给空态，不渲染空壳分组', async () => {
+    const wrapper = await openTodo([])
+    expect(wrapper.find('.todo-list').exists()).toBe(false)
+    expect(wrapper.find('.todo-card').text()).toContain('暂无待办')
+  })
+
+  it('执行前必须确认 —— 处置单里没有一步到位的写入', async () => {
+    // 未确认写回是零容忍红线。批量执行更危险：一次点击可能落多条记录。
+    const wrapper = await openTodo()
+    await wrapper.findAll('.todo-cat-check input')[1].setValue(true)
+
+    const calls0 = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.length
+    await wrapper.findAll('.todo-category')[1].find('.todo-cat-batch').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const after = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.slice(calls0)
+    const writes = after.filter((c) => {
+      const init = c[1] as RequestInit | undefined
+      return init?.method === 'POST'
+    })
+    expect(writes, '点「一键执行」不得直接写入，必须先弹确认').toHaveLength(0)
+  })
+})

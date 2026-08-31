@@ -669,3 +669,130 @@ def test_run_log_never_returns_record_content(client):
         assert "output" not in row
         assert "input_digest" not in row
         assert set(row) >= {"agent_key", "status", "model_tier", "config_version", "elapsed_ms", "context_hash"}
+
+
+# ------------------------------------------------------------------ AI 处置单
+
+
+def _todos(client, patient_id="P001"):
+    body = client.get(f"/api/emr/report-summary/{patient_id}").json()
+    return body["todos"]
+
+
+def test_todo_shape_matches_v43(client):
+    """
+    处置项形状必须是 V4.3 的 {id,text,priority,source,done,action_type,category}。
+
+    早先后端给的是 {type,title,detail,level} —— 界面按分类分组、按 action_type
+    分发动作，那套字段一个都对不上。
+    """
+    todos = _todos(client)
+    assert todos, "应至少产出一条处置项"
+    for t in todos:
+        assert set(t) >= {"id", "text", "priority", "source", "done", "action_type", "category"}
+        assert t["done"] is False, "done 一律为 False —— 系统不替医生判断某件事做完没有"
+        assert t["text"].strip()
+
+
+def test_todo_action_types_are_from_the_closed_set(client):
+    """action_type 是闭集：出现表外的值，界面就分不了类也派不了动作。"""
+    from app.routers.emr import TODO_CATEGORY
+
+    for t in _todos(client):
+        assert t["action_type"] in TODO_CATEGORY, f"未知 action_type：{t['action_type']}"
+        assert t["category"] == TODO_CATEGORY[t["action_type"]]
+
+
+def test_todo_categories_are_all_in_the_ordered_list(client):
+    """分类必须落在固定顺序表内，否则界面排序时会掉到最后一组。"""
+    from app.routers.emr import TODO_CATEGORY_ORDER
+
+    for t in _todos(client):
+        assert t["category"] in TODO_CATEGORY_ORDER
+
+
+def test_todo_ids_are_unique(client):
+    """id 重复会让界面的勾选状态串台 —— 勾一条亮两条。"""
+    ids = [t["id"] for t in _todos(client)]
+    assert len(ids) == len(set(ids))
+
+
+def test_todo_only_appears_with_real_evidence():
+    """
+    没有依据就不该列待办。
+
+    凭空列一堆比不列更糟：医生会先学会忽略这个面板，真正要紧的那条也跟着被忽略。
+    直接测规则函数，不建库记录 —— 这条断言与患者表结构无关。
+    """
+    from app.routers.emr import _build_todos
+
+    class FakePatient:
+        nutrition_screening_score = 0
+
+    todos = _build_todos(
+        {"lab_results": []}, [],
+        patient=FakePatient(), suspected=[], recommended_orders=[],
+        examinations=[], comorbidity={"detected": False, "conditions": []},
+    )
+    kinds = {t["action_type"] for t in todos}
+    assert "comorbidity_referral" not in kinds, "无共病却给了转诊待办"
+    assert "nutrition_consult" not in kinds, "营养评分正常却给了会诊待办"
+    assert "order_exam" not in kinds, "无异常检验却给了复查待办"
+    assert "diagnosis_confirm" not in kinds, "无疑似诊断却给了确认待办"
+    assert "treatment_plan" not in kinds, "无推荐医嘱却给了开立待办"
+    # 病历草稿待审核是每位患者都成立的，保留
+    assert kinds == {"record_confirm"}
+
+
+def test_nutrition_todo_respects_the_threshold(client):
+    """营养会诊按阈值触发，不是有分就报。"""
+    from app.routers.emr import NUTRITION_THRESHOLD, _build_todos
+
+    class FakePatient:
+        nutrition_screening_score = NUTRITION_THRESHOLD
+
+    at_threshold = _build_todos(
+        {}, [], patient=FakePatient(), suspected=[], recommended_orders=[],
+        examinations=[], comorbidity={},
+    )
+    assert "nutrition_consult" not in {t["action_type"] for t in at_threshold}, "等于阈值不该触发"
+
+    FakePatient.nutrition_screening_score = NUTRITION_THRESHOLD + 1
+    above = _build_todos(
+        {}, [], patient=FakePatient(), suspected=[], recommended_orders=[],
+        examinations=[], comorbidity={},
+    )
+    assert "nutrition_consult" in {t["action_type"] for t in above}
+
+
+def test_red_alerts_become_top_priority_todos(client):
+    """
+    红色预警必须逐条进处置单且排在最前。
+
+    风险漏报是零容忍红线之一；把危急值混在一堆低优先级待办中间等同于漏报。
+    """
+    todos = _todos(client, "P006")
+    body = client.get("/api/emr/report-summary/P006").json()
+    if not body["risk_alerts"]:
+        return  # 该患者本次没有红色预警，跳过
+
+    alert_todos = [t for t in todos if t["source"] == "预警评估"]
+    assert len(alert_todos) == len(body["risk_alerts"])
+    assert all(t["priority"] == "高" for t in alert_todos)
+    assert todos[0]["source"] == "预警评估", "红色预警必须排在最前"
+
+
+def test_recommended_exams_are_a_field_not_filtered_from_todos(client):
+    """
+    推荐复查是独立字段，不再从 todos 里按类型过滤。
+
+    以前待办清单兼职当推荐列表，两边形状一改就互相拖累 —— 这次改处置单
+    直接把编译搞崩了。拆开后各自演进互不影响。
+    """
+    body = client.get("/api/emr/report-summary/P001").json()
+    assert "recommended_exams" in body
+    for item in body["recommended_exams"]:
+        assert set(item) == {"id", "name", "type", "basis"}
+        assert item["name"].endswith("复查")
+    # todos 里不该再出现被当作推荐项消费的形状
+    assert all("title" not in t for t in body["todos"])

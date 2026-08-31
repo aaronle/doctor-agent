@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { api, streamSse, type RecordQuality, type RiskItem } from '../api'
+import { api, streamSse, type RecordQuality, type RiskItem, type TodoItem } from '../api'
 import { RECORD_SECTIONS, useWorkstation } from '../stores/workstation'
 import { useVoiceInterview } from '../composables/useVoiceInterview'
 import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '../composables/diagnosisCommands'
@@ -155,6 +155,167 @@ function applyDiagnosisCommand(text: string): boolean {
   chatMessages.value.push({ role: 'assistant', content: result.reply })
   if (result.writeBack) void confirmDiagnoses()
   return true
+}
+
+/* ===================== AI 处置单 ===================== */
+
+/** 分类的固定展示顺序（V4.3 的 g7）。不在表内的排最后。 */
+const TODO_CATEGORY_ORDER = [
+  '诊断', '辅助检查', '导诊单', '处置/治疗', '住院申请',
+  '病历文书', '医嘱与宣教', '随访+营养科会诊', '随访+康复科干预', '其他',
+]
+
+/** action_type → 按钮文案（V4.3 的 Bg） */
+const TODO_ACTION_LABEL: Record<string, string> = {
+  order_exam: '开检查',
+  treatment_plan: '开医嘱',
+  record_confirm: '写病历',
+  diagnosis_confirm: '确认诊断',
+  qc_review: '审阅质控',
+  followup_reminder: '记录随访',
+  comorbidity_referral: '转接诊',
+  nutrition_consult: '申请营养会诊',
+  hospitalization_apply: '申请',
+  guide_sheet: '打印',
+}
+
+/** action_type → 按钮配色类（V4.3 的 e7） */
+const TODO_ACTION_CLASS: Record<string, string> = {
+  order_exam: 'tab-exam',
+  treatment_plan: 'tab-order',
+  record_confirm: 'tab-record',
+  comorbidity_referral: 'tab-referral',
+  nutrition_consult: 'tab-referral',
+  hospitalization_apply: 'tab-admission',
+  guide_sheet: 'tab-guide',
+}
+
+/** action_type → 这个动作到底会做什么，挂在 title 上（V4.3 的 t7） */
+const TODO_ACTION_HINT: Record<string, string> = {
+  order_exam: '从 AI 推荐检查中开立检查单',
+  treatment_plan: '从 AI 推荐医嘱中批量开立',
+  record_confirm: '将 AI 生成的病历草稿写入 HIS',
+  comorbidity_referral: '为患者挂转接诊号',
+  nutrition_consult: '营养筛查评分>3，申请营养科会诊',
+  hospitalization_apply: '基于住院指征推荐，预填患者信息后提交住院申请',
+  guide_sheet: '生成检查检验注意事项与优选路线并打印导诊单',
+  diagnosis_confirm: '在鉴别诊断中勾选并确认回写',
+  followup_reminder: '记录随访计划',
+}
+
+const todos = computed<TodoItem[]>(() => summary.value?.todos ?? [])
+
+/** 按分类分组，组序照固定表 */
+const todoGroups = computed(() => {
+  const buckets = new Map<string, TodoItem[]>()
+  for (const item of todos.value) {
+    const key = item.category || '其他'
+    if (!buckets.has(key)) buckets.set(key, [])
+    buckets.get(key)!.push(item)
+  }
+  const ordered: { name: string; items: TodoItem[] }[] = []
+  for (const name of TODO_CATEGORY_ORDER) {
+    const items = buckets.get(name)
+    if (items?.length) {
+      ordered.push({ name, items })
+      buckets.delete(name)
+    }
+  }
+  // 表外的分类排最后，但不能丢
+  for (const [name, items] of buckets) ordered.push({ name, items })
+  return ordered
+})
+
+const selectedTodos = ref<Set<string>>(new Set())
+const collapsedCategories = ref<Set<string>>(new Set())
+const executingTodos = ref(false)
+
+function todoActionable(items: TodoItem[]) {
+  return items.filter((t) => !t.done)
+}
+
+function todoSelectedCount(items: TodoItem[]) {
+  return todoActionable(items).filter((t) => selectedTodos.value.has(t.id)).length
+}
+
+function toggleTodo(item: TodoItem, checked: boolean) {
+  const next = new Set(selectedTodos.value)
+  checked ? next.add(item.id) : next.delete(item.id)
+  selectedTodos.value = next
+}
+
+function toggleTodoCategory(items: TodoItem[], checked: boolean) {
+  const next = new Set(selectedTodos.value)
+  for (const t of todoActionable(items)) checked ? next.add(t.id) : next.delete(t.id)
+  selectedTodos.value = next
+}
+
+function categoryAllChecked(items: TodoItem[]) {
+  const actionable = todoActionable(items)
+  return actionable.length > 0 && actionable.every((t) => selectedTodos.value.has(t.id))
+}
+
+function categoryIndeterminate(items: TodoItem[]) {
+  const n = todoSelectedCount(items)
+  return n > 0 && !categoryAllChecked(items)
+}
+
+function toggleCategoryCollapse(name: string) {
+  const next = new Set(collapsedCategories.value)
+  next.has(name) ? next.delete(name) : next.add(name)
+  collapsedCategories.value = next
+}
+
+/**
+ * 执行一条处置。
+ *
+ * **一律先确认再动手。** 未确认写回是零容忍红线，处置单又是最容易被连点的地方 ——
+ * 一个面板上摆着十几个按钮，手滑一下就可能往病历里写进东西。
+ * 这里只做「跳到对应功能区」，真正的写入仍由那一区自己的确认流程负责。
+ */
+async function runTodo(item: TodoItem) {
+  const hint = TODO_ACTION_HINT[item.action_type] ?? '处理该待办'
+  try {
+    await ElMessageBox.confirm(hint, TODO_ACTION_LABEL[item.action_type] ?? '处理', {
+      confirmButtonText: '前往处理',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  const tab: Record<string, Tab> = {
+    diagnosis_confirm: '诊断管理',
+    order_exam: '医嘱管理',
+    treatment_plan: '医嘱管理',
+    record_confirm: '病历管理',
+    qc_review: '病历管理',
+    comorbidity_referral: '共病管理',
+    nutrition_consult: '共病管理',
+  }
+  activeTab.value = tab[item.action_type] ?? '智慧诊疗'
+}
+
+/** 一键执行：同样先确认，且把要执行的条数说清楚 */
+async function runCategory(items: TodoItem[]) {
+  const picked = todoActionable(items).filter((t) => selectedTodos.value.has(t.id))
+  if (!picked.length) return
+  try {
+    await ElMessageBox.confirm(
+      `将依次处理 ${picked.length} 条待办：\n${picked.map((t) => `· ${t.text}`).join('\n')}`,
+      '一键执行',
+      { confirmButtonText: '开始', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  executingTodos.value = true
+  try {
+    // 逐条跳到对应功能区由医生确认；处置单本身不代替任何一次写入确认
+    activeTab.value = '智慧诊疗'
+    ElMessage.info(`已选 ${picked.length} 条，请在对应功能区逐条确认后执行`)
+  } finally {
+    executingTodos.value = false
+  }
 }
 
 const candidateNames = computed(() => (summary.value?.suspected_diagnoses ?? []).map((d) => d.name))
@@ -346,7 +507,7 @@ async function addRecommendedOrder(order: { drug: string; dose: string; freq: st
 /** 整单回写：把全部推荐用药与推荐检查一次性开出 */
 async function writeBackAllOrders() {
   const drugs = summary.value?.recommended_orders ?? []
-  const exams = (summary.value?.todos ?? []).filter((t) => t.type === 'exam')
+  const exams = summary.value?.recommended_exams ?? []
   if (!drugs.length && !exams.length) {
     ElMessage.warning('没有可回写的推荐医嘱')
     return
@@ -377,7 +538,7 @@ async function writeBackAllOrders() {
     for (const exam of exams) {
       await api.createExam({
         patient_id: ws.patientId,
-        name: exam.title,
+        name: exam.name,
         type: '检验',
         route: '门诊',
         freq: '一次',
@@ -1150,6 +1311,88 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                   </div>
                 </div>
 
+                <!--
+                  AI 处置单。位置与原件一致：鉴别诊断卡之后、风险提示之前。
+
+                  原件里这块被 `p2 = false` 关掉了，从不渲染 —— 我们按产品决定打开它。
+                  因此**还原度比对覆盖不到这一块**：没有参照物可比。形状靠从原件逐字
+                  拆来的样式保证，行为靠单元测试保证。
+                -->
+                <div class="todo-card">
+                  <div class="todo-card-header">
+                    <div class="todo-card-title">
+                      AI处置单
+                      <span v-if="selectedTodos.size" class="todo-count">{{ selectedTodos.size }}/{{ todos.length }}</span>
+                    </div>
+                  </div>
+
+                  <div v-if="todoGroups.length" class="todo-list">
+                    <div v-for="group in todoGroups" :key="group.name" class="todo-category">
+                      <div class="todo-cat-header" @click="toggleCategoryCollapse(group.name)">
+                        <div class="todo-cat-left">
+                          <el-checkbox
+                            class="todo-cat-check"
+                            :model-value="categoryAllChecked(group.items)"
+                            :indeterminate="categoryIndeterminate(group.items)"
+                            :disabled="!todoActionable(group.items).length"
+                            title="全选本分类"
+                            @click.stop
+                            @change="(v: boolean) => toggleTodoCategory(group.items, v)"
+                          />
+                          <span class="todo-cat-name">{{ group.name }}</span>
+                        </div>
+                        <div class="todo-cat-right">
+                          <!-- 「诊断」走既有的回写门禁，不能混进批量执行 -->
+                          <button
+                            v-if="group.name === '诊断'"
+                            class="todo-action-btn tab-record"
+                            :disabled="!checkedDiagnoses.size || writingBack"
+                            @click.stop="confirmDiagnoses"
+                          >确认诊断</button>
+                          <button
+                            v-else
+                            class="todo-action-btn tab-record todo-cat-batch"
+                            :class="{ invisible: !todoSelectedCount(group.items) }"
+                            :disabled="!todoSelectedCount(group.items) || executingTodos"
+                            :aria-hidden="!todoSelectedCount(group.items)"
+                            @click.stop="runCategory(group.items)"
+                          >{{ executingTodos ? '执行中…' : '一键执行' }}</button>
+                          <span class="todo-cat-count">
+                            {{ group.items.filter((t) => !t.done).length }}项待办
+                          </span>
+                          <span class="todo-cat-arrow" :class="{ expanded: !collapsedCategories.has(group.name) }">›</span>
+                        </div>
+                      </div>
+                      <div v-show="!collapsedCategories.has(group.name)" class="todo-cat-items">
+                        <div
+                          v-for="item in group.items"
+                          :key="item.id"
+                          class="todo-item"
+                          :class="{ done: item.done, selected: selectedTodos.has(item.id) }"
+                        >
+                          <el-checkbox
+                            class="todo-item-check"
+                            :model-value="item.done || selectedTodos.has(item.id)"
+                            :disabled="item.done"
+                            @click.stop
+                            @change="(v: boolean) => toggleTodo(item, v)"
+                          />
+                          <span class="todo-text">{{ item.text }}</span>
+                          <button
+                            v-if="item.action_type && !item.done"
+                            class="todo-action-btn"
+                            :class="TODO_ACTION_CLASS[item.action_type] ?? 'tab-default'"
+                            :disabled="executingTodos"
+                            :title="TODO_ACTION_HINT[item.action_type]"
+                            @click.stop="runTodo(item)"
+                          >{{ TODO_ACTION_LABEL[item.action_type] ?? '处理' }}</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <el-empty v-else description="暂无待办" :image-size="48" />
+                </div>
+
                 <!-- 风险提示：红/黄分级 + 逐条「查看建议」，与 V4.3 的 risk-alert-section 一致 -->
                 <div v-if="summary?.risk_assessments?.length" class="risk-alert-section">
                   <div class="ra-header">
@@ -1521,18 +1764,18 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
 
               <div class="treat-section-head exam">
                 <div class="treat-section-title">推荐检查</div>
-                <span class="treat-section-count">{{ summary?.todos?.filter((t) => t.type === 'exam').length ?? 0 }} 项</span>
+                <span class="treat-section-count">{{ summary?.recommended_exams?.length ?? 0 }} 项</span>
               </div>
               <div class="exam-list">
-                <div v-for="todo in summary?.todos?.filter((t) => t.type === 'exam') ?? []" :key="todo.title" class="exam-rec-order">
+                <div v-for="todo in summary?.recommended_exams ?? []" :key="todo.id" class="exam-rec-order">
                   <div class="ero-head">
                     <div class="ero-title-wrap">
-                      <span class="ero-name">{{ todo.title }}</span>
+                      <span class="ero-name">{{ todo.name }}</span>
                       <el-tag size="small" type="warning" effect="plain">检验</el-tag>
                     </div>
                   </div>
                   <div class="ero-spec">门诊 · 一次</div>
-                  <div class="ero-basis">{{ todo.detail }}</div>
+                  <div class="ero-basis">{{ todo.basis }}</div>
                 </div>
               </div>
             </div>

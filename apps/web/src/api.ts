@@ -142,6 +142,19 @@ export interface ComorbidityCondition {
   recommended_dept: string
 }
 
+/** AI 处置单的一条。形状对齐 V4.3，由后端按确定性规则产出。 */
+export interface TodoItem {
+  id: string
+  text: string
+  priority: string
+  source: string
+  /** 一律为 false —— 系统不替医生判断某件事做完没有 */
+  done: boolean
+  /** 闭集，决定按钮文案、配色与跳转目标 */
+  action_type: string
+  category: string
+}
+
 export interface ReportSummary {
   overall_conclusion: { risk_level?: string; summary?: string; problems?: string[]; conflicts?: string[] }
   treatment_effectiveness: { ai_summary?: string }
@@ -149,7 +162,9 @@ export interface ReportSummary {
   risk_alerts: RiskItem[]
   recommended_orders: { drug: string; dose: string; freq: string; route: string; basis: string }[]
   examinations: Record<string, unknown>[]
-  todos: { type: string; title: string; detail: string; level: string }[]
+  /** 推荐复查项。与 todos 分开 —— 待办清单不兼职当推荐列表 */
+  recommended_exams: { id: string; name: string; type: string; basis: string }[]
+  todos: TodoItem[]
   dialog_script: { role: string; text: string }[]
   record_nodes: Record<string, string>
   record_content: Record<string, string>

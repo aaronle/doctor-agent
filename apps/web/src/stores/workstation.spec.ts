@@ -19,6 +19,7 @@ function makeSummary(alerts: Partial<RiskItem>[]): ReportSummary {
     })) as RiskItem[],
     recommended_orders: [],
     examinations: [],
+    recommended_exams: [],
     todos: [],
     dialog_script: [],
     record_nodes: {},

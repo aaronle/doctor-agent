@@ -153,7 +153,16 @@ async def report_summary(
         # 推荐医嘱一期仍取种子：它属于治疗决策，需临床专家先定评测集再交给模型
         "recommended_orders": seeded.get("recommended_orders", []),
         "examinations": seed_items(session, "examination", patient_id),
-        "todos": _build_todos(ctx, alerts),
+        "recommended_exams": _build_recommended_exams(ctx),
+        "todos": _build_todos(
+            ctx,
+            alerts,
+            patient=patient,
+            suspected=diagnosis_data.get("suspected_diagnoses", []),
+            recommended_orders=seeded.get("recommended_orders", []),
+            examinations=seed_items(session, "examination", patient_id),
+            comorbidity=comorbidity_data,
+        ),
         "dialog_script": latest_dialog(session, patient_id),
         "record_nodes": SECTION_LABELS,
         "record_content": record_content,
@@ -182,22 +191,141 @@ async def report_summary(
     return payload
 
 
-def _build_todos(ctx: dict, alerts: list[dict]) -> list[dict]:
-    """待办由确定性规则生成，类型取 V4.3 定义的枚举。"""
-    todos: list[dict] = []
-    for alert in alerts:
-        todos.append({"type": "critical_lab", "title": alert["name"], "detail": alert["summary"], "level": "danger"})
+# action_type → 分类。取自 V4.3 的 h7 映射。
+#
+# 原件里 followup_reminder 声明了两次（"随访+营养科会诊" 与 "随访+康复科干预"），
+# JS 取后者。这里按 JS 的实际行为落，不复刻那个笔误的写法。
+TODO_CATEGORY = {
+    "diagnosis_confirm": "诊断",
+    "order_exam": "辅助检查",
+    "treatment_plan": "处置/治疗",
+    "record_confirm": "病历文书",
+    "qc_review": "病历文书",
+    "comorbidity_referral": "医嘱与宣教",
+    "nutrition_consult": "随访+营养科会诊",
+    "hospitalization_apply": "住院申请",
+    "guide_sheet": "导诊单",
+    "followup_reminder": "随访+康复科干预",
+}
+
+# 分类的固定展示顺序（V4.3 的 g7）。不在表内的排最后。
+TODO_CATEGORY_ORDER = [
+    "诊断", "辅助检查", "导诊单", "处置/治疗", "住院申请",
+    "病历文书", "医嘱与宣教", "随访+营养科会诊", "随访+康复科干预", "其他",
+]
+
+# 营养筛查阳性阈值。与共病岗位的营养提醒同源，改一处两处都变。
+NUTRITION_THRESHOLD = 3
+
+
+def _build_recommended_exams(ctx: dict) -> list[dict]:
+    """
+    推荐复查项：每一条异常检验对应一条。
+
+    以前这个列表是从 todos 里 `type === 'exam'` 过滤出来的 —— 待办清单兼职当
+    推荐列表，两者的形状一改就互相拖累（这次改处置单就直接把它编译崩了）。
+    拆成独立字段，各归各位。
+    """
+    exams: list[dict] = []
     for lab in ctx.get("lab_results", []):
-        if isinstance(lab, dict) and lab.get("abnormal"):
-            todos.append(
-                {
-                    "type": "exam",
-                    "title": f"{lab.get('name')}复查",
-                    "detail": f"当前 {lab.get('value')}{lab.get('unit', '')}，参考 {lab.get('ref', '—')}",
-                    "level": "warning",
-                }
-            )
-    return todos[:8]
+        if not isinstance(lab, dict) or not lab.get("abnormal"):
+            continue
+        exams.append({
+            "id": f"rec-{lab.get('name')}",
+            "name": f"{lab.get('name')}复查",
+            "type": "检验",
+            "basis": f"当前 {lab.get('value')}{lab.get('unit', '')}，参考 {lab.get('ref', '—')}",
+        })
+    return exams
+
+
+def _build_todos(
+    ctx: dict,
+    alerts: list[dict],
+    *,
+    patient,
+    suspected: list[dict],
+    recommended_orders: list[dict],
+    examinations: list[dict],
+    comorbidity: dict,
+) -> list[dict]:
+    """
+    AI 处置单。
+
+    形状对齐 V4.3：`{id, text, priority, source, done, action_type, category}`。
+    每一条都由**确定性规则**生成，且**必须有真实依据才出现** —— 凭空列一堆待办
+    比不列更糟：医生会先学会忽略它，真正要紧的那条也跟着被忽略。
+
+    `done` 一律为 False：本项目不替医生判断某件事做完了没有。
+    """
+    todos: list[dict] = []
+
+    def add(action_type: str, text: str, *, priority: str, source: str) -> None:
+        todos.append({
+            "id": f"t_{action_type}_{len(todos)}",
+            "text": text,
+            "priority": priority,
+            "source": source,
+            "done": False,
+            "action_type": action_type,
+            "category": TODO_CATEGORY.get(action_type, "其他"),
+        })
+
+    # 危急值优先：红色预警逐条列出，医生必须逐条处置
+    for alert in alerts:
+        add("qc_review", f"{alert['name']}：{alert['summary']}", priority="高", source="预警评估")
+
+    if suspected:
+        names = "、".join(d.get("name", "") for d in suspected[:3] if d.get("name"))
+        add(
+            "diagnosis_confirm",
+            f"待确认诊断 {len(suspected)} 条（{names}{'…' if len(suspected) > 3 else ''}），勾选后回写 HIS",
+            priority="高",
+            source="诊断智能体",
+        )
+
+    abnormal_labs = [l for l in ctx.get("lab_results", []) if isinstance(l, dict) and l.get("abnormal")]
+    if abnormal_labs:
+        names = "、".join(str(l.get("name")) for l in abnormal_labs[:3])
+        add(
+            "order_exam",
+            f"{len(abnormal_labs)} 项检验异常需复查（{names}{'…' if len(abnormal_labs) > 3 else ''}）",
+            priority="中",
+            source="检验结果",
+        )
+
+    if recommended_orders:
+        add(
+            "treatment_plan",
+            f"AI 推荐医嘱 {len(recommended_orders)} 条待医生审核后开立",
+            priority="中",
+            source="智慧诊疗",
+        )
+
+    if examinations:
+        add("guide_sheet", f"{len(examinations)} 项检查检验需生成注意事项与导诊单", priority="低", source="医嘱管理")
+
+    if comorbidity.get("detected") and comorbidity.get("conditions"):
+        count = len(comorbidity["conditions"])
+        add(
+            "comorbidity_referral",
+            f"多病共存（{count} 种慢性病），建议转诊至多病共存管理门诊",
+            priority="高",
+            source="共病管理",
+        )
+
+    score = getattr(patient, "nutrition_screening_score", 0) or 0
+    if score > NUTRITION_THRESHOLD:
+        add(
+            "nutrition_consult",
+            f"营养筛查评分 {score}（阈值 {NUTRITION_THRESHOLD}），申请营养科会诊",
+            priority="中",
+            source="共病管理",
+        )
+
+    add("record_confirm", "AI 病历草稿待审核后写入 HIS", priority="中", source="病历生成")
+
+    return todos
 
 
 # ------------------------------------------------------------------ SSE：对话与病历
