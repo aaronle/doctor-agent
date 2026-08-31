@@ -481,12 +481,23 @@ const focusedField = ref<string | null>(null)
 /** 医生最近一次确认「已审阅质控提醒」的时刻 */
 const qcReviewedAt = ref<string | null>(null)
 
+let focusTimer: ReturnType<typeof setTimeout> | undefined
+
+/**
+ * 点质控提醒 → 定位到对应那一段病历。
+ *
+ * 原件只做 scrollIntoView。但目标段本来就在视野里时，滚动等于没动，
+ * 医生完全不知道点上没有 —— 所以补一个 1.6 秒的高亮做反馈。
+ * 只加边框与底色，不改尺寸与布局。
+ */
 function focusRecordField(key: string) {
   focusedField.value = key
+  clearTimeout(focusTimer)
+  focusTimer = setTimeout(() => { focusedField.value = null }, 1600)
+
   nextTick(() => {
     const node = document.querySelector(`[data-record-node="${key}"]`)
-    // 高亮是主要反馈，滚动只是锦上添花；测试 DOM 里没有 scrollIntoView，
-    // 不设防会抛未捕获异常，把整个测试运行判成失败。
+    // 测试 DOM 里没有 scrollIntoView，不设防会抛未捕获异常，把整轮测试判失败
     if (node && typeof node.scrollIntoView === 'function') {
       node.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }

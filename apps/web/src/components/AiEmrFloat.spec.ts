@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
@@ -314,6 +317,11 @@ describe('病历质控提醒', () => {
     const target = wrapper.find('[data-record-node="personal_history"]')
     expect(target.exists()).toBe(true)
     expect(target.classes()).toContain('focused')
+
+    // 高亮必须真的有样式撑着 —— 只挂个类名不配 CSS，点了等于没反应。
+    // 这个坑真踩过：类挂上了、测试绿了，公网上点下去纹丝不动。
+    const css = readFileSync(resolve(__dirname, '../styles/AiEmrFloat.scoped.css'), 'utf-8')
+    expect(css).toContain('.record-node.focused')
   })
 
   it('「我已审阅质控提醒」只在明细展开时出现，点完提醒收起', async () => {

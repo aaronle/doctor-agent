@@ -503,6 +503,9 @@
 .ero-basis{font-size:11px;color:#8b95a8;line-height:1.45}
 .ro-add-btn{flex-shrink:0}
 .record-node{margin-bottom:8px;border:1px solid #e8ecf2;border-radius:6px;overflow:hidden}
+/* 【增强】点质控提醒定位到该段时的短暂高亮。原件只滚动，目标已在视野内时零反馈。
+   只改边框与底色，不动尺寸与布局，因此不影响还原度比对。 */
+.record-node.focused{border-color:#1677ff;background:#f0f7ff;transition:background .2s,border-color .2s}
 .node-header{background:#fafbfc;padding:4px 8px;display:flex;align-items:center;gap:6px}
 .node-title{font-size:12px;font-weight:600;color:#1a2a4a;flex:1}
 .node-writeback-btn{font-size:11px!important;padding:0 4px!important;height:20px!important;flex-shrink:0}
