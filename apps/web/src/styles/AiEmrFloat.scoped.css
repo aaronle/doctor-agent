@@ -845,3 +845,19 @@
 .sni-editor:focus{border-color:#1677ff;box-shadow:0 0 0 3px #1677ff1a}
 .sni-editor:empty:before{content:attr(data-placeholder);color:#a0aec0;font-weight:400;pointer-events:none}
 .sni-editor .ai-fill{font-weight:400;color:#4b5563}
+
+/* 知识库条目按钮的容器与词条正文。
+   .kb-link 本身的配色沿用从原件拆来的规则（蓝色下划线），这里只补容器排版。
+   原件把条目做成回复 HTML 里的 <a>，我们改成 button —— 去掉按钮的默认外观。 */
+.kb-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.kb-links .kb-link{background:none;border:0;padding:0;font-size:12px}
+.kb-loading{padding:24px;text-align:center;color:#909399;font-size:12px}
+.kb-body{font-size:13px;line-height:1.7;color:#1a2a4a;max-height:min(60vh,540px);overflow-y:auto}
+.kb-body h3{font-size:14px;margin:0 0 8px}
+.kb-body h4{font-size:13px;margin:12px 0 6px}
+.kb-body ul,.kb-body ol{padding-left:20px;margin:6px 0}
+.kb-body li{margin:3px 0}
+.kb-body p{margin:6px 0}
+.kb-body table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
+.kb-body th,.kb-body td{border:1px solid #e8ecf2;padding:5px 8px;text-align:left}
+.kb-body th{background:#f8fafc;font-weight:600}

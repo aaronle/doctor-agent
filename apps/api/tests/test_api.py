@@ -796,3 +796,59 @@ def test_recommended_exams_are_a_field_not_filtered_from_todos(client):
         assert item["name"].endswith("复查")
     # todos 里不该再出现被当作推荐项消费的形状
     assert all("title" not in t for t in body["todos"])
+
+
+# ------------------------------------------------------------------ 临床知识库
+
+
+def test_knowledge_list_returns_catalog_without_bodies(client):
+    """列表只给目录。正文最长 800 余字，列表里带上纯属浪费带宽。"""
+    body = client.get("/api/emr/knowledge").json()
+    assert len(body["items"]) == 7
+    for item in body["items"]:
+        assert set(item) == {"key", "title", "keywords"}
+        assert item["keywords"]
+
+
+def test_knowledge_query_matches_by_keyword(client):
+    """带 q 时按关键词匹配，供界面在一段文本旁挂「相关条目」。"""
+    hit = client.get("/api/emr/knowledge", params={"q": "患者主诉胸闷 3 天，建议查血常规"}).json()["items"]
+    keys = {i["key"] for i in hit}
+    assert "dd_chest_pain" in keys
+    assert "blood_rt" in keys
+    assert "dd_diarrhea" not in keys, "无关词条不该被挂出来"
+
+
+def test_knowledge_query_with_no_hit_returns_empty(client):
+    """匹配不上就给空，不要退回全量 —— 挂七条不相关的比不挂更干扰。"""
+    hit = client.get("/api/emr/knowledge", params={"q": "今天天气不错"}).json()["items"]
+    assert hit == []
+
+
+def test_knowledge_detail_returns_body(client):
+    body = client.get("/api/emr/knowledge/blood_rt").json()
+    assert body["title"] == "血常规解读"
+    assert "<table" in body["content"], "正文是带结构的 HTML"
+
+
+def test_knowledge_detail_404_for_unknown_key(client):
+    assert client.get("/api/emr/knowledge/not_exist").status_code == 404
+
+
+def test_knowledge_content_carries_no_executable_markup():
+    """
+    正文以 v-html 渲染，因此内容里不得出现可执行标记。
+
+    这是静态数据，改动走代码评审 —— 这条测试是那道评审的自动化下限：
+    有人往词条里贴了一段带 onclick 的 HTML，CI 要能拦下来。
+    """
+    import json as _json
+    from pathlib import Path
+
+    path = Path("apps/api/app/data/knowledge_base.json")
+    raw = _json.loads(path.read_text(encoding="utf-8"))
+    body = "".join(v["content"] for v in raw.values())
+    assert "<script" not in body.lower()
+    assert "javascript:" not in body.lower()
+    import re as _re
+    assert not _re.search(r"\son\w+\s*=", body, _re.I), "词条正文里不得出现内联事件处理器"

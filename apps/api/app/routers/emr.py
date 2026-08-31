@@ -95,6 +95,47 @@ def assessment_catalog() -> dict:
     return json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))
 
 
+# ------------------------------------------------------------------ 临床知识库
+
+_KB_PATH = Path(__file__).resolve().parents[1] / "data/knowledge_base.json"
+
+
+def _knowledge_base() -> dict:
+    return json.loads(_KB_PATH.read_text(encoding="utf-8"))
+
+
+@router.get("/knowledge")
+def knowledge_list(q: str = "") -> dict:
+    """
+    临床知识库目录：检验解读三条 + 鉴别诊断/诊疗指南四条。
+
+    带 `q` 时按关键词匹配，供界面在一段文本（对话回复、检查结论）旁挂出
+    「相关条目」。匹配放在服务端，因为关键词是数据的一部分，跟着内容走。
+
+    只返回目录不返回正文 —— 正文最长 800 余字，列表里带上纯属浪费。
+    """
+    kb = _knowledge_base()
+    items = [{"key": k, "title": v["title"], "keywords": v["keywords"]} for k, v in kb.items()]
+    if not q:
+        return {"items": items}
+    hit = [i for i in items if any(w in q for w in i["keywords"])]
+    return {"items": hit}
+
+
+@router.get("/knowledge/{key}")
+def knowledge_detail(key: str) -> dict:
+    """
+    单条词条正文。
+
+    正文是 HTML（h3/table/ul/p 等结构标签），由本仓库静态提供、无用户输入
+    参与拼接，因此前端以 v-html 渲染是安全的。内容变更走代码评审。
+    """
+    kb = _knowledge_base()
+    if key not in kb:
+        raise HTTPException(status_code=404, detail="词条不存在")
+    return {"key": key, **kb[key]}
+
+
 # ------------------------------------------------------------------ 聚合读取
 
 

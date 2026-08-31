@@ -279,8 +279,26 @@ export type RecordQuality = {
 
 // ------------------------------------------------------------------ 端点
 
+export interface KnowledgeItem {
+  key: string
+  title: string
+  keywords: string[]
+}
+
+export interface KnowledgeEntry extends KnowledgeItem {
+  /** 结构化 HTML（h3/table/ul/p）。本仓库静态提供，无用户输入参与拼接。 */
+  content: string
+}
+
 export const api = {
   config: () => get<RuntimeConfig>('/api/config'),
+
+  /** 知识库目录。带 q 时按关键词匹配，返回该文本命中的条目。 */
+  knowledgeMatch: (q: string) =>
+    get<{ items: KnowledgeItem[] }>(`/api/emr/knowledge?q=${encodeURIComponent(q)}`),
+  /** 单条正文。按需拉取 —— 正文最长 800 余字，列表阶段不该带上。 */
+  knowledgeEntry: (key: string) => get<KnowledgeEntry>(`/api/emr/knowledge/${key}`),
+
 
   // ---------------------------------------------------------------- 控制台
   adminAgents: () =>

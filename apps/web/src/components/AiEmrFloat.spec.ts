@@ -539,3 +539,93 @@ describe('AI 处置单', () => {
     expect(writes, '点「一键执行」不得直接写入，必须先弹确认').toHaveLength(0)
   })
 })
+
+describe('临床知识库', () => {
+  const KB_HITS = [
+    { key: 'dd_chest_pain', title: '胸闷胸痛鉴别', keywords: ['胸闷', '胸痛'] },
+    { key: 'blood_rt', title: '血常规解读', keywords: ['血常规'] },
+  ]
+
+  function stubKb(hits = KB_HITS) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url)
+        if (u.includes('assessment')) return new Response(JSON.stringify({ categories: [] }), { status: 200 })
+        if (u.includes('/knowledge/')) {
+          return new Response(
+            JSON.stringify({ key: 'blood_rt', title: '血常规解读', content: '<h3>参考范围</h3><table><tr><td>WBC</td></tr></table>' }),
+            { status: 200 },
+          )
+        }
+        if (u.includes('/knowledge')) return new Response(JSON.stringify({ items: hits }), { status: 200 })
+        if (u.includes('copilot/chat')) {
+          return new Response('data: {"type":"token","token":"患者胸闷，建议查血常规"}\n\n', {
+            status: 200,
+            headers: { 'Content-Type': 'text/event-stream' },
+          })
+        }
+        return new Response(JSON.stringify({}), { status: 200 })
+      }),
+    )
+  }
+
+  async function ask(hits = KB_HITS) {
+    stubKb(hits)
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    useWorkstation(pinia).patientId = 'P001'
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+    await wrapper.find('.chat-textarea-wrap textarea').setValue('这个患者的胸闷怎么看')
+    await wrapper.find('.float-send-btn').trigger('click')
+    await vi.waitFor(() => expect(wrapper.findAll('.kb-link').length).toBeGreaterThan(0))
+    return wrapper
+  }
+
+  it('回复旁挂出命中的相关条目', async () => {
+    const wrapper = await ask()
+    const links = wrapper.findAll('.kb-link')
+    expect(links.map((l) => l.text())).toEqual(['胸闷胸痛鉴别', '血常规解读'])
+  })
+
+  it('没命中就不挂 —— 挂七条不相关的比不挂更干扰', async () => {
+    stubKb([])
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    useWorkstation(pinia).patientId = 'P001'
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+    await wrapper.find('.chat-textarea-wrap textarea').setValue('今天天气不错')
+    await wrapper.find('.float-send-btn').trigger('click')
+    await vi.waitFor(() => expect(wrapper.findAll('.msg-bubble').length).toBeGreaterThan(0))
+
+    expect(wrapper.find('.kb-link').exists()).toBe(false)
+  })
+
+  it('点条目打开弹窗并渲染正文', async () => {
+    const wrapper = await ask()
+    await wrapper.findAll('.kb-link')[1].trigger('click')
+    // 正文按需拉取，要等它回来 —— 只等弹窗出现会断言在「加载中」上
+    await vi.waitFor(() => expect(document.querySelector('.kb-dialog .kb-body')).toBeTruthy())
+
+    const dialog = document.querySelector('.kb-dialog')!
+    expect(dialog.textContent).toContain('参考范围')
+    // 正文是结构化 HTML，必须渲染成表格而不是把标签当文字显示
+    expect(dialog.querySelector('table')).toBeTruthy()
+    expect(dialog.textContent).not.toContain('<table')
+  })
+
+  it('条目正文按需拉取，列表阶段不拉正文', async () => {
+    const wrapper = await ask()
+    const calls = () => (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls
+    expect(calls().some((c) => String(c[0]).includes('/knowledge/'))).toBe(false)
+
+    await wrapper.findAll('.kb-link')[0].trigger('click')
+    await vi.waitFor(() => expect(calls().some((c) => String(c[0]).includes('/knowledge/'))).toBe(true))
+  })
+})

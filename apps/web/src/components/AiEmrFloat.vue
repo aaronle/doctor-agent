@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { api, streamSse, type RecordQuality, type RiskItem, type TodoItem } from '../api'
+import { api, streamSse, type KnowledgeEntry, type KnowledgeItem, type RecordQuality, type RiskItem, type TodoItem } from '../api'
 import { RECORD_SECTIONS, useWorkstation } from '../stores/workstation'
 import { useVoiceInterview } from '../composables/useVoiceInterview'
 import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '../composables/diagnosisCommands'
@@ -913,6 +913,44 @@ watch(
   },
 )
 
+/* ===================== 临床知识库 ===================== */
+
+/**
+ * 每条助手回复命中的知识库条目。key 是消息下标。
+ *
+ * 原件靠在回复里嵌 `<a class="kb-link">` 锚点触发，我们的回复是纯文本
+ * （见诊断命令那节，理由是 XSS），所以改为：回复完成后拿全文去服务端做
+ * 关键词匹配，命中的条目以按钮形式挂在气泡下方。不改变界面形状。
+ */
+const kbHits = ref<Map<number, KnowledgeItem[]>>(new Map())
+const kbDialogOpen = ref(false)
+const kbEntry = ref<KnowledgeEntry | null>(null)
+const kbLoading = ref(false)
+
+async function matchKnowledge(index: number, text: string) {
+  if (!text.trim()) return
+  try {
+    const { items } = await api.knowledgeMatch(text)
+    if (items.length) kbHits.value = new Map(kbHits.value).set(index, items)
+  } catch {
+    // 匹配失败不影响回复本身，静默即可
+  }
+}
+
+async function openKnowledge(key: string) {
+  kbDialogOpen.value = true
+  kbLoading.value = true
+  kbEntry.value = null
+  try {
+    kbEntry.value = await api.knowledgeEntry(key)
+  } catch (error) {
+    ElMessage.error(`词条加载失败：${(error as Error).message}`)
+    kbDialogOpen.value = false
+  } finally {
+    kbLoading.value = false
+  }
+}
+
 async function sendChat(preset?: string) {
   const text = (preset ?? chatInput.value).trim()
   if (!text || chatting.value) return
@@ -942,6 +980,8 @@ async function sendChat(preset?: string) {
   } finally {
     chatting.value = false
   }
+  // 回复完整后再匹配：流式过程中文本还不全，会漏掉后半段里的关键词
+  void matchKnowledge(index, chatMessages.value[index].content)
 }
 
 // ---------------------------------------------------------------- 生成与更新
@@ -2064,6 +2104,15 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                 <span class="bubble-role">{{ message.role === 'user' ? '医生' : 'AI' }}</span>
               </div>
               <div class="bubble-content">{{ message.content || '…' }}</div>
+              <!-- 命中的知识库条目：原件嵌在回复 HTML 里，这里挂成按钮 -->
+              <div v-if="kbHits.get(index)?.length" class="kb-links">
+                <button
+                  v-for="hit in kbHits.get(index)"
+                  :key="hit.key"
+                  class="kb-link"
+                  @click="openKnowledge(hit.key)"
+                >{{ hit.title }}</button>
+              </div>
             </div>
 
             <div v-if="actionStep" class="voice-ready-hint">⚡ {{ actionStep }}</div>
@@ -2286,6 +2335,20 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
 
       <template #footer>
         <el-button @click="skillDialogOpen = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 临床知识库词条 -->
+    <el-dialog v-model="kbDialogOpen" :title="kbEntry?.title ?? '临床知识库'" width="680px" class="kb-dialog" append-to-body>
+      <div v-if="kbLoading" class="kb-loading">加载中…</div>
+      <!--
+        eslint-disable-next-line vue/no-v-html
+        正文是本仓库静态提供的结构化 HTML，无用户输入或模型输出参与拼接；
+        「不含可执行标记」由后端一条测试把守（见 test_api.py）。
+      -->
+      <div v-else-if="kbEntry" class="kb-body" v-html="kbEntry.content" />
+      <template #footer>
+        <el-button @click="kbDialogOpen = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>

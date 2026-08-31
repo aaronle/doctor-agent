@@ -471,6 +471,97 @@
         }
       }
     },
+    "/api/emr/knowledge": {
+      "get": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Knowledge List",
+        "description": "临床知识库目录：检验解读三条 + 鉴别诊断/诊疗指南四条。\n\n带 `q` 时按关键词匹配，供界面在一段文本（对话回复、检查结论）旁挂出\n「相关条目」。匹配放在服务端，因为关键词是数据的一部分，跟着内容走。\n\n只返回目录不返回正文 —— 正文最长 800 余字，列表里带上纯属浪费。",
+        "operationId": "knowledge_list_api_emr_knowledge_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Knowledge List Api Emr Knowledge Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/knowledge/{key}": {
+      "get": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Knowledge Detail",
+        "description": "单条词条正文。\n\n正文是 HTML（h3/table/ul/p 等结构标签），由本仓库静态提供、无用户输入\n参与拼接，因此前端以 v-html 渲染是安全的。内容变更走代码评审。",
+        "operationId": "knowledge_detail_api_emr_knowledge__key__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Knowledge Detail Api Emr Knowledge  Key  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/emr/report-summary/{patient_id}": {
       "get": {
         "tags": [
