@@ -188,6 +188,46 @@
       "domBytes": 98618,
       "outlineLines": 1119,
       "classCount": 393
+    },
+    {
+      "key": "50-plus-menu",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 502,
+      "outlineLines": 10,
+      "classCount": 363
+    },
+    {
+      "key": "51-plus-menu-prompts",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 92917,
+      "outlineLines": 1035,
+      "classCount": 360
+    },
+    {
+      "key": "52-skill-manage",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 4329,
+      "outlineLines": 17,
+      "classCount": 360
+    },
+    {
+      "key": "53-solo-tips-open-btn",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 25457,
+      "outlineLines": 327,
+      "classCount": 118
+    },
+    {
+      "key": "54-ai-float-btn",
+      "hash": "#/outpatient/P001",
+      "title": "门诊工作站 · 惠每AI门诊",
+      "domBytes": 158,
+      "outlineLines": 2,
+      "classCount": 87
     }
   ]
 }

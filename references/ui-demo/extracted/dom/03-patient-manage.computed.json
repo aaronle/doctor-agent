@@ -57,7 +57,7 @@
   "his-date": {
     "display": "block",
     "position": "static",
-    "width": "121.766px",
+    "width": "119.172px",
     "height": "18.1875px",
     "flexDirection": "row",
     "fontSize": "13px",
@@ -101,7 +101,7 @@
   "his-header-right": {
     "display": "flex",
     "position": "static",
-    "width": "379.766px",
+    "width": "377.172px",
     "height": "24px",
     "gap": "16px",
     "flexDirection": "row",

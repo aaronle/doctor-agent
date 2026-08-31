@@ -7,7 +7,7 @@ div.his-list-page
     div.his-header-right
       div.ai-badge  «AI Mock 已就绪»
         span.ai-dot
-      span.his-date  «张医生 · 2026/8/29»
+      span.his-date  «张医生 · 2026/8/31»
       button.el-button.el-button--danger.el-button--small.is-text
         span  «退出»
   div.his-toolbar

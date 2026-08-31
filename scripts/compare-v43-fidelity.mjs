@@ -34,6 +34,22 @@ const VIEWPORT = { width: 1600, height: 1000 };
 const PROPS = ['fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor', 'padding', 'borderRadius'];
 
 // 每个页面挑一组有代表性的 class 做比对
+/**
+ * 把 ＋ 菜单点到「确定展开」。
+ *
+ * 不能简单点一下就完事：两个 page 实例在所有场景间复用，切 hash 不会重挂载组件，
+ * 上一个场景留下的展开态会让这一次的点击变成「收起」。所以先归零再展开。
+ */
+async function openPlusMenu(page) {
+  if (await page.locator('.plus-menu').first().isVisible().catch(() => false)) {
+    await page.locator('.tb-plus-btn').first().click();
+    await page.waitForTimeout(250);
+  }
+  await page.locator('.tb-plus-btn').first().click();
+  await page.locator('.plus-menu').first().waitFor({ state: 'visible', timeout: 8000 });
+  await page.waitForTimeout(300);
+}
+
 const PAGES = [
   {
     name: '候诊列表',
@@ -103,6 +119,51 @@ const PAGES = [
       '.pending-float', '.pending-title', '.pending-list', '.pq-item', '.pq-num', '.pq-text',
       '.msg-bubble', '.bubble-role', '.bubble-content', '.mode-badge',
     ],
+  },
+
+  {
+    name: '＋ 菜单展开',
+    hash: '#/outpatient/P001',
+    path: '/outpatient/P001',
+    prepare: openPlusMenu,
+    selectors: ['.plus-menu', '.pm-item', '.pm-submenu-trigger'],
+  },
+
+  {
+    name: '技能管理对话框',
+    hash: '#/outpatient/P001',
+    path: '/outpatient/P001',
+    prepare: async (page) => {
+      await openPlusMenu(page);
+      // 「技能管理」是 ＋ 菜单最后一项
+      await page.locator('.plus-menu .pm-item').last().click();
+      await page.locator('.skill-manage-dialog').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    },
+    selectors: ['.skill-manage-dialog', '.sm-body', '.sm-toolbar', '.sm-hint'],
+  },
+
+  {
+    name: '浮层全关的唤回钮',
+    hash: '#/outpatient/P001',
+    path: '/outpatient/P001',
+    prepare: async (page) => {
+      // 上一场景留下的技能管理对话框会盖住关闭按钮，先收干净
+      const close = page.locator('.skill-manage-dialog .el-dialog__headerbtn').first();
+      if (await close.isVisible().catch(() => false)) {
+        await close.click();
+        await page.waitForTimeout(400);
+      }
+      for (const sel of ['.tips-close', '.panel-close']) {
+        const btn = page.locator(sel).first();
+        if (await btn.isVisible().catch(() => false)) {
+          await btn.click();
+          await page.waitForTimeout(400);
+        }
+      }
+      await page.locator('.ai-float-btn').first().waitFor({ state: 'visible', timeout: 8000 });
+    },
+    selectors: ['.ai-float-btn', '.float-icon', '.float-ready-dot'],
   },
 ];
 

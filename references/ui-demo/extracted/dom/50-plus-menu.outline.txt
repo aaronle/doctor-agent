@@ -1,0 +1,10 @@
+div.pm-item  «上传文件»
+  span  «📎»
+div.pm-item  «上传图片»
+  span  «🖼»
+div.pm-item.pm-submenu-trigger  «常用提示词 ›»
+  span  «💬»
+div.pm-item  «患者管理»
+  span  «👥»
+div.pm-item  «技能管理»
+  span  «⚡»

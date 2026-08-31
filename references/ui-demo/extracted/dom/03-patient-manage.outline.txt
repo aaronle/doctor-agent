@@ -9,7 +9,7 @@ div.pm-page
         span  «返回医生站»
       button.el-button.el-button--small.is-text
         span  «候诊列表»
-      span.his-date  «张医生 · 2026/8/29»
+      span.his-date  «张医生 · 2026/8/31»
       button.el-button.el-button--danger.el-button--small.is-text
         span  «退出»
   div.pm-main

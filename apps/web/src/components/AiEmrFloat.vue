@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -15,6 +15,24 @@ type Tab = (typeof TABS)[number]
 const activeTab = ref<Tab>('智慧诊疗')
 const tipsOpen = ref(true)
 const panelOpen = ref(true)
+
+/**
+ * 浮层全关后的重新唤出入口。
+ *
+ * 只在「抽屉与面板都关」时出现 —— 面板还开着时，抽屉由面板边缘的
+ * .panel-tips-toggle（‹ ›）唤回，不需要浮动按钮。这与 V4.3 实测行为一致。
+ *
+ * 缺了它，医生把两个 × 都点掉就只能刷新页面。
+ *
+ * 注：原件里还有个 .solo-tips-open-btn（✦ 医护Copilot），显示条件为
+ * `c && !r`，但在该 build 中未发现可达路径 —— 实测关抽屉、关面板两种组合
+ * 都不触发。判定为死代码，不实现，以免显示原件从不显示的按钮。
+ */
+const showRoundEntry = computed(() => !tipsOpen.value && !panelOpen.value)
+
+function reopenTips() {
+  tipsOpen.value = true
+}
 
 /**
  * 智慧诊疗左右分栏比例。
@@ -717,6 +735,110 @@ async function finishAndGenerate() {
  */
 const router = useRouter()
 
+/* ===================== ＋ 菜单 ===================== */
+
+/** 五条常用提示词，逐字取自 V4.3，改动即偏离原件 */
+const PROMPT_PRESETS = [
+  '请根据检查结果给出初步诊断',
+  '请分析患者的用药风险',
+  '请评估该患者的并发症风险',
+  '请生成门诊随访计划',
+  '请解读最近一次血糖报告',
+]
+
+const plusMenuOpen = ref(false)
+const promptsOpen = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const imageInputRef = ref<HTMLInputElement | null>(null)
+
+/** 每次点 ＋ 都把二级菜单重置为收起，与原件一致 */
+function togglePlusMenu() {
+  plusMenuOpen.value = !plusMenuOpen.value
+  promptsOpen.value = false
+}
+
+function closePlusMenu() {
+  plusMenuOpen.value = false
+  promptsOpen.value = false
+}
+
+/** 选中提示词只填进输入框，不直接发出去 */
+function pickPrompt(text: string) {
+  chatInput.value = text
+  closePlusMenu()
+}
+
+function chooseUpload(kind: 'file' | 'image') {
+  plusMenuOpen.value = false
+  const input = kind === 'file' ? fileInputRef.value : imageInputRef.value
+  input?.click()
+}
+
+/**
+ * 只把文件名回显进对话，不发请求、不落存储 —— 一期不接收任何真实患者文件。
+ * 回显格式与原件一致。
+ */
+function onFilePicked(event: Event, label: '上传文件' | '上传图片') {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) chatMessages.value.push({ role: 'user', content: `[${label}] ${file.name}` })
+  input.value = ''
+}
+
+function goPatientManage() {
+  closePlusMenu()
+  router.push('/outpatient/manage')
+}
+
+/* ===================== 技能管理 ===================== */
+
+type Skill = { id: string; name: string; desc: string; prompt: string; icon: string; enabled: boolean }
+
+const SKILL_ICONS = ['⚡', '🩸', '💊', '🔍', '📋', '❤️', '🧠', '🦴', '📈', '✅']
+
+const skillDialogOpen = ref(false)
+const skills = ref<Skill[]>([])
+const skillFormOpen = ref(false)
+const editingId = ref<string | null>(null)
+const skillForm = ref<Omit<Skill, 'id' | 'enabled'>>({ name: '', desc: '', prompt: '', icon: '⚡' })
+
+function openSkillManage() {
+  closePlusMenu()
+  skillDialogOpen.value = true
+}
+
+function newSkill() {
+  editingId.value = null
+  skillForm.value = { name: '', desc: '', prompt: '', icon: '⚡' }
+  skillFormOpen.value = true
+}
+
+function editSkill(skill: Skill) {
+  editingId.value = skill.id
+  skillForm.value = { name: skill.name, desc: skill.desc, prompt: skill.prompt, icon: skill.icon }
+  skillFormOpen.value = true
+}
+
+function saveSkill() {
+  const form = skillForm.value
+  if (!form.name.trim()) {
+    ElMessage.warning('技能名称必填')
+    return
+  }
+  if (editingId.value) {
+    const target = skills.value.find((s) => s.id === editingId.value)
+    if (target) Object.assign(target, form)
+  } else {
+    skills.value.push({ id: `skill-${skills.value.length + 1}`, ...form, enabled: true })
+  }
+  skillFormOpen.value = false
+  editingId.value = null
+}
+
+function removeSkill(id: string) {
+  skills.value = skills.value.filter((s) => s.id !== id)
+}
+
 function nextPatient() {
   const queue = ws.queue
   const index = queue.findIndex((p) => p.id === ws.patientId)
@@ -768,16 +890,28 @@ const quickSkills = computed(() => {
 })
 
 onMounted(async () => {
+  // 点页面任意处收起 ＋ 菜单（＋ 按钮自己 .stop，不会被这个监听立刻关掉）
+  document.addEventListener('click', closePlusMenu)
   try {
     catalog.value = (await api.assessmentCatalog()).categories
   } catch {
     // 目录加载失败不影响主流程，界面显示空目录即可
   }
 })
+
+onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
 </script>
 
 <template>
   <div class="ai-emr-root">
+    <!--
+      浮层重新唤出。两态互斥：都关时是圆形 AI 钮，只关抽屉时是「医护Copilot」胶囊。
+      同一个处理器，同一个位置（right:24px bottom:32px）。
+    -->
+    <div v-if="showRoundEntry" class="ai-float-btn" @click="reopenTips">
+      <div class="float-icon">AI</div>
+      <span class="float-ready-dot" />
+    </div>
     <div class="ai-float-wrapper">
       <!-- ======================= AI 助手 ======================= -->
       <div v-if="tipsOpen" class="tips-drawer connected-right">
@@ -1610,8 +1744,39 @@ onMounted(async () => {
             </div>
             <div class="chat-toolbar">
               <div class="tb-left">
-                <button class="tb-plus-btn" title="上传/提示词">＋</button>
+                <button class="tb-plus-btn" title="上传/提示词" @click.stop="togglePlusMenu">＋</button>
                 <span class="tb-hint" />
+
+                <transition name="plus-menu-slide">
+                  <div v-if="plusMenuOpen" class="plus-menu" @click.stop>
+                    <div class="pm-item" @click="chooseUpload('file')">
+                      <span>📎</span> 上传文件
+                    </div>
+                    <div class="pm-item" @click="chooseUpload('image')">
+                      <span>🖼</span> 上传图片
+                    </div>
+                    <div class="pm-item pm-submenu-trigger" @click="promptsOpen = !promptsOpen">
+                      <span>💬</span> 常用提示词 ›
+                    </div>
+                    <div v-if="promptsOpen" class="pm-prompts">
+                      <div
+                        v-for="preset in PROMPT_PRESETS"
+                        :key="preset"
+                        class="pm-prompt-item"
+                        @click="pickPrompt(preset)"
+                      >{{ preset }}</div>
+                    </div>
+                    <div class="pm-item" @click="goPatientManage">
+                      <span>👥</span> 患者管理
+                    </div>
+                    <div class="pm-item" @click="openSkillManage">
+                      <span>⚡</span> 技能管理
+                    </div>
+                  </div>
+                </transition>
+
+                <input ref="fileInputRef" type="file" style="display: none" @change="onFilePicked($event, '上传文件')" />
+                <input ref="imageInputRef" type="file" accept="image/*" style="display: none" @change="onFilePicked($event, '上传图片')" />
               </div>
               <div class="tb-actions">
                 <button class="tb-action-btn" @click="nextPatient">接诊下一位</button>
@@ -1677,6 +1842,73 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- 技能管理 -->
+    <el-dialog
+      v-model="skillDialogOpen"
+      title="技能管理"
+      width="720px"
+      class="skill-manage-dialog"
+      destroy-on-close
+      append-to-body
+    >
+      <div class="sm-body">
+        <div class="sm-toolbar">
+          <div class="sm-hint">维护个性化 Skills，启用后可在侧栏与 Copilot「/」菜单中使用</div>
+          <el-button type="primary" size="small" @click="newSkill">新建技能</el-button>
+        </div>
+
+        <div v-if="skillFormOpen" class="sm-form-card">
+          <div class="sm-form-title">{{ editingId ? '编辑技能' : '新建技能' }}</div>
+          <el-form label-width="88px" size="default" class="sm-form">
+            <el-form-item label="名称" required>
+              <el-input v-model="skillForm.name" maxlength="30" show-word-limit placeholder="如：糖尿病足筛查" />
+            </el-form-item>
+            <el-form-item label="说明">
+              <el-input v-model="skillForm.desc" maxlength="60" show-word-limit />
+            </el-form-item>
+            <el-form-item label="提示词">
+              <el-input v-model="skillForm.prompt" type="textarea" :rows="3" />
+            </el-form-item>
+            <el-form-item label="图标">
+              <div class="sm-icon-picker">
+                <button
+                  v-for="icon in SKILL_ICONS"
+                  :key="icon"
+                  class="sm-icon-btn"
+                  :class="{ active: skillForm.icon === icon }"
+                  @click.prevent="skillForm.icon = icon"
+                >{{ icon }}</button>
+              </div>
+            </el-form-item>
+          </el-form>
+          <div class="sm-form-actions">
+            <el-button size="small" @click="skillFormOpen = false">取消</el-button>
+            <el-button type="primary" size="small" @click="saveSkill">保存</el-button>
+          </div>
+        </div>
+
+        <div class="sm-list">
+          <div v-for="skill in skills" :key="skill.id" class="sm-item" :class="{ disabled: !skill.enabled }">
+            <div class="sm-item-icon">{{ skill.icon }}</div>
+            <div class="sm-item-main">
+              <div class="sm-item-name">{{ skill.name }}</div>
+              <div class="sm-item-desc">{{ skill.desc || skill.prompt }}</div>
+            </div>
+            <div class="sm-item-actions">
+              <el-switch v-model="skill.enabled" size="small" />
+              <el-button link size="small" @click="editSkill(skill)">编辑</el-button>
+              <el-button link size="small" type="danger" @click="removeSkill(skill.id)">删除</el-button>
+            </div>
+          </div>
+          <div v-if="!skills.length" class="sm-hint">还没有自定义技能。</div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="skillDialogOpen = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

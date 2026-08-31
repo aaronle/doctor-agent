@@ -1,0 +1,327 @@
+div.workstation-page
+  div.his-header
+    div.his-header-left
+      button.el-button.is-text.back-btn
+        i.el-icon
+        span  «候诊列表»
+      span.his-divider  «|»
+      span.his-logo
+      span.his-title  «惠每门诊工作站»
+    div.his-header-right
+      button.el-button.el-button--small.is-text
+        span  «候诊列表»
+      button.el-button.el-button--danger.el-button--small.is-text
+        span  «退出»
+  div.basic-info-strip
+    div.strip-fields
+      span.strip-field.bold  «王某某»
+      span.strip-sep  «·»
+      span.strip-field  «女»
+      span.strip-sep  «·»
+      span.strip-field  «58岁»
+      span.strip-divider
+      span.strip-field  «内分泌科»
+        span.sf-label  «科室»
+      span.strip-field  «李医生»
+        span.sf-label  «主治»
+      span.strip-field  «2026-06-17»
+        span.sf-label  «就诊»
+      span.strip-field  «138****8001»
+        span.sf-label  «电话»
+      span.strip-field
+        span.sf-label  «过敏»
+        span.sf-allergy  «无»
+    div.strip-actions
+      span.el-tag.el-tag--success.el-tag--small.el-tag--light.is-round
+        span.el-tag__content  «门诊»
+      span.el-tag.el-tag--danger.el-tag--small.el-tag--light.is-round
+        span.el-tag__content  «高风险»
+  div.workstation-body
+    div.sidebar.collapsed
+      div.sidebar-header
+        button.sidebar-toggle  «›»
+      div.sidebar-avatars
+        div.sa-avatar.active  «王»
+        div.sa-avatar  «张»
+        div.sa-avatar  «李»
+        div.sa-avatar  «陈»
+        div.sa-avatar  «刘»
+        div.sa-avatar  «赵»
+    div.main-two-col
+      div.his-record-panel
+        div.panel-title-bar
+          span.pt-title  «📋 门诊病历»
+          div.pt-actions
+            span.shortcut-hint  «Ctrl+/ 切回 AI»
+            button.el-button.el-button--small
+              span  «暂存»
+            button.el-button.el-button--primary.el-button--small
+              span  «提交病历»
+        div.diagnosis-section
+          div.diag-section-header
+            span.diag-section-title  «📌 诊断»
+            div.diag-section-actions
+              button.el-button.el-button--primary.el-button--small
+                span  «保存诊断»
+              button.el-button.el-button--small
+                span  «编辑»
+          div.diag-list
+            div.diag-empty  «暂无确诊诊断»
+          div.suspected-diag-section
+            div.suspected-diag-title  «疑似诊断（AI 推测）»
+            div.suspected-diag-list
+              span.el-tag.el-tag--warning.el-tag--default.el-tag--plain.suspected-diag-tag
+                span.el-tag__content
+                  span.sd-name  «2型糖尿病（血糖控制不佳）»
+                  span.sd-icd  «[E11.9]»
+                  span.sd-conf  «92%»
+              span.el-tag.el-tag--warning.el-tag--default.el-tag--plain.suspected-diag-tag
+                span.el-tag__content
+                  span.sd-name  «糖尿病肾病（早期）»
+                  span.sd-icd  «[E11.2]»
+                  span.sd-conf  «78%»
+              span.el-tag.el-tag--warning.el-tag--default.el-tag--plain.suspected-diag-tag
+                span.el-tag__content
+                  span.sd-name  «糖尿病视网膜病变（NPDR轻度）»
+                  span.sd-icd  «[E11.3]»
+                  span.sd-conf  «85%»
+        div.record-form-scroll
+          div.form-row
+            span.fl.required-mark  «主诉»
+            div.fi
+              textarea.form-textarea
+          div.form-row
+            span.fl.required-mark  «现病史»
+            div.fi
+              textarea.form-textarea
+          div.form-row
+            span.fl  «既往史»
+            div.fi
+              textarea.form-textarea
+          div.form-row
+            span.fl  «个人史»
+            div.fi
+              textarea.form-textarea
+          div.form-row.single-line
+            span.fl  «过敏史»
+            div.fi
+              input.form-input
+          div.form-row.single-line.vitals-row
+            span.fl  «体征»
+            div.fi.vitals-inline
+              div.vf-item
+                span.vf-label  «身高»
+                input.vf-input
+                span.vf-unit  «CM»
+              div.vf-item
+                span.vf-label  «体重»
+                input.vf-input
+                span.vf-unit  «KG»
+              div.vf-item
+                span.vf-label  «BMI»
+                input.vf-input
+              div.vf-item
+                span.vf-label  «体温»
+                input.vf-input
+                span.vf-unit  «℃»
+              div.vf-item
+                span.vf-label  «脉搏»
+                input.vf-input
+                span.vf-unit  «次/分»
+              div.vf-item
+                span.vf-label  «呼吸»
+                input.vf-input
+                span.vf-unit  «次/分»
+              div.vf-item.bp-item
+                span.vf-label  «血压»
+                input.vf-input.bp-half
+                span.vf-slash  «/»
+                input.vf-input.bp-half
+              div.vf-item
+                span.vf-label  «心率»
+                input.vf-input
+                span.vf-unit  «次/分»
+          div.form-row
+            span.fl  «体格检查»
+            div.fi
+              textarea.form-textarea
+          div.form-row.auxiliary-row
+            span.fl.auxiliary-label  «辅助检查»
+            div.fi
+              textarea.form-textarea
+          div.form-row
+            span.fl  «建议»
+            div.fi
+              textarea.form-textarea
+      div.his-orders-panel
+        div.panel-title-bar
+          span.pt-title  «💊 医嘱»
+          button.el-button.el-button--primary.el-button--small
+            i.el-icon
+            span  «开嘱»
+        div.order-sub-tabs
+          div.ostab.active  «💊 药品»
+            span.ostab-badge  «4»
+          div.ostab  «🔬 检查»
+            span.ostab-badge  «3»
+          div.ostab  «🧪 检验»
+            span.ostab-badge  «7»
+        div.order-table-wrap
+          div.el-table--fit.el-table--striped.el-table--border.el-table--enable-row-hover.el-table--enable-row-transition.el-table--small.el-table.el-table--layout-fixed.compact-table.is-scrolling-none
+            div.el-table__inner-wrapper
+              div.hidden-columns
+                div
+                div
+                div
+                div
+                div
+                div
+              div.el-table__header-wrapper
+                table.el-table__header
+                  colgroup
+                    col
+                    col
+                    col
+                    col
+                    col
+                    col
+                  thead
+                    tr
+                      th.el-table_50_column_251.is-leaf.el-table__cell
+                        div.cell  «药品名称»
+                      th.el-table_50_column_252.is-center.is-leaf.el-table__cell
+                        div.cell  «剂量»
+                      th.el-table_50_column_253.is-center.is-leaf.el-table__cell
+                        div.cell  «频次»
+                      th.el-table_50_column_254.is-center.is-leaf.el-table__cell
+                        div.cell  «用法»
+                      th.el-table_50_column_255.is-center.is-leaf.el-table__cell
+                        div.cell  «天数»
+                      th.el-table_50_column_256.is-center.is-leaf.el-table__cell
+                        div.cell  «状态»
+              div.el-table__body-wrapper
+                div.el-scrollbar
+                  div.el-scrollbar__wrap.el-scrollbar__wrap--hidden-default
+                    div.el-scrollbar__view
+                      table.el-table__body
+                        colgroup
+                        tbody
+                  div.el-scrollbar__bar.is-horizontal
+                    div.el-scrollbar__thumb
+                  div.el-scrollbar__bar.is-vertical
+                    div.el-scrollbar__thumb
+              div.el-table__border-left-patch
+            div.el-table__column-resize-proxy
+        div.result-panel
+          div.result-panel-header
+            span.rp-title
+              span  «⚠ 阳性结果 (9)»
+          div.result-list-wrap
+            div.result-list
+              div.result-list-item.exam
+                span.rli-badge  «检查»
+                span.rli-name  «12导联心电图»
+                span.rli-extra  «异常：心肌供血不足可能»
+                span.rli-arrow  «›»
+              div.result-list-item.exam
+                span.rli-badge  «检查»
+                span.rli-name  «双眼底照相»
+                span.rli-extra  «异常：NPDR 轻度»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «空腹血糖»
+                span.rli-extra  «近3次均值较好，较诊断下降0.7»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «餐后2h血糖»
+                span.rli-extra  «近3次均值高，呈下降趋势»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «糖化血红蛋白(HbA1c)»
+                span.rli-extra  «近3次均值较好，较诊断下降0.4%»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «尿微量白蛋白/肌酐(UACR)»
+                span.rli-extra  «近3次均均高，呈下降趋势»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «肾小球滤过率(eGFR)»
+                span.rli-extra  «偏高»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «低密度脂蛋白(LDL-C)»
+                span.rli-extra  «偏高»
+                span.rli-arrow  «›»
+              div.result-list-item.lab
+                span.rli-badge  «检验»
+                span.rli-name  «总胆固醇(TC)»
+                span.rli-extra  «偏高»
+                span.rli-arrow  «›»
+  div.el-overlay.el-modal-dialog
+    div.el-overlay-dialog
+  div.el-overlay.el-modal-dialog
+    div.el-overlay-dialog
+  div.el-overlay.el-modal-dialog
+    div.el-overlay-dialog
+  div.ai-emr-root
+    div.ai-float-wrapper
+      div.panel-tips-toggle
+      div.assistant-panel
+        div.panel-header
+          span.panel-title  «医生智能体»
+            span.panel-ai-dot
+          div.panel-header-actions
+            button.el-button.el-button--small.is-text.panel-action-btn
+              span  «⟩⟨»
+            button.el-button.el-button--small.is-text.panel-action-btn.panel-close
+              span  «×»
+        div.copilot-tab-bar
+          div.ctab.active
+            span.patient-tab-name  «王某某»
+            span.patient-tab-meta  «· 女 · 58岁»
+        div.chat-area
+          div.chat-messages
+            div.quick-skill-area
+              div.quick-skill-title  «本科常用 Skill»
+              div.quick-skill-grid
+                div.skill-chip
+                  span.skill-chip-icon  «🩸»
+                  span.skill-chip-label  «血糖控制评估»
+                div.skill-chip
+                  span.skill-chip-icon  «💊»
+                  span.skill-chip-label  «高血压复诊套餐»
+                div.skill-chip
+                  span.skill-chip-icon  «🔍»
+                  span.skill-chip-label  «并发症风险筛查»
+                div.skill-chip
+                  span.skill-chip-icon  «✅»
+                  span.skill-chip-label  «用药审核优化»
+                div.skill-chip
+                  span.skill-chip-icon  «📋»
+                  span.skill-chip-label  «多病共存管理»
+          div.action-bar
+            button.el-button.el-button--primary.el-button--small
+              span  «● 语音问诊»
+          div.chat-input-wrap
+            div.chat-textarea-wrap
+              div.el-textarea.chat-textarea
+                textarea.el-textarea__inner
+              div.chat-float-actions
+                button.float-voice-btn  «🎤»
+                button.float-send-btn  «↑»
+            div.chat-toolbar
+              div.tb-left
+                button.tb-plus-btn  «＋»
+                span.tb-hint
+              div.tb-actions
+                button.tb-action-btn  «接诊下一位»
+                button.tb-action-btn  «报告解读»
+                button.tb-action-btn  «鉴别诊断»
+            input
+            input

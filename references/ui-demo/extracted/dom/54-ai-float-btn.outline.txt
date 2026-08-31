@@ -1,0 +1,2 @@
+div.float-icon  «AI»
+span.float-ready-dot

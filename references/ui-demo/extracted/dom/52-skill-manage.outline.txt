@@ -1,0 +1,17 @@
+header.el-dialog__header.show-close
+  span.el-dialog__title  «技能管理»
+  button.el-dialog__headerbtn
+    i.el-icon.el-dialog__close
+div.el-dialog__body
+  div.sm-body
+    div.sm-toolbar
+      div.sm-hint  «维护个性化 Skills，启用后可在侧栏与 Copilot「/」菜单中使用»
+      button.el-button.el-button--primary.el-button--small
+        span  «新建技能»
+    div.el-empty
+      div.el-empty__image
+      div.el-empty__description
+        p  «暂无自定义技能，点击「新建技能」开始配置»
+footer.el-dialog__footer
+  button.el-button
+    span  «关闭»

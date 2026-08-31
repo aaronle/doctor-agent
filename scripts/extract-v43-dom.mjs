@@ -140,6 +140,62 @@ const TARGETS = [
       await page.waitForTimeout(600);
     },
   },
+
+  // ＋ 菜单与技能管理。这几个状态此前完全没采集过 —— 它们藏在菜单展开与对话框里，
+  // 不点开就不存在于 DOM，照着源码写会漏掉计算样式，还原度比对也覆盖不到。
+  {
+    key: '50-plus-menu',
+    hash: '#/outpatient/P001',
+    root: '.plus-menu',
+    steps: async (page) => {
+      await page.locator('.tb-plus-btn').first().click();
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    key: '51-plus-menu-prompts',
+    hash: '#/outpatient/P001',
+    root: '.plus-menu',
+    steps: async (page) => {
+      await page.locator('.tb-plus-btn').first().click();
+      await page.waitForTimeout(300);
+      await page.locator('.pm-submenu-trigger').first().click();
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    key: '52-skill-manage',
+    hash: '#/outpatient/P001',
+    root: '.skill-manage-dialog',
+    steps: async (page) => {
+      await page.locator('.tb-plus-btn').first().click();
+      await page.waitForTimeout(300);
+      // 「技能管理」是 ＋ 菜单最后一项
+      await page.locator('.plus-menu .pm-item').last().click();
+      await page.waitForTimeout(700);
+    },
+  },
+
+  // 浮层关闭后的两个重新唤出态。两者互斥，必须分别采。
+  // 漏掉它们的后果不是样式差一点，而是医生点了 × 之后再也唤不回浮层。
+  {
+    key: '53-solo-tips-open-btn',
+    hash: '#/outpatient/P001',
+    root: '.solo-tips-open-btn',
+    steps: async (page) => {
+      await page.locator('.tips-close').first().click();
+      await page.waitForTimeout(500);
+    },
+  },
+  {
+    key: '54-ai-float-btn',
+    hash: '#/outpatient/P001',
+    root: '.ai-float-btn',
+    steps: async (page) => {
+      await closeAiFloat(page);
+      await page.waitForTimeout(500);
+    },
+  },
 ];
 
 /**
