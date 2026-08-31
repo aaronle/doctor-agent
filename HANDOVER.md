@@ -4,6 +4,7 @@
 项目目录：`/Users/leying/Documents/北大医疗/AI Native Systems/projects/doctor-agent`
 远程仓库：`https://github.com/aaronle/doctor-agent`（**私有**）
 项目状态：一期七功能已按 V4.3 界面基准实现完毕，六个岗位接真实 Claude Haiku。
+界面还原度门禁覆盖 **136 个元素，零差异零缺失**。
 **已上线公网：<https://da.aaronhealth.cn>**（2026-08-31）。证书 Let's Encrypt，有效期至
 2026-11-29，`certbot.timer` 自动续期，续期演练已通过。公网实测：真实模型端到端 17.8s
 零降级，五个入口与控制台全部 200，两个 SSE 端点真流式（块间隔 11.9ms / 20.9ms，与服务端
@@ -67,6 +68,7 @@ npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + C
 | 改了什么 | 必须同步改 |
 | --- | --- |
 | UI/UX | `docs/product/09-一期需求规划说明书.md` 对应功能段 + 该行为的测试 + 跑 `npm run fidelity` |
+| **新增界面** | 还要给 `extract-v43-dom.mjs` 加采集态、给 `compare-v43-fidelity.mjs` 加场景 —— 否则它落在门禁外 |
 | API 形状 | `docs/product/08-V4.3界面基准与后端API契约.md` + `apps/api/tests/test_api.py` + 重跑 `contracts:export` |
 | Agent 输出结构 | 规格里该岗位的输出约束 + 对应校验测试 |
 | 安全红线 | 规格第 7 节 + 一条能失败的测试（红线没有测试等于没有红线） |
