@@ -3,7 +3,11 @@
 更新时间：2026-08-29（Asia/Shanghai）
 项目目录：`/Users/leying/Documents/北大医疗/AI Native Systems/projects/doctor-agent`
 远程仓库：`https://github.com/aaronle/doctor-agent`（**私有**）
-项目状态：一期七功能已按 V4.3 界面基准实现完毕，六个岗位接真实 Claude Haiku；尚未发布到 `da.aaronhealth.cn`
+项目状态：一期七功能已按 V4.3 界面基准实现完毕，六个岗位接真实 Claude Haiku。
+**已上线公网：<https://da.aaronhealth.cn>**（2026-08-31）。证书 Let's Encrypt，有效期至
+2026-11-29，`certbot.timer` 自动续期，续期演练已通过。公网实测：真实模型端到端 17.8s
+零降级，五个入口与控制台全部 200，两个 SSE 端点真流式（块间隔 11.9ms / 20.9ms，与服务端
+节流的 12ms / 20ms 吻合），密钥无泄露，同机另外三个站点未受影响。
 
 本文件是 Doctor Agent 项目的当前接手入口。
 
@@ -172,12 +176,54 @@ Figma：**AI 门诊工作站 · 一期设计系统**
 6. 33 项专项评估的颗粒度与 Agent 化路径（一期只做目录展示）。
 7. 负责人、项目节奏、环境和发布路径。
 
-## 8. 发布前必办
+## 8. 上线状态
 
-- [ ] `da.aaronhealth.cn` 的 DNSPod A 记录指向 `81.71.155.220`（**尚未创建**）
-- [ ] 广州服务器到 `www.meatdc.com` 的出网连通性实测
-- [ ] 本机未装 Docker CLI，镜像构建须在广州候选环境验证
-- [ ] 模型配额是否需要与 Ticket System 分开计
+已全部完成，历史步骤见 [`deploy/tencent-guangzhou/GO-LIVE.md`](deploy/tencent-guangzhou/GO-LIVE.md)。
+
+- [x] `da` A 记录 → `81.71.155.220`（DNSPod，TTL 600）
+- [x] Nginx 站点，两个 SSE 端点 `proxy_buffering off`（certbot 重写后已复查仍在）
+- [x] Certbot 独立证书，至 2026-11-29，续期演练通过
+- [x] 公网逐功能验收
+- [ ] 模型配额是否需要与 Ticket System 分开计（两者共用同一个网关和同一把 key）
+
+备案不阻塞：`aaronhealth.cn` 已备案（`粤ICP备2026119734号`，主体乐颖，服务器
+`81.71.155.220`），`da` 作为子域名沿用主域名备案。
+
+### 续期须知（11 月会再遇到）
+
+**Let's Encrypt 签发本域名有概率失败，重试即可，不要改配置。** 首签连挫三次才成：
+
+| 次 | 报错 | 实质 |
+| --- | --- | --- |
+| 1 | `query timed out looking up CAA` | 查 CAA 超时 |
+| 2 | `During secondary validation: ... timed out looking up A/AAAA` | 多地校验的境外节点超时 |
+| 3 | `DNSSEC: DNSKEY Missing ... for cn. [exceeded the maximum number of sends]` | 连 `cn.` 顶级域的 DNSKEY 都拉不到 |
+| 4 | 成功 | —— |
+
+根因：`aaronhealth.cn` 用 DNSPod **免费版**，NS 是 `pisces/normal.dnspod.net`，
+**全球 Anycast 是付费功能**，境外只能跨国际链路回中国。LE 自 2020 年起强制多地校验，
+校验节点全在境外，撞上丢包就失败。境内查这两台 NS 是 48/48 零丢包 —— **在服务器上
+`dig` 得出的结论不适用于 LE**，跟宿主机 curl 测模型网关是同一类陷阱。
+
+排查时别被报错文字带偏：三次错误各不相同，且第三次指向 `cn.` 而非本域名，看着像
+DNSSEC 配置问题，实际全是同一条链路在丢包。
+
+注意 LE 限流：**每域名每小时 5 次失败验证**，用完锁一小时。所以不要循环重试；
+失败后先探测再决定。零成本探测（不消耗额度）：
+
+```sh
+curl -s -H 'accept: application/dns-json' \
+  "https://dns.google/resolve?name=cn.&type=DNSKEY&do=1" | grep -o '"Status":[0-9]*'
+```
+
+续期是 `certbot.timer` 自动跑的，且到期前 30 天就开始每天试两次，
+正常情况下会自己成功，不必人工干预。
+
+已完成，不必重做：
+
+- 广州服务器到 `www.meatdc.com` 的出网已实测可达（**必须在容器内测**，
+  宿主机 `curl` 会被 TLS reset，那是指纹问题不是路由问题）。
+- 镜像已在广州环境构建成功（本机仍未装 Docker CLI）。
 
 ## 9. Git 与远程
 

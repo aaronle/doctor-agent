@@ -99,16 +99,50 @@ curl -fsS -o /dev/null -w '%{http_code} %{time_total}s\n' https://www.meatdc.com
 
 ## 域名和 HTTPS
 
-1. 在 DNSPod 新建 `da.aaronhealth.cn -> 81.71.155.220` A 记录。
-   **这一步需要人工在 DNSPod 控制台完成** —— 工作区与服务器上都没有 DNSPod
-   API 凭据，自动化脚本加不了记录。加完后 certbot 才能签发证书。
+**已完成**：`https://da.aaronhealth.cn` 于 2026-08-31 上线，证书至 2026-11-29。
+
+当初的步骤，重建时照走：
+
+1. 在 DNSPod 的 `aaronhealth.cn` 下新建 `da` → `81.71.155.220` A 记录（默认线路，TTL 600）。
+   **需人工在控制台完成** —— 工作区与服务器上都没有 DNSPod API 凭据。
 2. 将 `nginx-da.aaronhealth.cn.conf.example` 安装为宿主机 Nginx 站点。
 3. 执行 `nginx -t` 后重载 Nginx。
-4. 用 Certbot 为 `da.aaronhealth.cn` 签发独立证书。
+4. 用 Certbot 为 `da.aaronhealth.cn` 签发独立证书。**可能要试几次**，原因见下。
 5. 公网逐功能验收。
 
 Nginx 需要为两个 SSE 端点关闭缓冲（`proxy_buffering off`），否则病历流式
-生成与语音追问会积压到结束才一次性吐出。
+生成与语音追问会积压到结束才一次性吐出。**certbot 会重写站点配置插入 443 块，
+签完必须回查这一行还在不在。**
+
+### 坑之四：Let's Encrypt 签发会随机失败，别改配置
+
+首签连挫三次才成，三次报错互不相同（CAA 超时 → 多地校验 A/AAAA 超时 →
+`cn.` 顶级域 DNSKEY 拉不到），看着像三个问题，其实是同一条链路在丢包：
+
+本域名用 DNSPod **免费版**，全球 Anycast 是付费功能，境外查询要跨国际链路回中国；
+而 LE 强制多地校验，校验节点全在境外。**境内 `dig` 这两台 NS 是 48/48 零丢包，
+但那个结论对 LE 不成立** —— 和坑之二（宿主机 curl 测模型网关）是同一类错误。
+
+LE 限流是每域名每小时 5 次失败验证，别循环重试。零成本探测当前链路（不耗额度）：
+
+```sh
+curl -s -H 'accept: application/dns-json' \
+  "https://dns.google/resolve?name=cn.&type=DNSKEY&do=1" | grep -o '"Status":[0-9]*'
+```
+
+### 怎么验 SSE 真的没被缓冲
+
+这两个端点是**先整体生成、再按固定间隔匀速下发**（病历 6 字符/12ms，语音 3 字符/20ms）
+做打字机效果，所以首块必然等在模型生成之后。**用「首块来得晚」判断被缓冲会误判** ——
+要看首块之后各块是否随时间摊开：
+
+```sh
+curl -sS -N https://da.aaronhealth.cn/api/emr/copilot/chat \
+  -H 'content-type: application/json' -d '{"patient_id":"P002","generate_record":true}'
+```
+
+实测块间隔中位数 11.9ms / 20.9ms，与服务端节流吻合即为真流式；
+若被缓冲，所有块会在同一时刻涌到。
 
 ## 隔离约束
 
