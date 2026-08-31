@@ -1,0 +1,32 @@
+div.qc-item.error
+  span.qc-icon  «❌»
+  div.qc-body
+    span.qc-field  «【主诉】»
+    span.qc-issue  «主诉为空，请补充»
+div.qc-item.error
+  span.qc-icon  «❌»
+  div.qc-body
+    span.qc-field  «【现病史】»
+    span.qc-issue  «现病史未填写»
+div.qc-item.warning
+  span.qc-icon  «⚠️»
+  div.qc-body
+    span.qc-field  «【既往史】»
+    span.qc-issue  «既往史未填写»
+div.qc-item.warning
+  span.qc-icon  «⚠️»
+  div.qc-body
+    span.qc-field  «【个人史】»
+    span.qc-issue  «个人史未填写»
+div.qc-item.warning
+  span.qc-icon  «⚠️»
+  div.qc-body
+    span.qc-field  «【初步诊断】»
+    span.qc-issue  «初步诊断未填写»
+div.qc-item.warning
+  span.qc-icon  «⚠️»
+  div.qc-body
+    span.qc-field  «【过敏史】»
+    span.qc-issue  «过敏史未记录，建议在病历中补充»
+button.el-button.el-button--warning.el-button--small.is-plain
+  span  «我已审阅质控提醒»

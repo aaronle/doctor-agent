@@ -122,6 +122,33 @@ const PAGES = [
   },
 
   {
+    name: '质控明细展开',
+    hash: '#/outpatient/P001',
+    path: '/outpatient/P001',
+    prepare: async (page) => {
+      await page.locator('.ttab').filter({ hasText: '病历管理' }).first().click();
+      await page.waitForTimeout(700);
+      // 「查看全部 N 处遗漏」是风险卡里的第一个 rc-side-more
+      await page.locator('.rc-risk-card .rc-side-more').first().click();
+      await page.locator('.qc-item').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    },
+    /**
+     * 只比与变体无关的元素。
+     *
+     * `.qc-item` 与 `.qc-issue` 的背景/字色取决于这一条是 error 还是 warning，
+     * 而「第一条是哪一型」「有没有某一型」完全由数据决定 —— 我们的质控规则是
+     * 【增强】重写过的确定性规则，触发分布本就与原件不同。拿它们比对，比的是
+     * 规则行为不是视觉还原，只会稳定误报。锁定某一变体也不行：那一型在某次
+     * 数据下可能一条都不出，就变成「缺失」。
+     *
+     * 变体配色由 split-v43-css 从原件逐字拆来，无人工改写；类是否正确挂上
+     * 由 AiEmrFloat.spec.ts 的「按 type 分图标」用例把守。
+     */
+    selectors: ['.rc-qc-detail', '.qc-icon', '.qc-body', '.qc-field'],
+  },
+
+  {
     name: '＋ 菜单展开',
     hash: '#/outpatient/P001',
     path: '/outpatient/P001',

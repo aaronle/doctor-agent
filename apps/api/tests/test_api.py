@@ -497,6 +497,50 @@ def test_quality_flags_unverified_negation_as_red_line():
     assert red[0]["status"] == "须核实"
 
 
+def test_quality_gap_carries_field_so_ui_can_jump_to_it():
+    """
+    每条遗漏必须带 field / field_key / issue，而不是只给一句拼好的 text。
+
+    界面上点一条质控提醒要能跳到对应那一段病历去改；只有整句文案，
+    就只能显示、跳不过去，医生得自己在七段里找。
+    """
+    from app.record_quality import evaluate
+    from app.agents.record import SECTION_KEYS
+
+    result = evaluate({"chief_complaint": "胸闷 3 天"}, dialog_text="")
+    assert result["gaps"], "多段未采集时应产生遗漏"
+    for gap in result["gaps"]:
+        assert gap["field"], "缺少可展示的字段名"
+        assert gap["field_key"] in SECTION_KEYS, f"field_key 必须是真实段名：{gap['field_key']}"
+        assert gap["issue"], "缺少问题描述"
+        # text 仍要保留：风险与遗漏那一栏按整句渲染
+        assert gap["text"] == f"{gap['field']}{gap['issue']}"
+
+
+def test_quality_gap_type_drives_the_icon():
+    """
+    type 决定界面图标：红线 error ❌ / 未采集 warning ⚠️ / 标准项缺失 info ℹ️。
+    三者混成一种图标，医生就分不出哪条必须处理、哪条只是建议。
+    """
+    from app.record_quality import evaluate
+
+    result = evaluate(
+        {
+            "chief_complaint": "胸闷 3 天",
+            "present_illness": "胸闷持续 3 天，活动后加重。",
+            "past_history": "否认药物过敏史。",
+            "physical_exam": "血压 130/80 mmHg。",
+            "auxiliary_exam": "心电图未见明显异常。",
+            "preliminary_diagnosis": "冠心病",
+            "advice": "建议复查。",
+        },
+        dialog_text="医生：胸闷多久了？患者：三天。",
+    )
+    by_type = {g["type"] for g in result["gaps"]}
+    assert "error" in by_type, "未经问诊的否认应为 error"
+    assert {g["type"] for g in result["gaps"] if g["level"] == "danger"} == {"error"}
+
+
 def test_quality_accepts_negation_that_was_actually_asked():
     """问过再写「否认」是规范记录，不该误报。"""
     from app.record_quality import evaluate

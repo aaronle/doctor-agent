@@ -141,6 +141,18 @@ const TARGETS = [
     },
   },
 
+  // 质控明细：点「查看全部 N 处遗漏」才展开，默认只有摘要
+  {
+    key: '43-qc-detail',
+    hash: '#/outpatient/P001',
+    root: '.rc-qc-detail',
+    steps: async (page) => {
+      await clickExact(page, '.ttab', '病历管理');
+      await page.locator('.rc-risk-card .rc-side-more').first().click();
+      await page.waitForTimeout(600);
+    },
+  },
+
   // ＋ 菜单与技能管理。这几个状态此前完全没采集过 —— 它们藏在菜单展开与对话框里，
   // 不点开就不存在于 DOM，照着源码写会漏掉计算样式，还原度比对也覆盖不到。
   {

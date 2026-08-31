@@ -241,6 +241,27 @@ export interface RuntimeConfig {
   voice_mode: string
 }
 
+export type QualityMetric = { name: string; value: number; basis: string }
+
+export type QualityGap = {
+  text: string
+  level: string
+  status: string
+  /** 中文段名，用于「【既往史】」这样的展示 */
+  field: string
+  /** 段的键名，界面据此跳到对应那一段病历 */
+  field_key: string
+  issue: string
+  /** 决定图标：error ❌ / warning ⚠️ / info ℹ️ */
+  type: 'error' | 'warning' | 'info'
+}
+
+export type RecordQuality = {
+  completeness: number
+  metrics: QualityMetric[]
+  gaps: QualityGap[]
+}
+
 // ------------------------------------------------------------------ 端点
 
 export const api = {
@@ -309,10 +330,7 @@ export const api = {
     }>(`/api/emr/voice/init/${id}`),
   /** 病历质控。四项指标由后端确定性规则算，不让模型给自己打分。 */
   recordQuality: (patientId: string, fields: Record<string, string>) =>
-    post<{ completeness: number; metrics: { name: string; value: number; basis: string }[]; gaps: { text: string; level: string; status: string }[] }>(
-      '/api/emr/record/quality',
-      { patient_id: patientId, fields },
-    ),
+    post<RecordQuality>('/api/emr/record/quality', { patient_id: patientId, fields }),
 
   /** 语义覆盖判定：判断追问清单里哪些已在对话中得到回答 */
   voiceCoverage: (patientId: string, openQuestions: string[], transcript: { role: string; text: string }[]) =>

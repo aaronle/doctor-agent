@@ -3,9 +3,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { api, streamSse, type RiskItem } from '../api'
+import { api, streamSse, type RecordQuality, type RiskItem } from '../api'
 import { RECORD_SECTIONS, useWorkstation } from '../stores/workstation'
 import { useVoiceInterview } from '../composables/useVoiceInterview'
+import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '../composables/diagnosisCommands'
 
 const ws = useWorkstation()
 
@@ -113,7 +114,65 @@ function markPrimary(name: string) {
   primaryDiagnosis.value = primaryDiagnosis.value === name ? '' : name
 }
 
+/**
+ * 医生在 Copilot 里手打添加的诊断。
+ *
+ * 候选诊断来自模型的疑似诊断列表，医生想加一条列表里没有的，就落在这里，
+ * 与候选合并后一起渲染、一起回写 —— 否则「添加诊断：xxx」执行完界面上看不见，
+ * 医生只会以为没生效。
+ */
+const manualDiagnoses = ref<DiagnosisEntry[]>([])
+
+/** 把界面状态摊成命令解释器认识的形状 */
+function diagnosisState(): DiagnosisState {
+  const known = new Map<string, string | undefined>(
+    (summary.value?.suspected_diagnoses ?? []).map((d) => [d.name, d.icd]),
+  )
+  for (const d of manualDiagnoses.value) known.set(d.name, d.icd)
+  return {
+    selected: [...checkedDiagnoses.value].map((name) => {
+      const icd = known.get(name)
+      return icd ? { name, icd } : { name }
+    }),
+    primary: primaryDiagnosis.value,
+  }
+}
+
+/**
+ * 执行一条诊断命令。返回 false 表示这不是命令，应交给模型。
+ */
+function applyDiagnosisCommand(text: string): boolean {
+  const result = runDiagnosisCommand(text, diagnosisState())
+  if (!result) return false
+
+  checkedDiagnoses.value = new Set(result.state.selected.map((d) => d.name))
+  primaryDiagnosis.value = result.state.primary
+
+  // 命令引入的新名字（候选列表里没有的）要留住，否则渲染不出来
+  const candidates = new Set(candidateNames.value)
+  manualDiagnoses.value = result.state.selected.filter((d) => !candidates.has(d.name))
+
+  chatMessages.value.push({ role: 'assistant', content: result.reply })
+  if (result.writeBack) void confirmDiagnoses()
+  return true
+}
+
 const candidateNames = computed(() => (summary.value?.suspected_diagnoses ?? []).map((d) => d.name))
+
+/**
+ * 渲染用的诊断列表：模型给的候选 + 医生手打添加的。
+ *
+ * 手打的必须并进来 —— 只渲染候选的话，「添加诊断：xxx」执行完界面上看不见，
+ * 医生只会以为命令没生效。手打项没有置信度，进度条按 0 渲染。
+ */
+const diagnosisRows = computed(() => {
+  const candidates = summary.value?.suspected_diagnoses ?? []
+  const known = new Set(candidates.map((d) => d.name))
+  const manual = manualDiagnoses.value
+    .filter((d) => !known.has(d.name))
+    .map((d) => ({ name: d.name, icd: d.icd, confidence: 0, desc: '医生手动添加' }))
+  return [...candidates, ...manual]
+})
 const allChecked = computed(
   () => candidateNames.value.length > 0 && candidateNames.value.every((n) => checkedDiagnoses.value.has(n)),
 )
@@ -409,12 +468,42 @@ async function generateFollowUpPlan() {
 
 // ---------------------------------------------------------------- 病历质控
 
-interface QualityGap { text: string; level: string; status: string }
-interface QualityMetric { name: string; value: number; basis: string }
-interface RecordQuality { completeness: number; metrics: QualityMetric[]; gaps: QualityGap[] }
 
 const GAP_PREVIEW = 4
 const quality = ref<RecordQuality | null>(null)
+
+/** 质控明细的图标：红线 / 未采集 / 建议项，三者必须一眼可分 */
+const QC_ICONS: Record<string, string> = { error: '❌', warning: '⚠️', info: 'ℹ️' }
+
+/** 被质控提醒点中的那一段，短暂高亮 */
+const focusedField = ref<string | null>(null)
+
+/** 医生最近一次确认「已审阅质控提醒」的时刻 */
+const qcReviewedAt = ref<string | null>(null)
+
+function focusRecordField(key: string) {
+  focusedField.value = key
+  nextTick(() => {
+    const node = document.querySelector(`[data-record-node="${key}"]`)
+    // 高亮是主要反馈，滚动只是锦上添花；测试 DOM 里没有 scrollIntoView，
+    // 不设防会抛未捕获异常，把整个测试运行判成失败。
+    if (node && typeof node.scrollIntoView === 'function') {
+      node.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  })
+}
+
+/**
+ * 医生确认「已审阅质控提醒」。
+ *
+ * 只收起明细并记一次确认，**不清空遗漏** —— 审阅代表看过，不代表病历改好了。
+ * 把遗漏一并抹掉，等于用一次点击给红线消音，下一个接手的人再也看不到。
+ */
+function markQcReviewed() {
+  showAllGaps.value = false
+  qcReviewedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+  ElMessage.success('已记录本次质控审阅，遗漏仍保留在清单中')
+}
 const showAllGaps = ref(false)
 
 const visibleGaps = computed(() => {
@@ -657,6 +746,11 @@ async function sendChat(preset?: string) {
   if (!text || chatting.value) return
   chatInput.value = ''
   chatMessages.value.push({ role: 'user', content: text })
+
+  // 诊断命令在本地结算，不走模型：结果必须确定，而且要立刻反映到勾选状态上。
+  // 交给模型的话，「删除诊断」可能被答成一段说明文字，界面纹丝不动。
+  if (applyDiagnosisCommand(text)) return
+
   chatMessages.value.push({ role: 'assistant', content: '' })
   const index = chatMessages.value.length - 1
   chatting.value = true
@@ -1228,7 +1322,13 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                   <span class="record-complete-badge">病历完整度 {{ quality?.completeness ?? 0 }}%</span>
                   <span class="writeback-hint">AI 草稿需确认后才进入正式病历</span>
                 </div>
-                <div v-for="[key, label] in RECORD_SECTIONS" :key="key" class="record-node" :data-record-node="key">
+                <div
+                  v-for="[key, label] in RECORD_SECTIONS"
+                  :key="key"
+                  class="record-node"
+                  :class="{ focused: focusedField === key }"
+                  :data-record-node="key"
+                >
                   <div class="node-header">
                     <span class="node-title">{{ label }}</span>
                     <el-button type="primary" size="small" link class="node-writeback-btn" @click="acceptField(key)">
@@ -1262,6 +1362,31 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                   <button type="button" class="rc-side-more" @click="showAllGaps = !showAllGaps">
                     {{ showAllGaps ? '收起' : `查看全部 ${quality?.gaps?.length ?? 0} 处遗漏` }} <span>›</span>
                   </button>
+
+                  <!-- 展开后的逐条明细：点一条跳到对应那一段病历去改 -->
+                  <div v-if="showAllGaps && quality?.gaps?.length" class="rc-qc-detail">
+                    <div
+                      v-for="(gap, i) in quality.gaps"
+                      :key="i"
+                      class="qc-item"
+                      :class="gap.type"
+                      @click="focusRecordField(gap.field_key)"
+                    >
+                      <span class="qc-icon">{{ QC_ICONS[gap.type] ?? 'ℹ️' }}</span>
+                      <div class="qc-body">
+                        <span class="qc-field">【{{ gap.field }}】</span>
+                        <span class="qc-issue">{{ gap.issue }}</span>
+                      </div>
+                    </div>
+                    <el-button
+                      type="warning"
+                      plain
+                      size="small"
+                      class="qc-reviewed-btn"
+                      style="width: 100%; margin-top: 6px"
+                      @click="markQcReviewed"
+                    >我已审阅质控提醒</el-button>
+                  </div>
                 </div>
 
                 <div class="rc-side-card rc-qc-card">
@@ -1297,7 +1422,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               <p class="susp-hint">勾选拟纳入诊断；点击右侧 <strong>主</strong> 标记指定主诊断</p>
               <div class="suspected-list">
                 <div
-                  v-for="item in summary?.suspected_diagnoses ?? []"
+                  v-for="item in diagnosisRows"
                   :key="item.name"
                   class="suspected-item"
                   :class="{ selected: checkedDiagnoses.has(item.name), primary: primaryDiagnosis === item.name }"

@@ -187,17 +187,17 @@ div.workstation-page
                     col
                   thead
                     tr
-                      th.el-table_46_column_231.is-leaf.el-table__cell
+                      th.el-table_48_column_241.is-leaf.el-table__cell
                         div.cell  «药品名称»
-                      th.el-table_46_column_232.is-center.is-leaf.el-table__cell
+                      th.el-table_48_column_242.is-center.is-leaf.el-table__cell
                         div.cell  «剂量»
-                      th.el-table_46_column_233.is-center.is-leaf.el-table__cell
+                      th.el-table_48_column_243.is-center.is-leaf.el-table__cell
                         div.cell  «频次»
-                      th.el-table_46_column_234.is-center.is-leaf.el-table__cell
+                      th.el-table_48_column_244.is-center.is-leaf.el-table__cell
                         div.cell  «用法»
-                      th.el-table_46_column_235.is-center.is-leaf.el-table__cell
+                      th.el-table_48_column_245.is-center.is-leaf.el-table__cell
                         div.cell  «天数»
-                      th.el-table_46_column_236.is-center.is-leaf.el-table__cell
+                      th.el-table_48_column_246.is-center.is-leaf.el-table__cell
                         div.cell  «状态»
               div.el-table__body-wrapper
                 div.el-scrollbar

@@ -61,18 +61,33 @@ def evaluate(fields: dict[str, str], *, dialog_text: str = "") -> dict:
     consistency = _pct(supported, len(names)) if names else 0
 
     # 用语规范性：出现否定表述但对话里没问过，即为不规范
-    unverified: list[str] = []
+    unverified: list[tuple[str, str]] = []
     for key, value in filled.items():
         for pattern in NEGATION_PATTERNS:
             if pattern in value and pattern not in dialog_text:
-                unverified.append(f"{SECTION_LABELS[key]}：出现「{pattern}」但问诊中未涉及")
+                unverified.append((key, f"出现「{pattern}」但问诊中未涉及"))
                 break
     wording = _pct(len(SECTION_KEYS) - len(unverified), len(SECTION_KEYS))
 
+    # 每条遗漏都带上 field / issue / type：
+    # field 让界面能「点一下跳到那一段」，type 决定图标（❌/⚠️/ℹ️）。
+    # 只给一句拼好的 text，界面就只能整句显示，既跳不过去也分不了级。
     gaps: list[dict] = []
+
+    def add(key: str, issue: str, *, level: str, status: str, type_: str) -> None:
+        gaps.append({
+            "field": SECTION_LABELS[key],
+            "field_key": key,
+            "issue": issue,
+            "text": f"{SECTION_LABELS[key]}{issue}",
+            "level": level,
+            "status": status,
+            "type": type_,
+        })
+
     for key in SECTION_KEYS:
         if not filled[key] or filled[key] == UNCOLLECTED:
-            gaps.append({"text": f"{SECTION_LABELS[key]}尚未采集", "level": "warn", "status": "建议补充"})
+            add(key, "尚未采集", level="warn", status="建议补充", type_="warning")
 
     for key, points in EXPECTED_POINTS.items():
         value = filled.get(key, "")
@@ -80,11 +95,11 @@ def evaluate(fields: dict[str, str], *, dialog_text: str = "") -> dict:
             continue
         for label, keywords in points:
             if keywords and not any(k in value for k in keywords):
-                gaps.append({"text": f"{SECTION_LABELS[key]}未写明{label}", "level": "warn", "status": "建议补充"})
+                add(key, f"未写明{label}", level="warn", status="建议补充", type_="info")
 
-    # 未经问诊的否定表述是红线，级别高于一般遗漏
-    for item in unverified:
-        gaps.append({"text": item, "level": "danger", "status": "须核实"})
+    # 未经问诊的否定表述是红线，级别高于一般遗漏，图标用 ❌
+    for key, issue in unverified:
+        add(key, f"：{issue}", level="danger", status="须核实", type_="error")
 
     return {
         "completeness": _pct(informational, len(SECTION_KEYS)),

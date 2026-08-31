@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRouter, createWebHistory } from 'vue-router'
 
 import AiEmrFloat from './AiEmrFloat.vue'
+import { useWorkstation } from '../stores/workstation'
 
 /** ＋ 菜单五项的原文与图标，顺序即 V4.3 顺序，不可改 */
 const PLUS_ITEMS = [
@@ -29,13 +30,31 @@ const router = createRouter({
   routes: [{ path: '/:p(.*)', component: { template: '<div/>' } }],
 })
 
+/** 两条质控遗漏：一条红线（error），一条未采集（warning） */
+const GAPS = [
+  {
+    field: '既往史', field_key: 'past_history', issue: '：出现「否认」但问诊中未涉及',
+    text: '既往史：出现「否认」但问诊中未涉及', level: 'danger', status: '须核实', type: 'error',
+  },
+  {
+    field: '个人史', field_key: 'personal_history', issue: '尚未采集',
+    text: '个人史尚未采集', level: 'warn', status: '建议补充', type: 'warning',
+  },
+]
+
 /** 组件挂载时会拉专项评估目录，其余接口按需返回空壳 */
-function stubFetch() {
+function stubFetch(quality?: unknown) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
       if (String(url).includes('assessment')) {
         return new Response(JSON.stringify({ categories: [] }), { status: 200 })
+      }
+      if (String(url).includes('record/quality')) {
+        return new Response(
+          JSON.stringify(quality ?? { completeness: 60, metrics: [], gaps: GAPS }),
+          { status: 200 },
+        )
       }
       return new Response(JSON.stringify({}), { status: 200 })
     }),
@@ -230,5 +249,152 @@ describe('技能管理', () => {
 
     expect(document.querySelector('.sm-form-title')!.textContent).toContain('新建技能')
     expect(document.querySelector('.sm-form input')!.getAttribute('placeholder')).toBe('如：糖尿病足筛查')
+  })
+})
+
+describe('病历质控提醒', () => {
+  /**
+   * 质控挂在「病历管理」标签页。
+   * 必须先给 store 一个 patientId —— refreshQuality 没有患者就直接返回，
+   * 不设的话 quality 永远是 null，测的就是个空壳。
+   */
+  async function openQc(quality?: unknown) {
+    stubFetch(quality)
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    useWorkstation(pinia).patientId = 'P001'
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+    await wrapper.findAll('.ttab').find((t) => t.text().includes('病历管理'))!.trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('.rc-risk-list').exists()).toBe(true))
+    return wrapper
+  }
+
+  it('默认只给摘要，明细要点「查看全部」才展开', async () => {
+    const wrapper = await openQc()
+    expect(wrapper.find('.qc-item').exists()).toBe(false)
+
+    await wrapper.find('.rc-side-more').trigger('click')
+    await vi.waitFor(() => expect(wrapper.findAll('.qc-item').length).toBeGreaterThan(0))
+  })
+
+  it('按 type 分图标 —— 红线和建议不能长一个样', async () => {
+    const wrapper = await openQc()
+    await wrapper.find('.rc-side-more').trigger('click')
+    await vi.waitFor(() => expect(wrapper.findAll('.qc-item').length).toBe(2))
+
+    const items = wrapper.findAll('.qc-item')
+    expect(items[0].classes()).toContain('error')
+    expect(items[0].find('.qc-icon').text()).toBe('❌')
+    expect(items[1].classes()).toContain('warning')
+    expect(items[1].find('.qc-icon').text()).toBe('⚠️')
+  })
+
+  it('字段名单独成段，便于一眼定位是哪一段有问题', async () => {
+    const wrapper = await openQc()
+    await wrapper.find('.rc-side-more').trigger('click')
+    await vi.waitFor(() => expect(wrapper.findAll('.qc-item').length).toBe(2))
+
+    const first = wrapper.findAll('.qc-item')[0]
+    expect(first.find('.qc-field').text()).toBe('【既往史】')
+    expect(first.find('.qc-issue').text()).toContain('否认')
+  })
+
+  it('点一条能跳到对应那一段病历', async () => {
+    const wrapper = await openQc()
+    await wrapper.find('.rc-side-more').trigger('click')
+    await vi.waitFor(() => expect(wrapper.findAll('.qc-item').length).toBe(2))
+
+    await wrapper.findAll('.qc-item')[1].trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // 落点是那一段的病历节点（已有的 data-record-node），并被标记为聚焦
+    const target = wrapper.find('[data-record-node="personal_history"]')
+    expect(target.exists()).toBe(true)
+    expect(target.classes()).toContain('focused')
+  })
+
+  it('「我已审阅质控提醒」只在明细展开时出现，点完提醒收起', async () => {
+    const wrapper = await openQc()
+    const label = '我已审阅质控提醒'
+    expect(wrapper.text()).not.toContain(label)
+
+    await wrapper.find('.rc-side-more').trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('.qc-reviewed-btn').exists()).toBe(true))
+    expect(wrapper.find('.qc-reviewed-btn').text()).toContain(label)
+
+    await wrapper.find('.qc-reviewed-btn').trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.qc-item').exists()).toBe(false)
+  })
+
+  it('审阅是记录一次确认，不是把遗漏抹掉', async () => {
+    const wrapper = await openQc()
+    await wrapper.find('.rc-side-more').trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('.qc-reviewed-btn').exists()).toBe(true))
+    await wrapper.find('.qc-reviewed-btn').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // 遗漏本身仍在 —— 审阅只代表医生看过，不代表病历改好了。
+    // 抹掉它等于用一次点击把红线消音。
+    expect(wrapper.findAll('.rc-risk-row').length).toBeGreaterThan(0)
+    expect(wrapper.text()).toContain('既往史')
+  })
+
+  it('没有遗漏时不出「查看全部」明细', async () => {
+    const wrapper = await openQc({ completeness: 100, metrics: [], gaps: [] })
+    await wrapper.find('.rc-side-more').trigger('click')
+    expect(wrapper.find('.qc-item').exists()).toBe(false)
+    expect(wrapper.find('.qc-reviewed-btn').exists()).toBe(false)
+  })
+})
+
+describe('诊断命令接进界面', () => {
+  async function open() {
+    stubFetch()
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    useWorkstation(pinia).patientId = 'P001'
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+    await wrapper.findAll('.ttab').find((t) => t.text().includes('诊断管理'))!.trigger('click')
+    return wrapper
+  }
+
+  /** 在 Copilot 输入框里打一条命令并发出 */
+  async function type(wrapper: Awaited<ReturnType<typeof open>>, text: string) {
+    await wrapper.find('.chat-textarea-wrap textarea').setValue(text)
+    await wrapper.find('.float-send-btn').trigger('click')
+    await wrapper.vm.$nextTick()
+  }
+
+  it('手打添加的诊断要出现在列表里，否则医生以为没生效', async () => {
+    const wrapper = await open()
+    await type(wrapper, '添加诊断：急性胃肠炎 K52.9')
+
+    const names = wrapper.findAll('.suspected-item .susp-name').map((n) => n.text())
+    expect(names).toContain('急性胃肠炎')
+  })
+
+  it('命令不发请求给模型 —— 结果必须确定', async () => {
+    const wrapper = await open()
+    const before = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.length
+    await type(wrapper, '添加诊断：肺炎')
+
+    const after = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls
+    expect(after.slice(before).every((c) => !String(c[0]).includes('copilot/chat'))).toBe(true)
+  })
+
+  it('普通提问照常交给模型，不被命令层吞掉', async () => {
+    const wrapper = await open()
+    await type(wrapper, '这个患者要不要抗凝')
+    await vi.waitFor(() => {
+      const calls = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      expect(calls.some((c) => String(c[0]).includes('copilot/chat'))).toBe(true)
+    })
   })
 })
