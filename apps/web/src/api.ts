@@ -290,6 +290,54 @@ export interface KnowledgeEntry extends KnowledgeItem {
   content: string
 }
 
+export interface DryRunResult {
+  output: Record<string, unknown>
+  provider: string
+  degraded: boolean
+  note: string
+  model: string
+  model_tier: string
+  config_version: string
+  config_source: string
+  prompt_hash: string
+  elapsed_ms: number
+  total_tokens: number
+}
+
+export interface CompareResult {
+  patient_id: string
+  published: DryRunResult
+  draft: DryRunResult
+  /** 逐字段差异。输出几十个字段，给两坨 JSON 等于没给。 */
+  diff: { field: string; kind: 'same' | 'changed' | 'added' | 'removed' }[]
+}
+
+export interface EvalCheck {
+  name: string
+  passed: boolean
+  detail: string
+}
+
+export interface EvalCaseResult {
+  case_id: string
+  name: string
+  patient_id: string
+  /** 降级时输出来自本地规则，判定说明不了提示词好坏，界面要单独标 */
+  degraded: boolean
+  elapsed_ms: number
+  passed: boolean
+  checks: EvalCheck[]
+}
+
+export interface EvalResult {
+  total: number
+  passed: number
+  failed: number
+  config_version: string
+  config_source: string
+  cases: EvalCaseResult[]
+}
+
 export const api = {
   config: () => get<RuntimeConfig>('/api/config'),
 
@@ -306,6 +354,20 @@ export const api = {
       '/api/admin/agents',
     ),
   adminAgent: (key: string) => get<AgentDetail>(`/api/admin/agents/${key}`),
+
+  /** 用草稿或线上配置跑一个演示病例。不写缓存、不落库、不计入运行统计。 */
+  adminDryRun: (key: string, patientId: string, use: 'draft' | 'published') =>
+    post<DryRunResult>(`/api/admin/agents/${key}/dry-run`, { patient_id: patientId, use }),
+  /** 草稿与线上并排跑同一个病例，服务端并发发起。 */
+  adminCompare: (key: string, patientId: string) =>
+    post<CompareResult>(`/api/admin/agents/${key}/compare`, { patient_id: patientId }),
+  adminEvalCases: (key: string) =>
+    get<{ cases: { id: string; name: string; agent_key: string; patient_id: string; checks: string[] }[] }>(
+      `/api/admin/eval-cases?agent_key=${key}`,
+    ),
+  adminRunEval: (key: string, use: 'draft' | 'published') =>
+    post<EvalResult>(`/api/admin/agents/${key}/eval`, { use }),
+
   adminSaveDraft: (key: string, body: { model_tier: string; role_prompt: string; note: string }) =>
     request<{ ok: boolean; draft_id: number; prompt_hash: string }>(`/api/admin/agents/${key}/draft`, {
       method: 'PUT',

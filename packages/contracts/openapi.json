@@ -1458,6 +1458,217 @@
         }
       }
     },
+    "/api/admin/agents/{agent_key}/dry-run": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Dry Run",
+        "description": "用草稿或线上配置跑一个演示病例，看真实输出。\n\n**不写缓存、不落库、不计入运行统计。** 见 docs/product/11 第 1.2 节。",
+        "operationId": "dry_run_api_admin_agents__agent_key__dry_run_post",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DryRunIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Dry Run Api Admin Agents  Agent Key  Dry Run Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/agents/{agent_key}/compare": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Compare",
+        "description": "草稿与线上并排跑同一个病例。\n\n**两次调用并发发起** —— 串行会让每次调优等两倍时间，而调优是个高频动作。",
+        "operationId": "compare_api_admin_agents__agent_key__compare_post",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DryRunIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Compare Api Admin Agents  Agent Key  Compare Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/eval-cases": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Eval Cases",
+        "description": "回归集用例清单。期望值由人写在 eval_cases.py，不自动生成。",
+        "operationId": "list_eval_cases_api_admin_eval_cases_get",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Agent Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Eval Cases Api Admin Eval Cases Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/agents/{agent_key}/eval": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Run Eval",
+        "description": "用草稿或线上配置跑完该岗位的全部回归用例。\n\n与试运行一样：不记账、不写缓存。校验全部是确定性规则，\n不用模型给模型打分 —— 那只会得到好看的分数。",
+        "operationId": "run_eval_api_admin_agents__agent_key__eval_post",
+        "parameters": [
+          {
+            "name": "agent_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvalIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Run Eval Api Admin Agents  Agent Key  Eval Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -1631,6 +1842,35 @@
         },
         "type": "object",
         "title": "DraftIn"
+      },
+      "DryRunIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "use": {
+            "type": "string",
+            "title": "Use",
+            "default": "draft"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "DryRunIn"
+      },
+      "EvalIn": {
+        "properties": {
+          "use": {
+            "type": "string",
+            "title": "Use",
+            "default": "draft"
+          }
+        },
+        "type": "object",
+        "title": "EvalIn"
       },
       "ExamIn": {
         "properties": {

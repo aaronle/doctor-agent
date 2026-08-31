@@ -43,6 +43,10 @@ class AgentOutcome:
     note: str = ""
     model: str = ""
     elapsed_ms: int = 0
+    # 试运行要显示成本，不能只依赖运行日志（试运行本来就不进日志）
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
 
 
 class Agent:
@@ -108,12 +112,33 @@ class Agent:
         )
         return [ChatMessage("system", system), ChatMessage("user", user)]
 
-    async def run(self, session: Session, ctx: dict, **kwargs: Any) -> AgentOutcome:
+    async def run(
+        self,
+        session: Session,
+        ctx: dict,
+        *,
+        config_override=None,
+        record: bool = True,
+        **kwargs: Any,
+    ) -> AgentOutcome:
+        """
+        跑一次该岗位。
+
+        config_override / record 两个参数只给控制台的试运行用：
+
+        - `config_override` 让调用方指定用哪一版配置（草稿或某个历史版本），
+          而不是固定用已发布版。发布前要能看到改动的效果，就必须能绕过 resolve。
+        - `record=False` 让本次调用不进 agent_runs。运行日志的定位是「生产运行的
+          可追溯记录」，把调优期的大量试错混进去，成功率这个数字就废了 ——
+          而那恰恰是最需要靠它判断线上健康度的时候。
+
+        产品路径一律用默认值，不传这两个参数。
+        """
         client = get_llm_client()
 
         # 运行时读已发布配置：Prompt 与模型档位都可能被控制台改过。
         # 读不到已发布版本才回落代码默认值，所以首次部署无需先建配置。
-        config = resolve(session, self)
+        config = config_override or resolve(session, self)
 
         if not client.configured:
             outcome = AgentOutcome(
@@ -122,7 +147,8 @@ class Agent:
                 degraded=True,
                 note="模型通道未配置，已降级为本地规则",
             )
-            self._record(session, ctx, outcome, status="degraded", error="unconfigured", config=config)
+            if record:
+                self._record(session, ctx, outcome, status="degraded", error="unconfigured", config=config)
             return outcome
 
         try:
@@ -139,7 +165,8 @@ class Agent:
                 degraded=True,
                 note=f"模型不可用，已降级为本地规则：{exc}",
             )
-            self._record(session, ctx, outcome, status="degraded", error=str(exc), config=config)
+            if record:
+                self._record(session, ctx, outcome, status="degraded", error=str(exc), config=config, raw=getattr(exc, "raw_excerpt", ""))
             return outcome
 
         outcome = AgentOutcome(
@@ -148,16 +175,21 @@ class Agent:
             model=result.model,
             elapsed_ms=result.elapsed_ms,
         )
-        self._record(
-            session,
-            ctx,
-            outcome,
-            status="ok",
-            config=config,
-            prompt_tokens=result.prompt_tokens,
-            completion_tokens=result.completion_tokens,
-            total_tokens=result.total_tokens,
-        )
+        if record:
+            self._record(
+                session,
+                ctx,
+                outcome,
+                status="ok",
+                config=config,
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+                total_tokens=result.total_tokens,
+            )
+        # 把 token 与模型带回给调用方 —— 试运行要显示成本，不能只依赖日志
+        outcome.prompt_tokens = result.prompt_tokens
+        outcome.completion_tokens = result.completion_tokens
+        outcome.total_tokens = result.total_tokens
         return outcome
 
     def _record(
@@ -172,6 +204,7 @@ class Agent:
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
         total_tokens: int = 0,
+        raw: str = "",
     ) -> None:
         # 只存上下文摘要与哈希，不存完整病历：运行日志不应成为病历副本
         digest = {
@@ -186,6 +219,12 @@ class Agent:
             "config_source": getattr(config, "source", "code-default"),
             "model_tier": getattr(config, "model_tier", "clinical_fast"),
         }
+        # 失败样本：只在失败时留模型原文的前 500 字符。
+        # 成功的输出不留 —— 那会让日志变成病历副本；500 字够定位格式问题，
+        # 不足以复原一份病历。早先「未转义半角双引号导致 JSON 解析失败」
+        # 就是靠人工抓原文才定位的，当时日志里什么都看不到。
+        if status != "ok" and raw:
+            digest["raw_excerpt"] = str(raw)[:500]
         session.add(
             AgentRun(
                 agent_key=self.key,

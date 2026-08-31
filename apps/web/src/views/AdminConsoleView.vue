@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { api, type AgentSummary, type AgentDetail, type AgentRunLog } from '../api'
+import { api, type AgentSummary, type AgentDetail, type AgentRunLog, type CompareResult, type EvalResult } from '../api'
 
 /**
  * Agent 配置与运行控制台。
@@ -19,10 +19,18 @@ const bundleVersion = ref('')
 const activeKey = ref('')
 const detail = ref<AgentDetail | null>(null)
 const runs = ref<AgentRunLog[]>([])
-const tab = ref<'config' | 'versions' | 'runs'>('config')
+const tab = ref<'config' | 'tune' | 'eval' | 'versions' | 'runs'>('config')
 
 /** 草稿编辑区。与已发布配置分开，未发布不影响线上。 */
 const draft = ref({ model_tier: 'clinical_fast', role_prompt: '', note: '' })
+
+/**
+ * 可调参数。两个都带上下限，且**服务端也会拦** —— 界面能绕过。
+ *
+ * temperature 临床岗位默认 0：调高会让同一份病历每次生成不同，无法复核。
+ * max_tokens 太小会截断 JSON，整个岗位跟着降级（一期真踩过）。
+ */
+const params = ref<{ temperature: number; max_tokens: number }>({ temperature: 0, max_tokens: 4096 })
 const saving = ref(false)
 
 const dirty = computed(() => {
@@ -30,6 +38,63 @@ const dirty = computed(() => {
   const base = detail.value.draft ?? detail.value.running
   return draft.value.role_prompt !== base.role_prompt || draft.value.model_tier !== base.model_tier
 })
+
+
+/* ===================== 试运行与调优 ===================== */
+
+const dryPatient = ref('P001')
+const comparing = ref(false)
+const comparison = ref<CompareResult | null>(null)
+
+const evaluating = ref(false)
+const evalResult = ref<EvalResult | null>(null)
+const evalCases = ref<{ id: string; name: string; patient_id: string; checks: string[] }[]>([])
+
+/** 只有变化过的字段值得看 —— 几十个 same 会把两条真差异淹掉 */
+const changedFields = computed(() =>
+  (comparison.value?.diff ?? []).filter((d) => d.kind !== 'same'),
+)
+
+function fieldText(side: 'published' | 'draft', field: string) {
+  const value = comparison.value?.[side].output?.[field]
+  if (value === undefined) return '（无此字段）'
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2)
+}
+
+async function runCompare() {
+  if (!activeKey.value) return
+  comparing.value = true
+  comparison.value = null
+  try {
+    comparison.value = await api.adminCompare(activeKey.value, dryPatient.value)
+  } catch (error) {
+    ElMessage.error(`试运行失败：${(error as Error).message}`)
+  } finally {
+    comparing.value = false
+  }
+}
+
+async function runEval() {
+  if (!activeKey.value) return
+  evaluating.value = true
+  evalResult.value = null
+  try {
+    evalResult.value = await api.adminRunEval(activeKey.value, 'draft')
+  } catch (error) {
+    ElMessage.error(`回归集执行失败：${(error as Error).message}`)
+  } finally {
+    evaluating.value = false
+  }
+}
+
+async function loadEvalCases() {
+  if (!activeKey.value) return
+  try {
+    evalCases.value = (await api.adminEvalCases(activeKey.value)).cases
+  } catch {
+    evalCases.value = []
+  }
+}
 
 async function loadOverview() {
   loading.value = true
@@ -48,6 +113,10 @@ async function loadOverview() {
 
 async function select(key: string) {
   activeKey.value = key
+  // 清掉上一个岗位的结果 —— 留着会让人对着 A 的输出判断 B 的提示词
+  comparison.value = null
+  evalResult.value = null
+  void loadEvalCases()
   detail.value = await api.adminAgent(key)
   const base = detail.value.draft ?? detail.value.running
   draft.value = {
@@ -166,6 +235,8 @@ onMounted(loadOverview)
           </div>
           <div class="admin-tabs">
             <span class="admin-tab" :class="{ active: tab === 'config' }" @click="tab = 'config'">配置</span>
+            <span class="admin-tab" :class="{ active: tab === 'tune' }" @click="tab = 'tune'">试运行</span>
+            <span class="admin-tab" :class="{ active: tab === 'eval' }" @click="tab = 'eval'">回归集</span>
             <span class="admin-tab" :class="{ active: tab === 'versions' }" @click="tab = 'versions'">
               版本 <em>{{ detail.versions.length }}</em>
             </span>
@@ -235,6 +306,116 @@ onMounted(loadOverview)
         </section>
 
         <!-- 版本历史 -->
+        <!-- ---------------- 试运行与并排对比 ---------------- -->
+        <section v-show="tab === 'tune'" class="admin-pane">
+          <div class="tune-bar">
+            <span class="tune-label">病例</span>
+            <el-select v-model="dryPatient" size="small" style="width: 200px">
+              <el-option value="P001" label="P001 王某某 · 内分泌" />
+              <el-option value="P002" label="P002 张某 · 心内" />
+              <el-option value="P004" label="P004 陈某 · 神内" />
+              <el-option value="P006" label="P006 赵某某 · 神内" />
+            </el-select>
+            <el-button type="primary" size="small" :loading="comparing" @click="runCompare">
+              试运行并对比
+            </el-button>
+            <span class="tune-note">
+              试运行不写缓存 · 不落库 · 不计入运行统计 · 仅限演示病例
+            </span>
+          </div>
+
+          <div v-if="!comparison && !comparing" class="tune-empty">
+            选一个病例，用当前草稿跑一次，与线上并排对照。<br>
+            没有这一步，改完提示词只能盲发 —— 而改动一旦发布就已经在给医生用了。
+          </div>
+
+          <div v-if="comparison" class="tune-cols">
+            <div v-for="side in (['published', 'draft'] as const)" :key="side" class="tune-col">
+              <div class="tune-col-head">
+                <span class="tune-tag" :class="side">{{ side === 'draft' ? '草稿' : '线上' }}</span>
+                <span class="tune-ver">
+                  {{ comparison[side].config_version }} · {{ comparison[side].config_source }}
+                </span>
+              </div>
+              <div class="tune-metrics">
+                <div class="tune-metric">
+                  <span class="tm-k">耗时</span>
+                  <span class="tm-v">{{ (comparison[side].elapsed_ms / 1000).toFixed(1) }}s</span>
+                </div>
+                <div class="tune-metric">
+                  <span class="tm-k">Token</span>
+                  <span class="tm-v">{{ comparison[side].total_tokens.toLocaleString() }}</span>
+                </div>
+                <div class="tune-metric">
+                  <span class="tm-k">降级</span>
+                  <span class="tm-v" :class="comparison[side].degraded ? 'bad' : 'good'">
+                    {{ comparison[side].degraded ? '是' : '无' }}
+                  </span>
+                </div>
+              </div>
+              <!-- 只列变化过的字段：几十个 same 会把两条真差异淹掉 -->
+              <div class="tune-out">
+                <div v-if="!changedFields.length" class="tune-same">两侧输出完全一致</div>
+                <div v-for="d in changedFields" :key="d.field" class="tune-field" :class="d.kind">
+                  <div class="tf-head">
+                    <span class="tf-kind">{{ d.kind === 'added' ? '新增' : d.kind === 'removed' ? '删除' : '变化' }}</span>
+                    <span class="tf-name">{{ d.field }}</span>
+                  </div>
+                  <pre class="tf-body">{{ fieldText(side, d.field) }}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="comparison && (comparison.published.degraded || comparison.draft.degraded)" class="tune-warn">
+            有一侧降级了 —— 降级输出来自本地规则，这次对比说明不了提示词的好坏，请重跑。
+          </div>
+        </section>
+
+        <!-- ---------------- 回归集 ---------------- -->
+        <section v-show="tab === 'eval'" class="admin-pane">
+          <div class="tune-bar">
+            <el-button type="primary" size="small" :loading="evaluating" @click="runEval">
+              用草稿跑回归集
+            </el-button>
+            <template v-if="evalResult">
+              <span class="eval-stat"><i>通过</i><b class="good">{{ evalResult.passed }}</b></span>
+              <span class="eval-stat"><i>失败</i><b class="bad">{{ evalResult.failed }}</b></span>
+              <span class="eval-stat"><i>用例</i><b>{{ evalResult.total }}</b></span>
+            </template>
+            <span class="tune-note">校验全部是确定性规则，不用模型给模型打分</span>
+          </div>
+
+          <div v-if="!evalResult && !evaluating" class="tune-empty">
+            <div>该岗位共 {{ evalCases.length }} 条用例。改提示词修好一个病例、弄坏另一个，是这类工作最常见的失败模式 —— 单次试运行看不出来。</div>
+            <ul class="eval-preview">
+              <li v-for="c in evalCases" :key="c.id">
+                <b>{{ c.id }}</b> {{ c.name }} · {{ c.patient_id }}
+                <span class="eval-checks">{{ c.checks.join(' / ') }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div v-if="evalResult" class="eval-list">
+            <div v-for="c in evalResult.cases" :key="c.case_id" class="eval-case" :class="{ failed: !c.passed }">
+              <div class="ec-head">
+                <span class="ec-mark" :class="c.passed ? 'good' : 'bad'">{{ c.passed ? '✓' : '✕' }}</span>
+                <span class="ec-id">{{ c.case_id }} {{ c.name }}</span>
+                <span class="ec-meta">{{ c.patient_id }} · {{ (c.elapsed_ms / 1000).toFixed(1) }}s</span>
+                <span v-if="c.degraded" class="ec-degraded">降级 · 本次判定不说明提示词好坏</span>
+              </div>
+              <div class="ec-checks">
+                <span v-for="k in c.checks" :key="k.name" class="ec-chip" :class="k.passed ? 'good' : 'bad'">
+                  {{ k.passed ? '✓' : '✕' }} {{ k.name }}
+                </span>
+              </div>
+              <div v-for="k in c.checks.filter((x) => !x.passed && x.detail)" :key="`d-${k.name}`" class="ec-detail">
+                └ {{ k.detail }}
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section v-show="tab === 'versions'" class="admin-pane">
           <el-table :data="detail.versions" size="small" border stripe>
             <el-table-column prop="version" label="版本" width="80" />

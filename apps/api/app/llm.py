@@ -34,7 +34,16 @@ MAX_TOKENS = 4096
 
 
 class LlmError(RuntimeError):
-    """模型通道不可用或返回不可解析。调用方据此降级到本地规则。"""
+    """
+    模型通道不可用或返回不可解析。调用方据此降级到本地规则。
+
+    解析失败时带上 `raw_excerpt`（模型原文片段）。只有原文能说清楚
+    「模型到底吐了什么」—— 只有一句异常消息时，格式类问题基本无从定位。
+    """
+
+    def __init__(self, message: str, *, raw_excerpt: str = "") -> None:
+        super().__init__(message)
+        self.raw_excerpt = raw_excerpt
 
 
 @dataclass
@@ -165,7 +174,7 @@ class LlmClient:
                     payload = json.dumps(body, ensure_ascii=False)
                     await asyncio.sleep(BACKOFF_MS[attempt - 1] / 1000)
                     continue
-                raise LlmError(f"模型连续返回不可解析的 JSON：{exc}") from exc
+                raise LlmError(f"模型连续返回不可解析的 JSON：{exc}", raw_excerpt=text) from exc
 
             elapsed_ms = int((time.monotonic() - started) * 1000)
             self._log(agent_key, target_model, attempt, len(payload), "ok", started)
