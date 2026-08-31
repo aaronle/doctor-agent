@@ -846,13 +846,23 @@ def submit_record(body: RecordSaveIn, session: Session = Depends(get_session)) -
     patient.payload = payload
     flag_modified(patient, "payload")
 
+    # 提交 = 本次就诊完成，患者出候诊队列。
+    #
+    # 此前没有任何地方会把 in_queue 置 false —— 于是「今日候诊 6 人」永远是 6，
+    # 医生看完全部患者，队列纹丝不动。一次就诊没有「结束」，这个系统就只是个查看器。
+    # 暂存不出队（它的语义就是没弄完）；误点后可在患者管理里「重新接诊」。
+    patient.in_queue = False
+
     record_audit(
         session, action="submit_record", entity="record_draft", entity_id=str(version),
         patient_id=patient.id, detail={"fields": sorted(body.fields.keys()), "handled_alerts": body.handled_alerts},
     )
     session.commit()
     cache.clear()
-    return {"ok": True, "version": version, "message": "病历已提交（本地库 + 审计，未触达真实 HIS）"}
+    return {
+        "ok": True, "version": version, "dequeued": True,
+        "message": "病历已提交，本次就诊完成（本地库 + 审计，未触达真实 HIS）",
+    }
 
 
 @router.get("/record/{patient_id}")

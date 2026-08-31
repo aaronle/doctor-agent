@@ -258,6 +258,9 @@ async function submitRecord() {
     const result = await api.submitRecord(ws.patientId, recordFields(), [...ws.handledAlertIds])
     ElMessage.success(`${result.message} · 第 ${result.version} 版`)
     savedHint.value = `已提交 · 第 ${result.version} 版`
+    // 提交即出队，刷新队列让「今日候诊 N 人」跟着变 ——
+    // 不刷新的话医生看完全部患者，计数纹丝不动，看着像没生效
+    if (result.dequeued) await ws.loadQueue()
   } catch (error) {
     // 服务端门禁返回 409 时如实报出来，不要吞成一句「提交成功」
     ElMessage.error(`提交失败：${(error as Error).message}`)

@@ -37,6 +37,16 @@ function riskType(level: string) {
   return 'success'
 }
 
+async function requeue(row: ManagedPatient) {
+  try {
+    const result = await api.requeuePatient(row.id)
+    ElMessage.success(result.message)
+    await load()
+  } catch (error) {
+    ElMessage.error(`操作失败：${(error as Error).message}`)
+  }
+}
+
 async function load() {
   loading.value = true
   try {
@@ -182,7 +192,7 @@ onMounted(load)
           <el-table-column label="候诊" width="80">
             <template #default="{ row }">
               <el-tag size="small" :type="row.in_queue ? 'success' : 'info'" effect="plain">
-                {{ row.in_queue ? '候诊中' : '未候诊' }}
+                {{ row.in_queue ? '候诊中' : '已完成' }}
               </el-tag>
             </template>
           </el-table-column>
@@ -191,6 +201,10 @@ onMounted(load)
               <div class="pm-reminders">
                 <el-button type="primary" size="small" link @click="remind([row.id])">提醒</el-button>
                 <span v-if="row.reminded" class="pm-reminded">✓ 已提醒</span>
+                <!-- 提交病历会让患者出队，这是不可逆的单向操作；给一条明确的退路 -->
+                <el-button v-if="!row.in_queue" size="small" link type="primary" @click="requeue(row)">
+                  重新接诊
+                </el-button>
               </div>
             </template>
           </el-table-column>

@@ -141,6 +141,32 @@ def manage_patients(session: Session = Depends(get_session)) -> dict:
     }
 
 
+class RequeueIn(BaseModel):
+    patient_id: str
+
+
+@router.post("/patients/requeue")
+def requeue_patient(body: RequeueIn, session: Session = Depends(get_session)) -> dict:
+    """
+    重新接诊：把已完成的患者放回候诊队列。
+
+    提交病历会让患者出队，这是不可逆的单向操作 —— 误点一次，医生的列表里
+    就再也找不到这个人了。给一条明确的退路比让人去数据库里改稳妥得多。
+    """
+    patient = session.get(Patient, body.patient_id)
+    if patient is None:
+        raise HTTPException(status_code=404, detail="患者不存在")
+    if patient.in_queue:
+        return {"ok": True, "message": "该患者本就在候诊队列中", "changed": False}
+    patient.in_queue = True
+    record_audit(
+        session, action="requeue_patient", entity="patient", entity_id=patient.id,
+        patient_id=patient.id, detail={},
+    )
+    session.commit()
+    return {"ok": True, "message": f"{patient.name} 已重新加入候诊队列", "changed": True}
+
+
 @router.post("/patients/remind")
 def remind_patients(body: RemindIn, session: Session = Depends(get_session)) -> dict:
     targets = list(body.patient_ids)

@@ -1276,3 +1276,57 @@ def test_qc_review_leaves_an_audit_but_changes_nothing_else(client):
         assert session.query(AuditLog).filter(AuditLog.action == "qc_review").count() >= 1
     finally:
         session.close()
+
+
+# ------------------------------------------------------------------ 就诊闭环：出队与重新接诊
+
+
+def test_submitting_a_record_completes_the_visit_and_dequeues(client):
+    """
+    提交病历 = 本次就诊完成，患者出候诊队列。
+
+    此前没有任何地方会把 in_queue 置 false —— 于是「今日候诊 6 人」永远是 6，
+    医生看完全部患者，队列纹丝不动。一次就诊没有「结束」，这个系统就只是个查看器。
+    """
+    before = {p["id"] for p in client.get("/api/his/patients").json()}
+    assert "P004" in before
+
+    body = client.post(
+        "/api/emr/record/submit", json={"patient_id": "P004", "fields": {"chief_complaint": "完诊测试"}}
+    ).json()
+    assert body["dequeued"] is True
+
+    after = {p["id"] for p in client.get("/api/his/patients").json()}
+    assert "P004" not in after, "提交后应离开候诊队列"
+    # 患者管理仍看得到，标记为已完成
+    managed = {p["id"]: p for p in client.get("/api/his/patients/manage").json()["patients"]}
+    assert managed["P004"]["in_queue"] is False
+
+
+def test_stashing_does_not_dequeue(client):
+    """暂存的语义是「没弄完」，不该让患者离开队列。"""
+    client.post("/api/emr/record/stash", json={"patient_id": "P005", "fields": {"chief_complaint": "写一半"}})
+    assert "P005" in {p["id"] for p in client.get("/api/his/patients").json()}
+
+
+def test_requeue_puts_a_finished_patient_back(client):
+    """
+    出队是不可逆的单向操作 —— 误点一次，医生的列表里就再也找不到这个人。
+    必须有一条明确的退路。
+    """
+    client.post("/api/emr/record/submit", json={"patient_id": "P003", "fields": {"chief_complaint": "x"}})
+    assert "P003" not in {p["id"] for p in client.get("/api/his/patients").json()}
+
+    body = client.post("/api/his/patients/requeue", json={"patient_id": "P003"}).json()
+    assert body["changed"] is True
+    assert "P003" in {p["id"] for p in client.get("/api/his/patients").json()}
+
+
+def test_requeue_is_idempotent(client):
+    """对本就在队列里的患者重新接诊，不报错也不重复计数。"""
+    body = client.post("/api/his/patients/requeue", json={"patient_id": "P001"}).json()
+    assert body["ok"] is True and body["changed"] is False
+
+
+def test_requeue_unknown_patient_is_404(client):
+    assert client.post("/api/his/patients/requeue", json={"patient_id": "P999"}).status_code == 404

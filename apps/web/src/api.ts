@@ -425,6 +425,10 @@ export const api = {
       provider: string
       degraded: boolean
     }>(`/api/emr/voice/init/${id}`),
+  /** 重新接诊：把已完成的患者放回候诊队列（提交病历会让患者出队）。 */
+  requeuePatient: (patientId: string) =>
+    post<{ ok: boolean; message: string; changed: boolean }>('/api/his/patients/requeue', { patient_id: patientId }),
+
   /** 记录一次红色风险处置。落患者主档 + 审计 —— 刷新后要能恢复。 */
   handleAlert: (patientId: string, alertId: string, alertName: string) =>
     post<{ ok: boolean; handled_alerts: string[]; message: string }>('/api/emr/alerts/handle', {
@@ -443,7 +447,7 @@ export const api = {
     }),
   /** 提交病历。服务端会再校验一次红色风险闭环，未闭环返回 409。 */
   submitRecord: (patientId: string, fields: Record<string, string>, handledAlerts: string[]) =>
-    post<{ ok: boolean; version: number; message: string }>('/api/emr/record/submit', {
+    post<{ ok: boolean; version: number; message: string; dequeued: boolean }>('/api/emr/record/submit', {
       patient_id: patientId, fields, handled_alerts: handledAlerts,
     }),
   /** 读回最近一次暂存/提交的病历 —— 没有它，刷新就得从头再来。 */

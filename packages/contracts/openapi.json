@@ -118,6 +118,50 @@
         }
       }
     },
+    "/api/his/patients/requeue": {
+      "post": {
+        "tags": [
+          "his"
+        ],
+        "summary": "Requeue Patient",
+        "description": "重新接诊：把已完成的患者放回候诊队列。\n\n提交病历会让患者出队，这是不可逆的单向操作 —— 误点一次，医生的列表里\n就再也找不到这个人了。给一条明确的退路比让人去数据库里改稳妥得多。",
+        "operationId": "requeue_patient_api_his_patients_requeue_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequeueIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Requeue Patient Api His Patients Requeue Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/his/patients/remind": {
       "post": {
         "tags": [
@@ -2383,6 +2427,19 @@
         },
         "type": "object",
         "title": "RemindIn"
+      },
+      "RequeueIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "RequeueIn"
       },
       "ValidationError": {
         "properties": {
