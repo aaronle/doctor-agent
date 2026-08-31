@@ -108,7 +108,7 @@ doctor-agent/
 │   └── extracted/               全部抽取产物，脚本可复现
 ├── scripts/
 │   ├── extract-v43-assets.mjs   静态抽取：CSS / 令牌 / fixture
-│   ├── extract-v43-dom.mjs      动态抽取：20 个界面状态的渲染 DOM
+│   ├── extract-v43-dom.mjs      动态抽取：28 个界面状态的渲染 DOM
 │   ├── split-v43-css.mjs        按组件作用域拆分 CSS
 │   └── compare-v43-fidelity.mjs 还原度数值比对
 └── deploy/tencent-guangzhou/    广州单容器部署定义
