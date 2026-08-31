@@ -1114,3 +1114,113 @@ def test_eval_checks_see_through_the_fields_wrapper():
     wrapped, _ = check({"fields": {"chief_complaint": "胸闷"}}, {})
     flat, _ = check({"chief_complaint": "胸闷"}, {})
     assert wrapped and flat
+
+
+# ------------------------------------------------------------------ 病历暂存与提交
+
+
+def test_submit_record_actually_persists(client):
+    """
+    提交病历必须真的落库。
+
+    此前界面上这个按钮只弹一句「病历已提交（写入本地库并留审计）」，
+    **实际什么都没写** —— 医生以为存下了，刷新就没了。伪造的成功文案
+    是最不该出现的一种缺陷：它让人对系统建立错误的信任。
+    """
+    body = client.post(
+        "/api/emr/record/submit",
+        json={"patient_id": "P003", "fields": {"chief_complaint": "头晕 3 天", "present_illness": "起病急"}},
+    )
+    assert body.status_code == 200, body.text
+    version = body.json()["version"]
+
+    saved = client.get("/api/emr/record/P003").json()
+    assert saved["submitted"]["version"] == version
+    assert saved["submitted"]["fields"]["chief_complaint"] == "头晕 3 天"
+
+
+def test_submit_requires_chief_complaint(client):
+    """主诉是必填项，空主诉的病历不该被收下。"""
+    r = client.post("/api/emr/record/submit", json={"patient_id": "P003", "fields": {"present_illness": "x"}})
+    assert r.status_code == 400
+
+
+def test_submit_is_blocked_by_open_red_alerts(client):
+    """
+    红色风险未闭环时服务端阻断提交，返回 409。
+
+    前端禁用按钮只是体验 —— 改 DOM 或直接发请求都能绕过，
+    所以这条门禁必须在服务端。
+    """
+    from app.agents.risk import hard_rule_alerts
+    from app.agents.context import build_context
+    from app.database import SessionLocal
+    from app.models import Patient
+
+    session = SessionLocal()
+    try:
+        patient = session.get(Patient, "P006")
+        alerts = hard_rule_alerts(build_context(session, patient))
+    finally:
+        session.close()
+    if not alerts:
+        return  # 该病例本次无硬规则红线，跳过
+
+    r = client.post(
+        "/api/emr/record/submit",
+        json={"patient_id": "P006", "fields": {"chief_complaint": "x"}, "handled_alerts": []},
+    )
+    assert r.status_code == 409
+    assert "未处置" in r.json()["detail"]
+
+    # 逐条处置后放行
+    ok = client.post(
+        "/api/emr/record/submit",
+        json={"patient_id": "P006", "fields": {"chief_complaint": "x"}, "handled_alerts": [a["id"] for a in alerts]},
+    )
+    assert ok.status_code == 200
+
+
+def test_stash_is_not_blocked_by_red_alerts(client):
+    """
+    暂存不过门禁。
+
+    暂存的用途正是「还没弄完，先存着」；拿门禁拦住它，等于逼医生
+    要么一次做完、要么丢掉已经写的内容。
+    """
+    r = client.post(
+        "/api/emr/record/stash",
+        json={"patient_id": "P006", "fields": {"chief_complaint": "写了一半"}, "handled_alerts": []},
+    )
+    assert r.status_code == 200
+    assert client.get("/api/emr/record/P006").json()["latest"]["fields"]["chief_complaint"] == "写了一半"
+
+
+def test_versions_increment_and_history_is_kept(client):
+    """每次保存递增版本，旧版本保留 —— 病历改动要能追溯。"""
+    v1 = client.post("/api/emr/record/stash", json={"patient_id": "P004", "fields": {"chief_complaint": "一"}}).json()
+    v2 = client.post("/api/emr/record/stash", json={"patient_id": "P004", "fields": {"chief_complaint": "二"}}).json()
+    assert v2["version"] == v1["version"] + 1
+    assert client.get("/api/emr/record/P004").json()["latest"]["fields"]["chief_complaint"] == "二"
+
+
+def test_save_leaves_an_audit_trail(client):
+    """落库必须留审计 —— 「写入本地库并留审计」不能只是一句文案。"""
+    from app.database import SessionLocal
+    from app.models import AuditLog
+
+    client.post("/api/emr/record/submit", json={"patient_id": "P003", "fields": {"chief_complaint": "留痕测试"}})
+    session = SessionLocal()
+    try:
+        rows = session.query(AuditLog).filter(AuditLog.action == "submit_record").all()
+        assert rows, "提交病历必须留审计"
+        assert rows[-1].patient_id == "P003"
+    finally:
+        session.close()
+
+
+def test_reading_a_patient_with_no_saved_record_is_not_an_error(client):
+    """没存过就返回空，不是 404 —— 新病历是正常状态。"""
+    body = client.get("/api/emr/record/P005").json()
+    assert body["latest"] is None or isinstance(body["latest"], dict)
+    assert "submitted" in body

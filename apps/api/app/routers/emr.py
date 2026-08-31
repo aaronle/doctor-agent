@@ -16,7 +16,7 @@ from typing import AsyncIterator
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -720,6 +720,109 @@ class DiagnosisWriteBackIn(BaseModel):
     handled_alerts: list[str] = Field(default_factory=list)
 
 
+def _assert_red_alerts_closed(session: Session, patient, handled: list[str], *, action: str) -> None:
+    """
+    红色风险闭环校验。**服务端再校验一次**，前端禁用按钮只是体验。
+
+    抽成函数是因为提交病历与回写诊断都要用它 —— 各写一份的话，
+    哪天规则改了必然漏掉一处，而漏掉的那处就是一个能绕过红线的入口。
+    """
+    ctx = build_context(session, patient)
+    hard = hard_rule_alerts(ctx)
+    cached = cache.get(cache.context_key(patient.id, build_context(session, patient, include_dialog=True)))
+    model_alerts = (cached or {}).get("risk_alerts", [])
+    all_red = {a["id"] for a in hard} | {a["id"] for a in model_alerts if a.get("level") == "高风险"}
+    open_red = sorted(all_red - set(handled or []))
+    if open_red:
+        raise HTTPException(status_code=409, detail=f"尚有 {len(open_red)} 条红色风险未处置，已阻断{action}")
+
+
+class RecordSaveIn(BaseModel):
+    patient_id: str
+    fields: dict = Field(default_factory=dict)
+    handled_alerts: list[str] = Field(default_factory=list)
+
+
+@router.post("/record/stash")
+def stash_record(body: RecordSaveIn, session: Session = Depends(get_session)) -> dict:
+    """
+    暂存病历。
+
+    暂存**不过红线门禁** —— 它的用途正是「还没弄完，先存着」，
+    拿门禁拦住暂存，等于逼医生要么一次做完要么丢掉已写的内容。
+    暂存不改患者主档，只落草稿。
+    """
+    patient = _patient_or_404(session, body.patient_id)
+    version = _next_draft_version(session, patient.id)
+    session.add(RecordDraft(patient_id=patient.id, version=version, fields=body.fields, provider="doctor-stash"))
+    record_audit(
+        session, action="stash_record", entity="record_draft", entity_id=str(version),
+        patient_id=patient.id, detail={"fields": sorted(body.fields.keys())},
+    )
+    session.commit()
+    return {"ok": True, "version": version, "message": "已暂存（未提交）"}
+
+
+@router.post("/record/submit")
+def submit_record(body: RecordSaveIn, session: Session = Depends(get_session)) -> dict:
+    """
+    提交病历：落库 + 留审计 + 写回患者主档。
+
+    此前界面上这个按钮只弹一句「病历已提交（写入本地库并留审计）」，
+    **实际什么都没写** —— 医生以为存下了，刷新就没了。伪造的成功文案
+    是零容忍红线里最不该出现的一种，因为它让人对系统建立错误的信任。
+    """
+    patient = _patient_or_404(session, body.patient_id)
+    if not str(body.fields.get("chief_complaint") or "").strip():
+        raise HTTPException(status_code=400, detail="主诉不能为空")
+    _assert_red_alerts_closed(session, patient, body.handled_alerts, action="提交")
+
+    version = _next_draft_version(session, patient.id)
+    session.add(RecordDraft(patient_id=patient.id, version=version, fields=body.fields, provider="doctor-submitted"))
+
+    payload = patient.payload or {}
+    payload["submitted_record"] = {"version": version, "fields": body.fields}
+    patient.payload = payload
+    flag_modified(patient, "payload")
+
+    record_audit(
+        session, action="submit_record", entity="record_draft", entity_id=str(version),
+        patient_id=patient.id, detail={"fields": sorted(body.fields.keys()), "handled_alerts": body.handled_alerts},
+    )
+    session.commit()
+    cache.clear()
+    return {"ok": True, "version": version, "message": "病历已提交（本地库 + 审计，未触达真实 HIS）"}
+
+
+@router.get("/record/{patient_id}")
+def get_record(patient_id: str, session: Session = Depends(get_session)) -> dict:
+    """
+    读回该患者最近一次暂存/提交的病历。
+
+    没有这个接口，刷新页面医生就得从头再来一遍 —— 那不叫系统，叫演示。
+    """
+    patient = _patient_or_404(session, patient_id)
+    latest = session.scalars(
+        select(RecordDraft).where(RecordDraft.patient_id == patient_id).order_by(RecordDraft.version.desc()).limit(1)
+    ).first()
+    submitted = (patient.payload or {}).get("submitted_record")
+    return {
+        "patient_id": patient_id,
+        "latest": None if latest is None else {
+            "version": latest.version, "fields": latest.fields,
+            "provider": latest.provider, "created_at": latest.created_at.isoformat(),
+        },
+        "submitted": submitted,
+    }
+
+
+def _next_draft_version(session: Session, patient_id: str) -> int:
+    current = session.scalar(
+        select(func.max(RecordDraft.version)).where(RecordDraft.patient_id == patient_id)
+    )
+    return int(current or 0) + 1
+
+
 @router.post("/diagnosis/write-back")
 async def diagnosis_write_back(body: DiagnosisWriteBackIn, session: Session = Depends(get_session)) -> dict:
     """
@@ -737,15 +840,7 @@ async def diagnosis_write_back(body: DiagnosisWriteBackIn, session: Session = De
     if body.primary not in body.diagnoses:
         raise HTTPException(status_code=400, detail="主诊断必须在已选诊断中")
 
-    # 红色风险闭环校验：拿当前聚合结果里的红色项与医生已处置列表比对
-    ctx = build_context(session, patient)
-    hard_alerts = hard_rule_alerts(ctx)
-    cached = cache.get(cache.context_key(body.patient_id, build_context(session, patient, include_dialog=True)))
-    model_alerts = (cached or {}).get("risk_alerts", [])
-    all_red = {a["id"] for a in hard_alerts} | {a["id"] for a in model_alerts if a.get("level") == "高风险"}
-    open_red = sorted(all_red - set(body.handled_alerts))
-    if open_red:
-        raise HTTPException(status_code=409, detail=f"尚有 {len(open_red)} 条红色风险未处置，已阻断回写")
+    _assert_red_alerts_closed(session, patient, body.handled_alerts, action="回写")
 
     payload = patient.payload or {}
     payload["diagnoses"] = [

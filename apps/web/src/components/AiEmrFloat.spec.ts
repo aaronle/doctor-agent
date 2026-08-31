@@ -629,3 +629,123 @@ describe('临床知识库', () => {
     await vi.waitFor(() => expect(calls().some((c) => String(c[0]).includes('/knowledge/'))).toBe(true))
   })
 })
+
+describe('预警评估 · 风险色点与动作', () => {
+  const RISKS = [
+    { id: 'r1', name: '血糖控制不达标', level: '高风险', color: 'danger', summary: 's', evidence: 'e', suggestion: 'g' },
+    { id: 'r2', name: '心肌缺血风险', level: '中风险', color: 'warning', summary: 's', evidence: 'e', suggestion: 'g' },
+    { id: 'r3', name: '低风险项', level: '低风险', color: 'info', summary: 's', evidence: 'e', suggestion: 'g' },
+  ]
+
+  async function openRisk() {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url)
+        if (u.includes('assessment')) return new Response(JSON.stringify({ categories: [] }), { status: 200 })
+        if (u.includes('report-summary')) {
+          return new Response(JSON.stringify({ risk_assessments: RISKS, risk_alerts: [], todos: [], _meta: {} }), { status: 200 })
+        }
+        return new Response(JSON.stringify({}), { status: 200 })
+      }),
+    )
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    await useWorkstation(pinia).selectPatient('P001')
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+    await wrapper.findAll('.ttab').find((t) => t.text().includes('预警评估'))!.trigger('click')
+    await vi.waitFor(() => expect(wrapper.findAll('.risk-card').length).toBe(3))
+    return wrapper
+  }
+
+  it('色点按等级上色 —— 原件靠内联背景，只渲染空 span 等于看不见', async () => {
+    const wrapper = await openRisk()
+    const dots = wrapper.findAll('.risk-dot')
+    expect(dots).toHaveLength(3)
+    // 取自原件 DOM 的三档内联色
+    expect(dots[0].attributes('style')).toContain('rgb(230, 25, 26)')
+    expect(dots[1].attributes('style')).toContain('rgb(230, 162, 60)')
+    expect(dots[2].attributes('style')).toContain('rgb(144, 147, 153)')
+  })
+
+  it('每条风险都带「大模型解读」与「↗」两个动作', async () => {
+    const wrapper = await openRisk()
+    const first = wrapper.findAll('.risk-card')[0]
+    const labels = first.findAll('.risk-actions button').map((b) => b.text())
+    expect(labels).toContain('大模型解读')
+    expect(labels).toContain('↗')
+  })
+
+  it('「↗」带原件的 title 提示', async () => {
+    const wrapper = await openRisk()
+    const arrow = wrapper.findAll('.risk-actions button').find((b) => b.text() === '↗')
+    expect(arrow?.attributes('title')).toBe('在 Copilot 中放大展示')
+  })
+
+  it('只有高风险才出「处置」—— 处置是红线闭环，不该给中低风险', async () => {
+    const wrapper = await openRisk()
+    const cards = wrapper.findAll('.risk-card')
+    expect(cards[0].text()).toContain('处置')
+    expect(cards[1].findAll('.risk-actions button').map((b) => b.text())).not.toContain('处置')
+  })
+})
+
+describe('专项评估默认态', () => {
+  const CATALOG = {
+    categories: [
+      {
+        name: '诊疗质控助手',
+        count: 2,
+        items: [
+          { name: '诊断预后分析', level: 'danger', desc: '说明一', default_expanded: true },
+          { name: '院感风险监测', level: 'warning', desc: '说明二' },
+        ],
+      },
+      { name: '患者服务助手', count: 1, items: [{ name: '随访计划', level: 'info', desc: '说明三' }] },
+    ],
+  }
+
+  async function open() {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('assessment')) return new Response(JSON.stringify(CATALOG), { status: 200 })
+        return new Response(JSON.stringify({}), { status: 200 })
+      }),
+    )
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [createPinia(), router, ElementPlus] },
+      attachTo: document.body,
+    })
+    await vi.waitFor(() => expect(wrapper.findAll('.ka-cat-header').length).toBe(2))
+    return wrapper
+  }
+
+  it('分类默认全展开 —— 全折叠的话 33 项评估一项都看不到', async () => {
+    const wrapper = await open()
+    expect(wrapper.findAll('.ka-list')).toHaveLength(2)
+    expect(wrapper.findAll('.ka-card')).toHaveLength(3)
+  })
+
+  it('标了 default_expanded 的条目连说明一起展开，其余折叠', async () => {
+    const wrapper = await open()
+    const cards = wrapper.findAll('.ka-card')
+    expect(cards[0].classes()).not.toContain('collapsed')
+    expect(cards[0].text()).toContain('说明一')
+    expect(cards[1].classes()).toContain('collapsed')
+    expect(cards[1].text()).not.toContain('说明二')
+  })
+
+  it('默认展开哪几项由后端目录决定，不写死在组件里', async () => {
+    // 组件禁止写死临床数据：改默认态应该只改后端目录，不改代码。
+    // 直接读组件源码断言 —— 否则这条测试测不到任何东西。
+    const src = readFileSync(resolve(__dirname, 'AiEmrFloat.vue'), 'utf-8')
+    for (const name of ['诊断预后分析', '专病风险评估', '院感风险监测']) {
+      expect(src, `组件里不该出现评估条目名「${name}」`).not.toContain(name)
+    }
+    expect(src).toContain('default_expanded')
+  })
+})

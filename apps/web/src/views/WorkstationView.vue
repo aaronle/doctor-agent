@@ -253,7 +253,72 @@ async function submitRecord() {
     )
     return
   }
-  ElMessage.success('病历已提交（写入本地库并留审计，未触达真实 HIS）')
+  submitting.value = true
+  try {
+    const result = await api.submitRecord(ws.patientId, recordFields(), [...ws.handledAlertIds])
+    ElMessage.success(`${result.message} · 第 ${result.version} 版`)
+    savedHint.value = `已提交 · 第 ${result.version} 版`
+  } catch (error) {
+    // 服务端门禁返回 409 时如实报出来，不要吞成一句「提交成功」
+    ElMessage.error(`提交失败：${(error as Error).message}`)
+  } finally {
+    submitting.value = false
+  }
+}
+
+/** 把十行表单摊成后端认识的七段 + 体征 */
+function recordFields(): Record<string, string> {
+  const v = vitals.value
+  return {
+    ...form.value,
+    vitals_text: [
+      v.height && `身高 ${v.height}cm`, v.weight && `体重 ${v.weight}kg`, v.bmi && `BMI ${v.bmi}`,
+      v.temp && `体温 ${v.temp}℃`, v.pulse && `脉搏 ${v.pulse}次/分`, v.breath && `呼吸 ${v.breath}次/分`,
+      (v.bpHigh || v.bpLow) && `血压 ${v.bpHigh}/${v.bpLow} mmHg`, v.hr && `心率 ${v.hr}次/分`,
+    ].filter(Boolean).join('，'),
+  }
+}
+
+/** 最近一次保存的提示。医生需要一眼看到「存没存住」。 */
+const savedHint = ref('')
+
+/**
+ * 暂存。不过红线门禁 —— 它的用途正是「还没弄完，先存着」。
+ */
+async function stashRecord() {
+  submitting.value = true
+  try {
+    const result = await api.stashRecord(ws.patientId, recordFields())
+    ElMessage.success(`${result.message} · 第 ${result.version} 版`)
+    savedHint.value = `已暂存 · 第 ${result.version} 版`
+  } catch (error) {
+    ElMessage.error(`暂存失败：${(error as Error).message}`)
+  } finally {
+    submitting.value = false
+  }
+}
+
+/**
+ * 恢复上次保存的病历。
+ *
+ * 没有这一步，医生刷新一次页面就得从头再写 —— 那不叫系统，叫演示。
+ * 已保存的内容优先于患者主档回填。
+ */
+async function restoreSavedRecord() {
+  if (!ws.patientId) return
+  try {
+    const saved = await api.savedRecord(ws.patientId)
+    const fields = saved.submitted?.fields ?? saved.latest?.fields
+    if (!fields) return
+    for (const key of Object.keys(form.value) as (keyof typeof form.value)[]) {
+      if (fields[key]) form.value[key] = fields[key]
+    }
+    savedHint.value = saved.submitted
+      ? `已提交 · 第 ${saved.submitted.version} 版`
+      : `上次暂存 · 第 ${saved.latest?.version} 版`
+  } catch {
+    // 读不到就按新病历处理，不打扰医生
+  }
 }
 
 function switchPatient(id: string) {
@@ -271,6 +336,8 @@ watch(
     if (typeof id === 'string' && id) {
       await ws.selectPatient(id)
       hydrate()
+      savedHint.value = ''
+      await restoreSavedRecord()
     }
   },
 )
@@ -283,6 +350,7 @@ onMounted(async () => {
   if (typeof id === 'string' && id) {
     await ws.selectPatient(id)
     hydrate()
+    await restoreSavedRecord()
   } else if (ws.queue.length) {
     // /outpatient 无患者时接诊队列第一位，与 V4.3 的 OutpatientHome 行为一致
     router.replace(`/outpatient/${ws.queue[0].id}`)
@@ -360,8 +428,9 @@ onMounted(async () => {
             <span class="pt-title">📋 门诊病历</span>
             <div class="pt-actions">
               <span class="shortcut-hint">AI 结果需确认后写入</span>
-              <el-button size="small">暂存</el-button>
-              <el-button type="primary" size="small" @click="submitRecord">提交病历</el-button>
+              <el-button size="small" :loading="submitting" @click="stashRecord">暂存</el-button>
+              <el-button type="primary" size="small" :loading="submitting" @click="submitRecord">提交病历</el-button>
+              <span v-if="savedHint" class="saved-hint">{{ savedHint }}</span>
             </div>
           </div>
 

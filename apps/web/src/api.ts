@@ -423,6 +423,24 @@ export const api = {
       provider: string
       degraded: boolean
     }>(`/api/emr/voice/init/${id}`),
+  /** 暂存病历。不过红线门禁 —— 暂存的用途就是「还没弄完，先存着」。 */
+  stashRecord: (patientId: string, fields: Record<string, string>) =>
+    post<{ ok: boolean; version: number; message: string }>('/api/emr/record/stash', {
+      patient_id: patientId, fields,
+    }),
+  /** 提交病历。服务端会再校验一次红色风险闭环，未闭环返回 409。 */
+  submitRecord: (patientId: string, fields: Record<string, string>, handledAlerts: string[]) =>
+    post<{ ok: boolean; version: number; message: string }>('/api/emr/record/submit', {
+      patient_id: patientId, fields, handled_alerts: handledAlerts,
+    }),
+  /** 读回最近一次暂存/提交的病历 —— 没有它，刷新就得从头再来。 */
+  savedRecord: (patientId: string) =>
+    get<{
+      patient_id: string
+      latest: { version: number; fields: Record<string, string>; provider: string; created_at: string } | null
+      submitted: { version: number; fields: Record<string, string> } | null
+    }>(`/api/emr/record/${patientId}`),
+
   /** 病历质控。四项指标由后端确定性规则算，不让模型给自己打分。 */
   recordQuality: (patientId: string, fields: Record<string, string>) =>
     post<RecordQuality>('/api/emr/record/quality', { patient_id: patientId, fields }),

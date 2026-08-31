@@ -146,3 +146,7 @@
 /* 对话框底部说明。写在这里而不是 app-overrides：它是本页新增的元素，
    V4.3 没有对应类名，不属于还原范围。 */
 .dialog-hint{float:left;font-size:11px;color:var(--gray-2);line-height:32px}
+
+/* 「已暂存 / 已提交 · 第 N 版」提示。医生需要一眼看到「存没存住」——
+   此前这个按钮只弹一句成功文案，实际什么都没写。 */
+.saved-hint{margin-left:8px;font-size:11px;color:#16a34a}

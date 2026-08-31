@@ -1000,6 +1000,139 @@
         }
       }
     },
+    "/api/emr/record/stash": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Stash Record",
+        "description": "暂存病历。\n\n暂存**不过红线门禁** —— 它的用途正是「还没弄完，先存着」，\n拿门禁拦住暂存，等于逼医生要么一次做完要么丢掉已写的内容。\n暂存不改患者主档，只落草稿。",
+        "operationId": "stash_record_api_emr_record_stash_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordSaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Stash Record Api Emr Record Stash Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/record/submit": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Submit Record",
+        "description": "提交病历：落库 + 留审计 + 写回患者主档。\n\n此前界面上这个按钮只弹一句「病历已提交（写入本地库并留审计）」，\n**实际什么都没写** —— 医生以为存下了，刷新就没了。伪造的成功文案\n是零容忍红线里最不该出现的一种，因为它让人对系统建立错误的信任。",
+        "operationId": "submit_record_api_emr_record_submit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordSaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Submit Record Api Emr Record Submit Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/record/{patient_id}": {
+      "get": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Get Record",
+        "description": "读回该患者最近一次暂存/提交的病历。\n\n没有这个接口，刷新页面医生就得从头再来一遍 —— 那不叫系统，叫演示。",
+        "operationId": "get_record_api_emr_record__patient_id__get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Record Api Emr Record  Patient Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/emr/diagnosis/write-back": {
       "post": {
         "tags": [
@@ -2043,6 +2176,31 @@
           "patient_id"
         ],
         "title": "RecordQualityIn"
+      },
+      "RecordSaveIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields"
+          },
+          "handled_alerts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Handled Alerts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "RecordSaveIn"
       },
       "ReferralIn": {
         "properties": {

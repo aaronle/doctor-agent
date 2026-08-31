@@ -99,7 +99,10 @@ const PAGES = [
   // 就是「结构看着有、其实整块没做」，只有逐页取样才能发现。
   ...[
     ['智慧诊疗', ['.condition-overview-card', '.coc-title', '.dd-card', '.record-card', '.rc-label', '.ka-cat-name', '.ka-card', '.rc-vital', '.rc-vk']],
-    ['预警评估', ['.risk-assess-block', '.risk-card', '.risk-card-header', '.risk-name', '.risk-summary']],
+    // .risk-dot / .risk-actions 是补上的：漏写就等于不检查 ——
+    // 色点当初只渲染了一个没有背景色的空 span，肉眼是「少了个图标」，
+    // 而 126→144 个元素的比对一路全绿，因为它俩根本不在清单里。
+    ['预警评估', ['.risk-assess-block', '.risk-card', '.risk-card-header', '.risk-dot', '.risk-name', '.risk-actions', '.risk-summary']],
     ['病历管理', ['.record-layout', '.record-main', '.record-node', '.node-title', '.node-content', '.record-qc-side', '.rc-side-card', '.rc-side-head', '.rc-side-title', '.rc-risk-row', '.rc-risk-text', '.rc-qc-row', '.rc-qc-name', '.rc-qc-pill', '.rc-side-more']],
     ['诊断管理', ['.suspected-list', '.suspected-item', '.susp-name', '.susp-conf', '.susp-icd', '.susp-desc', '.primary-mark-btn', '.diag-selection-actions']],
     ['医嘱管理', ['.treat-panel', '.treat-section-title', '.treat-card', '.treat-drug', '.treat-spec', '.treat-basis', '.exam-rec-order', '.ero-name']],
@@ -114,13 +117,21 @@ const PAGES = [
       await ensureAiFloat(page);
       await page.locator('.ttab').filter({ hasText: tab }).first().click();
       await page.waitForTimeout(700);
-      // 专项评估与就诊卡默认折叠，展开第一个才能取到内部元素
-      for (const sel of ['.ka-cat-header', '.visit-card']) {
-        const el = page.locator(sel).first();
-        if (await el.isVisible().catch(() => false)) {
-          await el.click();
-          await page.waitForTimeout(400);
-        }
+      // 就诊卡默认折叠，点开第一张才能取到内部元素
+      const visit = page.locator('.visit-card').first();
+      if (await visit.isVisible().catch(() => false)) {
+        await visit.click();
+        await page.waitForTimeout(400);
+      }
+      // 专项评估**默认就是展开的**（与原件一致）。这里要「确保展开」而不是
+      // 「点一下」—— 盲点会把已展开的第一个分类收起来，于是第一张可见卡片
+      // 变成另一个分类的，比出来是背景色不一致，其实是取样取错了对象。
+      // 注意先判断分类头存在：它只在智慧诊疗页有，别的标签页上点它会一直等到超时
+      const cat = page.locator('.ka-cat-header').first();
+      const listVisible = await page.locator('.ka-list').first().isVisible().catch(() => false);
+      if (!listVisible && (await cat.isVisible().catch(() => false))) {
+        await cat.click();
+        await page.waitForTimeout(400);
       }
     },
     selectors,

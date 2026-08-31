@@ -318,6 +318,24 @@ async function runCategory(items: TodoItem[]) {
   }
 }
 
+/**
+ * 风险等级色点。原件用**内联背景**上色（`style="background: rgb(230,25,26)"`），
+ * `.risk-dot` 的 CSS 只有尺寸和圆角、没有颜色 —— 只渲染一个空 span，
+ * 点就是透明的，等于看不见。
+ */
+const RISK_DOT_COLOR: Record<string, string> = {
+  danger: '#e6191a',
+  warning: '#e6a23c',
+  success: '#52c41a',
+  info: '#909399',
+}
+
+/** 把这条风险的完整依据与建议送进 Copilot 展开讲 */
+function explainRisk(risk: RiskItem) {
+  activeTab.value = '智慧诊疗'
+  void sendChat(`请就「${risk.name}」这条风险展开解读：依据是${risk.evidence || risk.summary}，当前建议是${risk.suggestion || '（无）'}。`)
+}
+
 const candidateNames = computed(() => (summary.value?.suspected_diagnoses ?? []).map((d) => d.name))
 
 /**
@@ -813,7 +831,16 @@ function toggleVisit(id: string) {
 
 // ---------------------------------------------------------------- 专项评估目录
 
-const catalog = ref<{ name: string; count: number; items: { name: string; level: string; desc: string }[] }[]>([])
+const catalog = ref<{ name: string; count: number; items: { name: string; level: string; desc: string; default_expanded?: boolean }[] }[]>([])
+
+/**
+ * 专项评估的默认展开态，与 V4.3 一致：**五个分类全部展开**，
+ * 其中目录里标了 `default_expanded` 的条目连说明一起展开。
+ *
+ * 早先做成了全折叠 —— 界面上只剩五个标题，33 项评估一项都看不到。
+ * 还原度比对没抓到，因为它的 prepare 会先点开分类再比，
+ * 测的是「展开后长得对不对」，测不到「默认就该是展开的」。
+ */
 const expandedCategories = ref<Set<string>>(new Set())
 
 function toggleCategory(name: string) {
@@ -1200,6 +1227,11 @@ onMounted(async () => {
   document.addEventListener('click', closePlusMenu)
   try {
     catalog.value = (await api.assessmentCatalog()).categories
+    // 默认态跟着数据走，不在组件里写死条目名（组件禁止写死临床数据）
+    expandedCategories.value = new Set(catalog.value.map((c) => c.name))
+    expandedSkills.value = new Set(
+      catalog.value.flatMap((c) => c.items.filter((i) => i.default_expanded).map((i) => i.name)),
+    )
   } catch {
     // 目录加载失败不影响主流程，界面显示空目录即可
   }
@@ -1583,12 +1615,14 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               <div class="tab-section-title">专项评估</div>
               <div v-for="risk in summary?.risk_assessments ?? []" :key="risk.id" class="risk-card">
                 <div class="risk-card-header">
-                  <span class="risk-dot" />
+                  <span class="risk-dot" :style="{ background: RISK_DOT_COLOR[risk.color] ?? RISK_DOT_COLOR.info }" />
                   <span class="risk-name">{{ risk.name }}</span>
                   <el-tag size="small" round effect="light" :type="risk.color === 'danger' ? 'danger' : risk.color === 'warning' ? 'warning' : 'success'">
                     {{ risk.level }}
                   </el-tag>
                   <div class="risk-actions">
+                    <el-button type="primary" size="small" link @click="explainRisk(risk)">大模型解读</el-button>
+                    <el-button size="small" link title="在 Copilot 中放大展示" @click="explainRisk(risk)">↗</el-button>
                     <el-button v-if="risk.level === '高风险'" type="primary" size="small" link @click="handleAlert(risk)">
                       {{ ws.openRedAlerts.some((a) => a.id === risk.id) ? '处置' : '✓ 已处置' }}
                     </el-button>
