@@ -49,6 +49,9 @@ const PROPS = ['fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor
  */
 const PROP_EXEMPTIONS = {
   '.ra-card-name': ['color'],
+  // 同上：色点的背景绑在 risk.color 上，也是模型判的等级。
+  // 映射由 AiEmrFloat.spec.ts「色点按等级上色」守着。
+  '.risk-dot': ['backgroundColor'],
 };
 
 // 每个页面挑一组有代表性的 class 做比对
@@ -350,6 +353,16 @@ async function collect(page, selectors) {
   }, [selectors, PROPS]);
 }
 
+// **重建版一律不用 networkidle 等页面。**
+//
+// 解锁过的就诊一进场就会拉 report-summary，Sonnet 5 下要跑一分钟以上 ——
+// 网络永远闲不下来，30 秒必然超时。networkidle 的前提是「加载完请求就停」，
+// 这个页面根本不满足。
+//
+// 改成等 DOM 就绪 + 等真正要用的元素出现：判据从「网络安静了」换成
+// 「我要比的东西在场了」，那才是这一步真正等的东西。
+const APP_READY = { waitUntil: 'domcontentloaded' };
+
 const refPage = await browser.newPage({ viewport: VIEWPORT });
 await refPage.goto(`http://127.0.0.1:${REF_PORT}/#/login`, { waitUntil: 'networkidle' });
 await refPage.getByRole('button', { name: '进入门诊工作站' }).click();
@@ -358,7 +371,8 @@ await refPage.waitForTimeout(1500);
 // 重建版已于 2026-09-01 移除登录页（一期无 SSO，那道门形同虚设），直接进候诊列表。
 // 原件那边还得走登录 —— 两边入口不同，但落点都是候诊列表，比对的起点是一致的。
 const appPage = await browser.newPage({ viewport: VIEWPORT });
-await appPage.goto(`${APP_URL}/outpatient/list`, { waitUntil: 'networkidle' });
+await appPage.goto(`${APP_URL}/outpatient/list`, APP_READY);
+await appPage.locator('.patient-card').first().waitFor({ state: 'visible', timeout: 30000 });
 await appPage.waitForTimeout(1500);
 // 两位取样患者都推进到「问诊已完成」，否则受门禁的四页取不到元素
 for (const pid of ['P001', 'P006']) await ensureAnalysisUnlocked(appPage, APP_URL, pid);
@@ -370,7 +384,10 @@ let missing = 0;
 for (const target of PAGES) {
   await refPage.evaluate((h) => { location.hash = h.slice(1); }, target.hash);
   await refPage.waitForTimeout(1800);
-  await appPage.goto(`${APP_URL}${target.path}`, { waitUntil: 'networkidle' });
+  await appPage.goto(`${APP_URL}${target.path}`, APP_READY);
+  // 等页面骨架，不等网络 —— 分析是后台慢慢回来的，不该卡住导航
+  await appPage.locator(target.path.includes('/list') ? '.his-list-page' : '.workstation-page')
+    .first().waitFor({ state: 'visible', timeout: 30000 });
   // 工作站首屏要等四个岗位跑完，给足时间
   await appPage.waitForTimeout(target.path.includes('/outpatient/P') ? 25000 : 2000);
 

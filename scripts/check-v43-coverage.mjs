@@ -69,7 +69,10 @@ function collectClasses(root) {
  * 所以这里按「有登录按钮就点，没有就算了」处理，两边共用一个入口函数。
  */
 async function enter(page, url) {
-  await page.goto(url, { waitUntil: 'networkidle' });
+  // 不用 networkidle：解锁过的就诊进场即拉分析，Sonnet 5 下网络一分钟不会闲下来。
+  // 判据换成「要用的元素在场了」。
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1500);
   const btn = page.getByRole('button', { name: '进入门诊工作站' });
   if (await btn.isVisible().catch(() => false)) {
     await btn.click();
@@ -171,7 +174,8 @@ const refClasses = await classesPerTab(refPage, async () => {
 });
 // 重建版首屏要等真实模型返回，给足时间
 const appClasses = await classesPerTab(appPage, async () => {
-  await appPage.goto(`${APP_URL}/outpatient/P001`, { waitUntil: 'networkidle' });
+  await appPage.goto(`${APP_URL}/outpatient/P001`, { waitUntil: 'domcontentloaded' });
+  await appPage.locator('.workstation-page').first().waitFor({ state: 'visible', timeout: 30000 });
   await appPage.waitForTimeout(20000);
 });
 

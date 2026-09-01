@@ -33,6 +33,20 @@ MAX_ATTEMPTS = len(BACKOFF_MS) + 1
 # 够装下最长的一份七段病历；再大只会拖慢首屏而没有实际收益
 MAX_TOKENS = 4096
 
+# 已废弃 temperature 的模型：发过去会 400。
+#
+# 用**显式清单**而不是「试一次看报不报错」：后者要么在首屏多花一次往返，
+# 要么把结果缓存起来 —— 那等于把网关的行为变成隐式状态，出问题时更难查。
+# 清单短、变化慢，加一行的成本远低于一次线上降级。
+#
+# 代价要说清楚：这些模型上我们**无法固定温度**，可复现性依赖模型自身。
+# 病历复核时若发现两次输出不一致，先想到这一条。
+MODELS_WITHOUT_TEMPERATURE = ("claude-sonnet-5", "claude-opus-5", "claude-fable-5")
+
+
+def _accepts_temperature(model: str) -> bool:
+    return not any(model.startswith(m) for m in MODELS_WITHOUT_TEMPERATURE)
+
 
 class LlmError(RuntimeError):
     """
@@ -95,11 +109,16 @@ class LlmClient:
             body["response_format"] = {"type": "json_object"}
         if stream:
             body["stream"] = True
-        # 结构化临床输出必须可复现：同一份上下文两次生成的病历应当一致，否则无法复核。
-        # **温度固定为 0，与用哪个模型无关。** 早先这里写的是 `if "haiku" in model`，
-        # 把模型名当成了判据 —— 2026-09-02 换到 Sonnet 后这个分支再也不触发，
-        # 温度悄悄变成网关默认值。判据应该是「这是不是临床结构化输出」，而不是模型叫什么。
-        body["temperature"] = 0
+        # 结构化临床输出要可复现：同一份上下文两次生成的病历应当一致，否则无法复核。
+        #
+        # 但**不是所有模型都收这个参数**。claude-sonnet-5 已废弃 temperature，
+        # 带上直接 400：`temperature is deprecated for this model`。
+        # 2026-09-02 换模型时就是栽在这里 —— 三个岗位同时降级。
+        #
+        # 早先写的是 `if "haiku" in model`，那是把模型名当判据、纯属巧合地成立。
+        # 现在的判据是**这个模型收不收 temperature**，那是它的真实属性。
+        if _accepts_temperature(model):
+            body["temperature"] = 0
         return body
 
     async def complete_json(
@@ -130,6 +149,20 @@ class LlmClient:
                 if response.status_code in RETRYABLE_STATUS:
                     last_error = f"HTTP {response.status_code}"
                     raise _Retry()
+                if response.status_code >= 400:
+                    # **不在白名单里的 4xx 直接失败，不重试。**
+                    #
+                    # 早先这里只有 raise_for_status()，抛出的 HTTPStatusError 落进下面
+                    # 那个通用 `except httpx.HTTPError`，于是 400 照样退避重试四次 ——
+                    # 上面白名单写的「4xx 参数错误重试只会重复失败」被下面的处理器架空了。
+                    # 2026-09-02 换模型时三个岗位各白等 8 秒才降级，就是这个原因。
+                    #
+                    # 而且要**带上网关的原话**。只报一句 HTTPStatusError 什么线索都没有；
+                    # 网关其实明说了 `temperature is deprecated for this model`。
+                    detail = response.text[:200].replace("\n", " ")
+                    last_error = f"HTTP {response.status_code}"
+                    self._log(agent_key, target_model, attempt, len(payload), last_error, started)
+                    raise LlmError(f"模型通道拒绝请求（HTTP {response.status_code}，不重试）：{detail}")
                 response.raise_for_status()
                 data = response.json()
             except _Retry:

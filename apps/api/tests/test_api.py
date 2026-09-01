@@ -1951,21 +1951,77 @@ def test_objective_timeline_includes_this_visit_actions(client):
     assert len(after) > before
 
 
-def test_clinical_output_temperature_is_pinned_regardless_of_model():
+def test_temperature_is_sent_only_to_models_that_accept_it():
     """
-    结构化临床输出必须可复现：同一份上下文两次生成的病历应当一致，否则无法复核。
+    结构化临床输出要可复现，所以能固定温度的一律固定为 0。
 
-    早先这里写的是 `if "haiku" in model` —— 把模型名当成了判据。2026-09-02 换到
-    Sonnet 后那个分支再也不触发，温度悄悄变成网关默认值。判据应该是
-    「这是不是临床结构化输出」，而不是模型叫什么。
+    但 claude-sonnet-5 已废弃 temperature，带上直接 400
+    （`temperature is deprecated for this model`）—— 2026-09-02 换模型时
+    三个岗位就是这么同时降级的。
+
+    判据是**这个模型收不收 temperature**（它的真实属性），
+    不是模型名里有没有 "haiku"（那是巧合）。
     """
     from app.llm import ChatMessage, LlmClient
 
     client = LlmClient()
     msgs = [ChatMessage(role="user", content="x")]
-    for model in ("claude-sonnet-5", "claude-haiku-4-5-20251001", "some-future-model"):
+
+    for model in ("claude-haiku-4-5-20251001", "claude-sonnet-4-6", "gpt-4o"):
         body = client._body(msgs, model=model, json_mode=True, stream=False)
-        assert body.get("temperature") == 0, f"{model} 的温度没有固定为 0"
+        assert body.get("temperature") == 0, f"{model} 应当固定温度"
+
+    for model in ("claude-sonnet-5", "claude-opus-5", "claude-fable-5"):
+        body = client._body(msgs, model=model, json_mode=True, stream=False)
+        assert "temperature" not in body, f"{model} 不收 temperature，发过去会 400"
+
+
+def test_non_retryable_4xx_fails_fast_with_the_gateway_message(monkeypatch):
+    """
+    不在白名单里的 4xx 不重试，且要带上网关原话。
+
+    早先 raise_for_status() 抛的 HTTPStatusError 落进通用 except httpx.HTTPError，
+    于是 400 照样退避重试四次 —— 白名单注释写的「4xx 参数错误重试只会重复失败」
+    被下面的处理器架空了。换模型时三个岗位各白等 8 秒才降级。
+
+    错误消息里必须有网关原话：只报一句 HTTPStatusError 什么线索都没有。
+    """
+    import asyncio
+
+    import httpx
+    import pytest
+
+    from app import llm as llm_mod
+    from app.llm import ChatMessage, LlmClient, LlmError
+
+    calls = {"n": 0}
+    bad_body = '{"error":{"message":"`temperature` is deprecated for this model."}}'
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(400, text=bad_body)
+
+    real_client = httpx.AsyncClient
+
+    def fake_client(*_args, **kwargs):
+        kwargs.pop("timeout", None)
+        return real_client(transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr(llm_mod.httpx, "AsyncClient", fake_client)
+
+    client = LlmClient()
+    if not client.configured:
+        monkeypatch.setattr(client.settings, "api_key", "test-key", raising=False)
+        monkeypatch.setattr(type(client), "configured", property(lambda _self: True))
+
+    async def run() -> str:
+        with pytest.raises(LlmError) as exc:
+            await client.complete_json([ChatMessage(role="user", content="x")], model="claude-sonnet-5")
+        return str(exc.value)
+
+    message = asyncio.run(run())
+    assert calls["n"] == 1, f"400 不该重试，实际请求了 {calls['n']} 次"
+    assert "deprecated" in message, f"错误消息要带网关原话，实际：{message}"
 
 
 def test_default_models_are_sonnet5():
