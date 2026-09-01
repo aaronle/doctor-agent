@@ -22,6 +22,16 @@ const summary = computed(() => ws.summary)
 const patient = computed(() => ws.patient)
 
 /**
+ * 与桌面端同一套门禁：这四块是模型基于本次问诊推断的，问诊前不给。
+ * 其余四块来自 HIS 已有数据与纯代码硬规则，照常显示。
+ *
+ * 移动端一度漏了这一层 —— 分析页八块全是 0、没有任何解释，
+ * 医生只会以为「跑失败了」。
+ */
+const GATED = new Set(['病情概要', '鉴别诊断', '共病管理', '病历质控'])
+const locked = (key: string) => !ws.analysisUnlocked && GATED.has(key)
+
+/**
  * 默认只展开病情概要。
  *
  * 一开始默认展开两块，实测第一屏被概要和鉴别诊断吃满 —— 概要的问题清单有
@@ -61,7 +71,17 @@ watch(
 
 const conclusion = computed(() => summary.value?.overall_conclusion ?? {})
 const diagnoses = computed(() => summary.value?.suspected_diagnoses ?? [])
-const risks = computed(() => summary.value?.risk_assessments ?? [])
+/** 预警评估 = 硬规则红线 + 模型风险。硬规则一进来就在，不等问诊。 */
+const risks = computed(() => {
+  const seen = new Set<string>()
+  const out: typeof ws.hardAlerts = []
+  for (const r of [...ws.hardAlerts, ...(summary.value?.risk_assessments ?? [])]) {
+    if (!r?.id || seen.has(r.id)) continue
+    seen.add(r.id)
+    out.push(r)
+  }
+  return out
+})
 const comorbidity = computed(() => summary.value?.comorbidity)
 /** 处置建议的条数 = 推荐复查 + 推荐用药。AI 处置单已下线，不再计入。 */
 const adviceCount = computed(
@@ -72,7 +92,7 @@ const labs = computed<LabResult[]>(() => patient.value?.lab_results ?? [])
 
 /** 阳性结果：异常检查在前、异常检验在后，与桌面端同一套判定 */
 const positives = computed(() => {
-  const exams = (summary.value?.examinations ?? [])
+  const exams = ws.examinations
     .filter((e) => {
       const row = e as Record<string, unknown>
       return row.abnormal === true || String(row.conclusion ?? '').includes('异常')
@@ -140,6 +160,10 @@ function riskTone(level = '') {
         <span class="m-chev">{{ open.has('病情概要') ? '▾' : '▸' }}</span>
       </button>
       <div v-if="open.has('病情概要')" class="m-sec-body">
+        <p v-if="locked('病情概要')" class="m-row m-row-sub">
+          🔒 模型基于本次问诊推断，问诊后才生成 —— 问诊前给出结论会让医生先看到答案再去找证据。
+        </p>
+        <template v-else>
         <p v-if="conclusion.summary" class="m-row">{{ conclusion.summary }}</p>
         <!-- 矛盾信息并列显示，不合并成一句 —— 合并等于替医生做了判断 -->
         <p v-for="item in conclusion.conflicts ?? []" :key="item" class="m-row m-row-strong">⚠ {{ item }}</p>
@@ -161,6 +185,7 @@ function riskTone(level = '') {
         </template>
         <p v-if="!conclusion.summary && !ws.loadingSummary" class="m-row m-row-sub">暂无概要</p>
         <p v-if="ws.loadingSummary" class="m-row m-row-sub">智能体分析中…</p>
+        </template>
       </div>
     </section>
 
@@ -173,6 +198,10 @@ function riskTone(level = '') {
         <span class="m-chev">{{ open.has('鉴别诊断') ? '▾' : '▸' }}</span>
       </button>
       <div v-if="open.has('鉴别诊断')" class="m-sec-body">
+        <p v-if="locked('鉴别诊断')" class="m-row m-row-sub">
+          🔒 模型基于本次问诊推断，问诊后才生成 —— 问诊前给出结论会让医生先看到答案再去找证据。
+        </p>
+        <template v-else>
         <div v-for="(item, i) in diagnoses" :key="item.name" class="m-item">
           <div class="m-row m-row-strong">{{ item.rank_label ?? `${i + 1}` }} {{ item.name }}</div>
           <!-- ICD 与置信度另起一行：跟诊断名挤一行会把长诊断名压折 -->
@@ -187,6 +216,7 @@ function riskTone(level = '') {
         <p v-if="!diagnoses.length" class="m-row m-row-sub">
           {{ ws.loadingSummary ? '智能体分析中…' : '暂无疑似诊断' }}
         </p>
+        </template>
       </div>
     </section>
 
@@ -225,6 +255,10 @@ function riskTone(level = '') {
         <span class="m-chev">{{ open.has('共病管理') ? '▾' : '▸' }}</span>
       </button>
       <div v-if="open.has('共病管理')" class="m-sec-body">
+        <p v-if="locked('共病管理')" class="m-row m-row-sub">
+          🔒 模型基于本次问诊推断，问诊后才生成 —— 问诊前给出结论会让医生先看到答案再去找证据。
+        </p>
+        <template v-else>
         <p v-if="comorbidity?.summary" class="m-row">{{ comorbidity.summary }}</p>
         <div v-for="item in comorbidity?.conditions ?? []" :key="item.name" class="m-item">
           <div class="m-row m-row-strong">{{ item.name }}<span v-if="item.icd" class="m-row-sub"> · {{ item.icd }}</span></div>
@@ -236,6 +270,7 @@ function riskTone(level = '') {
           🍽 {{ comorbidity.nutrition.message }}
         </p>
         <p v-if="!comorbidity?.detected" class="m-row m-row-sub">未检出需要处理的共病</p>
+        </template>
       </div>
     </section>
 
@@ -307,6 +342,10 @@ function riskTone(level = '') {
         <span class="m-chev">{{ open.has('病历质控') ? '▾' : '▸' }}</span>
       </button>
       <div v-if="open.has('病历质控')" class="m-sec-body">
+        <p v-if="locked('病历质控')" class="m-row m-row-sub">
+          🔒 模型基于本次问诊推断，问诊后才生成 —— 问诊前给出结论会让医生先看到答案再去找证据。
+        </p>
+        <template v-else>
         <div v-for="metric in quality?.metrics ?? []" :key="metric.name" class="m-row">
           {{ metric.name }} <span class="m-row-strong">{{ metric.value }}</span>
           <span class="m-row-sub"> · {{ metric.basis }}</span>
@@ -319,6 +358,7 @@ function riskTone(level = '') {
         </div>
         <p v-if="!quality" class="m-row m-row-sub">质控计算中…</p>
         <p v-else-if="!quality.gaps?.length" class="m-row m-row-sub">未检出遗漏项</p>
+        </template>
       </div>
     </section>
   </div>

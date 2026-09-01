@@ -110,7 +110,7 @@ type ExamRow = { id: string; name: string; type: string; date: string; conclusio
 
 /** 与桌面端同源：已做的检查来自 examinations，本次新开的来自医嘱表 */
 const examRows = computed<ExamRow[]>(() => {
-  const done = (summary.value?.examinations ?? []).map((e, i) => {
+  const done = ws.examinations.map((e, i) => {
     const row = e as Record<string, string>
     return {
       id: String(row.id ?? `exam-${i}`),
@@ -128,7 +128,7 @@ const examRows = computed<ExamRow[]>(() => {
 
 const labs = computed<LabResult[]>(() => patient.value?.lab_results ?? [])
 
-const timeline = computed(() => summary.value?.timeline ?? [])
+const timeline = computed(() => ws.timeline)
 
 type VisitRecord = { visit_date?: string; visit_type?: string; dept?: string; doctor?: string; diagnosis?: string; summary?: string }
 const visits = computed<VisitRecord[]>(() => (patient.value?.visit_history ?? []) as VisitRecord[])

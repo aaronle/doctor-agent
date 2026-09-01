@@ -695,6 +695,51 @@
         }
       }
     },
+    "/api/emr/objective/{patient_id}": {
+      "get": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Objective Data",
+        "description": "这一场就诊的**客观资料**。确定性、毫秒级、不调模型。\n\n**为什么要单独开**：改成问诊门禁之后发现，检查记录与时间轴原本是搭\n`report-summary` 一起回来的 —— 而那个请求现在要等问诊。结果是规格里写着\n「客观数据一进来就给」，实际上时间轴、检查子页、健康档案概览全是空的。\n数据本身跟模型无关，只是当初图省事挂在了同一个出口上。\n\n时间轴 = 种子历史 + 本次就诊的真实动作（审计流），两者都不依赖模型。",
+        "operationId": "objective_data_api_emr_objective__patient_id__get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Objective Data Api Emr Objective  Patient Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/emr/red-alerts/{patient_id}": {
       "get": {
         "tags": [

@@ -60,6 +60,35 @@ export const useWorkstation = defineStore('workstation', () => {
    */
   const hardAlerts = ref<RiskItem[]>([])
 
+  /**
+   * 客观资料：检查记录 + 时间轴。
+   *
+   * 单拉一份而不是等 summary —— 这两样是确定性的，跟模型无关，只是当初
+   * 图省事挂在了同一个出口上。不拆开的话，「客观数据一进来就给」是句空话：
+   * 锁着时时间轴、检查子页、健康档案概览全是空的。
+   */
+  const objective = ref<{ examinations: Record<string, unknown>[]; timeline: ReportSummary['timeline'] }>({
+    examinations: [],
+    timeline: [],
+  })
+
+  /** 检查记录：优先用分析里的（可能更全），没有就用单拉的那份 */
+  const examinations = computed(() => summary.value?.examinations ?? objective.value.examinations)
+  const timeline = computed(() => summary.value?.timeline ?? objective.value.timeline)
+
+  async function loadObjective() {
+    if (!patientId.value) return
+    try {
+      const result = await api.objective(patientId.value)
+      objective.value = {
+        examinations: Array.isArray(result.examinations) ? result.examinations : [],
+        timeline: Array.isArray(result.timeline) ? result.timeline : [],
+      }
+    } catch {
+      objective.value = { examinations: [], timeline: [] }
+    }
+  }
+
   async function loadVisitState() {
     if (!patientId.value) return
     try {
@@ -156,6 +185,7 @@ export const useWorkstation = defineStore('workstation', () => {
 
     visit.value = null
     hardAlerts.value = []
+    objective.value = { examinations: [], timeline: [] }
 
     loadingPatient.value = true
     try {
@@ -166,7 +196,7 @@ export const useWorkstation = defineStore('workstation', () => {
 
     // 一进来只拉「不依赖问诊」的东西：硬规则红线 + 这场就诊的状态。
     // **刻意不调 report-summary** —— 那四个岗位的结论要等问诊，见 visit 的注释。
-    await Promise.all([loadHardAlerts(), loadVisitState()])
+    await Promise.all([loadHardAlerts(), loadVisitState(), loadObjective()])
 
     // 已经解锁过的（问诊做完了、或之前跳过了），刷新后要把分析拿回来，
     // 否则医生问完一轮刷新一下，八页又锁回去了。
@@ -217,6 +247,10 @@ export const useWorkstation = defineStore('workstation', () => {
     analysisUnlocked,
     interviewIncluded,
     hardAlerts,
+    objective,
+    examinations,
+    timeline,
+    loadObjective,
     loadVisitState,
     loadHardAlerts,
     unlockAndAnalyse,

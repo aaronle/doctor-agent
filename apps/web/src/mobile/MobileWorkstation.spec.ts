@@ -4,9 +4,10 @@ import ElementPlus from 'element-plus'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRouter, createWebHistory } from 'vue-router'
 
+import MobileAnalysis from './MobileAnalysis.vue'
 import MobileWorkstation from './MobileWorkstation.vue'
 import WorkstationView from '../views/WorkstationView.vue'
-import { PATIENT, SUMMARY, stubFetch, stubMatchMedia } from './testFixtures'
+import { LOCKED_VISIT, PATIENT, SUMMARY, UNLOCKED_VISIT, stubFetch, stubMatchMedia } from './testFixtures'
 import { useWorkstation } from '../stores/workstation'
 
 const router = createRouter({
@@ -28,6 +29,8 @@ async function render() {
   ws.patient = PATIENT as never
   ws.summary = SUMMARY as never
   ws.queue = [{ id: 'P001', name: '王某某' }, { id: 'P002', name: '张某' }] as never
+  // 多数用例测的是解锁后的呈现；锁定态另有专门的 describe
+  ws.visit = UNLOCKED_VISIT as never
   await wrapper.vm.$nextTick()
   return wrapper
 }
@@ -248,5 +251,99 @@ describe('视口分流', () => {
 
     expect(wrapper.find('.workstation-page').exists()).toBe(true)
     expect(wrapper.find('.m-page').exists()).toBe(false)
+  })
+})
+
+describe('移动端问诊门禁', () => {
+  async function renderLocked() {
+    stubMatchMedia(true)
+    stubFetch({ 'visit-state': LOCKED_VISIT })
+    await router.push('/outpatient/P001')
+    const pinia = createPinia()
+    const wrapper = mount(MobileWorkstation, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    ws.patientId = 'P001'
+    ws.patient = PATIENT as never
+    ws.visit = LOCKED_VISIT as never
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('未解锁时对话页不是空白 —— 给一张说明卡和两条出路', async () => {
+    // 移动端一度漏了整个门禁：0 张卡、一片空白，医生只会以为跑失败了
+    const wrapper = await renderLocked()
+    const card = wrapper.findAll('.m-card').find((c) => c.text().includes('先问诊'))
+    expect(card, '锁定时必须有开场说明卡').toBeTruthy()
+    expect(card!.text()).toContain('锚定')
+
+    const actions = card!.findAll('.m-cbtn').map((b) => b.text())
+    expect(actions.some((a) => a.includes('开始语音问诊'))).toBe(true)
+    expect(actions.some((a) => a.includes('跳过问诊'))).toBe(true)
+  })
+
+  it('说明卡指明「记录」页现在就能看 —— 客观数据不受门禁', async () => {
+    const wrapper = await renderLocked()
+    const card = wrapper.findAll('.m-card').find((c) => c.text().includes('先问诊'))!
+    expect(card.text()).toContain('记录')
+  })
+
+  it('跳过解锁后，对话页如实标「未含问诊」', async () => {
+    stubMatchMedia(true)
+    stubFetch()
+    const pinia = createPinia()
+    const wrapper = mount(MobileWorkstation, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    ws.patientId = 'P001'
+    ws.patient = PATIENT as never
+    ws.summary = SUMMARY as never
+    ws.visit = { ...UNLOCKED_VISIT, interview_done: false, unlocked_by: 'skipped' } as never
+    await wrapper.vm.$nextTick()
+
+    const card = wrapper.findAll('.m-card').find((c) => c.text().includes('未含问诊'))
+    expect(card, '跳过路径必须如实标，否则医生以为这份分析听过患者说话').toBeTruthy()
+  })
+
+  it('分析页受门禁的四块给出原因，不是干放一个 0', async () => {
+    stubMatchMedia(true)
+    stubFetch({ 'visit-state': LOCKED_VISIT })
+    const pinia = createPinia()
+    const wrapper = mount(MobileAnalysis, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    ws.patientId = 'P001'
+    ws.patient = PATIENT as never
+    ws.visit = LOCKED_VISIT as never
+    await wrapper.vm.$nextTick()
+
+    const section = wrapper.find('[data-sec="病情概要"]')
+    expect(section.find('.m-sec-body').text()).toContain('问诊后才生成')
+  })
+
+  it('分析页不受门禁的那几块照常显示', async () => {
+    stubMatchMedia(true)
+    stubFetch({ 'visit-state': LOCKED_VISIT })
+    const pinia = createPinia()
+    const wrapper = mount(MobileAnalysis, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    ws.patientId = 'P001'
+    ws.patient = PATIENT as never
+    ws.visit = LOCKED_VISIT as never
+    ws.objective = { examinations: SUMMARY.examinations, timeline: SUMMARY.timeline } as never
+    await wrapper.vm.$nextTick()
+
+    const section = wrapper.find('[data-sec="阳性结果"]')
+    await section.find('.m-sec-head').trigger('click')
+    expect(wrapper.find('[data-sec="阳性结果"]').text()).toContain('双眼底照相')
   })
 })

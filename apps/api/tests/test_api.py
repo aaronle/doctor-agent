@@ -1923,3 +1923,29 @@ def test_stash_is_not_gated_by_analysis(client):
         "patient_id": "P007", "fields": {"chief_complaint": "先记一句"},
     })
     assert resp.status_code == 200
+
+
+def test_objective_data_needs_no_model_and_no_interview(client):
+    """
+    检查记录与时间轴是确定性的，不该跟模型推断绑在一起。
+
+    改成问诊门禁后才发现：它们原本搭 report-summary 一起回来，而那个请求
+    现在要等问诊 —— 于是规格里写着「客观数据一进来就给」，实际上时间轴、
+    检查子页、健康档案概览全是空的。
+    """
+    body = client.get("/api/emr/objective/P001").json()
+    assert body["patient_id"] == "P001"
+    assert body["examinations"], "P001 有既往检查记录，不该为空"
+    assert body["timeline"], "时间轴至少有种子历史"
+    # 未解锁也照样给
+    assert client.get("/api/emr/visit-state/P001").json()["analysis_unlocked"] in (True, False)
+
+
+def test_objective_timeline_includes_this_visit_actions(client):
+    """时间轴要含本次就诊的真实动作，不只是种子历史。"""
+    before = len(client.get("/api/emr/objective/P006").json()["timeline"])
+    client.post("/api/emr/alerts/handle", json={
+        "patient_id": "P006", "alert_id": "t1", "alert_name": "测试红线",
+    })
+    after = client.get("/api/emr/objective/P006").json()["timeline"]
+    assert len(after) > before

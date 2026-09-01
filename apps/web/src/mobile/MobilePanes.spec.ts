@@ -9,7 +9,7 @@ import MobileAnalysis from './MobileAnalysis.vue'
 import MobileOutpatientList from './MobileOutpatientList.vue'
 import MobilePatientManage from './MobilePatientManage.vue'
 import MobileRecords from './MobileRecords.vue'
-import { PATIENT, SUMMARY, stubFetch, stubMatchMedia } from './testFixtures'
+import { PATIENT, SUMMARY, UNLOCKED_VISIT, stubFetch, stubMatchMedia } from './testFixtures'
 import { useWorkstation } from '../stores/workstation'
 
 const router = createRouter({
@@ -30,6 +30,9 @@ function mountPane(component: Component, props: Record<string, unknown> = {}): V
   ws.patientId = 'P001'
   ws.patient = PATIENT as never
   ws.summary = SUMMARY as never
+  // 多数用例测的是解锁后的呈现；锁定态另有专门的 describe
+  ws.visit = UNLOCKED_VISIT as never
+  ws.objective = { examinations: SUMMARY.examinations, timeline: SUMMARY.timeline } as never
   return wrapper
 }
 

@@ -94,6 +94,18 @@ export const RECORD_QUALITY = {
   gaps: [{ text: '未记录个人史', level: '一般', status: 'open', field: '个人史', field_key: 'personal_history', issue: '缺失', type: 'warning' as const }],
 }
 
+/** 已解锁的就诊。改成问诊门禁之后，多数呈现类用例的前置就是「已解锁」。 */
+export const UNLOCKED_VISIT = {
+  patient_id: 'P001', interview_done: true, analysis_unlocked: true,
+  unlocked_by: 'interview', unlocked_at: '2026-09-01T09:00:00Z',
+}
+
+/** 未解锁的就诊。用于锁定态用例。 */
+export const LOCKED_VISIT = {
+  patient_id: 'P001', interview_done: false, analysis_unlocked: false,
+  unlocked_by: '', unlocked_at: '',
+}
+
 /** 把窗口宽度伪装成手机。缺这一步，移动端分支根本不会渲染。 */
 export function stubMatchMedia(isMobile: boolean) {
   vi.stubGlobal(
@@ -122,6 +134,9 @@ export function stubFetch(overrides: Record<string, unknown> = {}) {
     if (u.includes('/api/his/patients/manage')) return json({ ok: true, patients: [], total: 0, reminded_count: 0 })
     if (u.includes('/api/his/patients')) return json([PATIENT])
     if (u.includes('/api/his/patient/')) return json(PATIENT)
+    if (u.includes('visit-state')) return json(UNLOCKED_VISIT)
+    if (u.includes('red-alerts')) return json({ patient_id: 'P001', alerts: [], handled_alerts: [], open_count: 0 })
+    if (u.includes('/api/emr/objective/')) return json({ patient_id: 'P001', examinations: SUMMARY.examinations, timeline: SUMMARY.timeline })
     if (u.includes('report-summary')) return json(SUMMARY)
     if (u.includes('assessment-catalog')) return json(ASSESSMENT_CATALOG)
     if (u.includes('record/quality')) return json(RECORD_QUALITY)

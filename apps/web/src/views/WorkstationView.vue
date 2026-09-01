@@ -57,7 +57,7 @@ const drugOrders = computed(() => allOrders.value.filter((o) => o.category !== '
 type ExamRow = { id: string; name: string; type: string; date: string; conclusion: string }
 
 const examOrders = computed<ExamRow[]>(() => {
-  const done = (summary.value?.examinations ?? []).map((e, i) => {
+  const done = ws.examinations.map((e, i) => {
     const row = e as Record<string, string>
     return {
       id: String(row.id ?? `exam-${i}`),
@@ -99,7 +99,7 @@ const positiveResults = computed<PositiveResult[]>(() => {
       detail: `${l.value} ${l.unit ?? ''}（参考: ${l.ref ?? '—'}）`,
       extra: l.diff_note || '偏高',
     }))
-  const exams = (summary.value?.examinations ?? [])
+  const exams = ws.examinations
     .filter((e) => {
       const row = e as Record<string, unknown>
       // 优先用结构化的 abnormal；没有该字段时退回结论文本判断

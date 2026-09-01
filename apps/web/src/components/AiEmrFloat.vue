@@ -33,6 +33,23 @@ function tabLocked(tab: Tab) {
 /** 当前这一页是不是锁着的。锁着时整页让位给说明卡，而不是显示空面板。 */
 const activeLocked = computed(() => tabLocked(activeTab.value))
 
+/**
+ * 预警评估这一页的卡片 = 硬规则红线 + 模型风险评估。
+ *
+ * 只取模型那份的话，问诊前这一页是空的 —— 而它恰恰是**不该锁**的那一页
+ * （危急值不能等）。硬规则是纯代码判定，一进来就该在这里。
+ */
+const riskCards = computed(() => {
+  const seen = new Set<string>()
+  const out: RiskItem[] = []
+  for (const r of [...ws.hardAlerts, ...(summary.value?.risk_assessments ?? [])]) {
+    if (!r?.id || seen.has(r.id)) continue
+    seen.add(r.id)
+    out.push(r)
+  }
+  return out
+})
+
 const unlocking = ref(false)
 
 /** 跳过问诊。二次确认里把后果讲清楚，而不是一句「确定吗」。 */
@@ -1439,7 +1456,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           <div v-show="activeTab === '预警评估'" class="tips-tab-pane">
             <div class="risk-assess-block">
               <div class="tab-section-title">专项评估</div>
-              <div v-for="risk in summary?.risk_assessments ?? []" :key="risk.id" class="risk-card">
+              <div v-for="risk in riskCards" :key="risk.id" class="risk-card">
                 <div class="risk-card-header">
                   <span class="risk-dot" :style="{ background: RISK_DOT_COLOR[risk.color] ?? RISK_DOT_COLOR.info }" />
                   <span class="risk-name">{{ risk.name }}</span>
@@ -1460,7 +1477,16 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                 <p v-if="risk.source" class="risk-summary"><strong>来源：</strong>{{ risk.source }}<template v-if="risk.threshold"> · 阈值 {{ risk.threshold }}</template></p>
               </div>
               <div v-if="!summary?.risk_assessments?.length" class="diag-empty">
-                {{ ws.loadingSummary ? '智能体分析中…' : '暂无风险项' }}
+                <!--
+                  「暂无风险项」在未评估时是误导 —— 它读起来像「已评估、没风险」，
+                  而实际是根本还没评估。这两种状态对医生的意义完全相反。
+                -->
+                <template v-if="ws.loadingSummary">智能体分析中…</template>
+                <template v-else-if="!ws.analysisUnlocked">
+                  硬规则已扫描，未发现危急值与过敏冲突。<b>模型风险评估待问诊后生成</b> ——
+                  这不等于「无风险」，只是还没评。
+                </template>
+                <template v-else>暂无风险项</template>
               </div>
             </div>
           </div>
@@ -1861,7 +1887,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             <div class="tab-section">
               <div class="tab-section-title">本次就诊时间轴</div>
               <div class="timeline-list">
-                <div v-for="(event, index) in summary?.timeline ?? []" :key="index" class="timeline-group">
+                <div v-for="(event, index) in ws.timeline" :key="index" class="timeline-group">
                   <div class="tl-time-tag">{{ event.time }}</div>
                   <div class="tl-group-card">
                     <div class="tl-group-header">
@@ -1904,10 +1930,10 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                     </div>
                   </div>
                 </div>
-                <div v-if="!summary?.timeline?.length" class="diag-empty">暂无时间轴事件</div>
+                <div v-if="!ws.timeline.length" class="diag-empty">暂无时间轴事件</div>
               </div>
 
-              <div v-if="summary?.timeline?.length" class="timeline-actions">
+              <div v-if="ws.timeline.length" class="timeline-actions">
                 <el-button type="primary" size="small" plain :loading="planningFollowUp" @click="generateFollowUpPlan">
                   生成随访计划并标记完成
                 </el-button>

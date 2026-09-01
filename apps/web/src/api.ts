@@ -487,6 +487,16 @@ export const api = {
       `/api/emr/red-alerts/${patientId}`,
     ),
 
+  /**
+   * 客观资料：检查记录 + 时间轴。确定性、毫秒级、不调模型，**不受问诊门禁**。
+   * 它们原本搭 report-summary 一起回来 —— 那个请求现在要等问诊，
+   * 于是「客观数据一进来就给」就成了空话。
+   */
+  objective: (patientId: string) =>
+    get<{ patient_id: string; examinations: Record<string, unknown>[]; timeline: ReportSummary['timeline'] }>(
+      `/api/emr/objective/${patientId}`,
+    ),
+
   /** 记录一次红色风险处置。落患者主档 + 审计 —— 刷新后要能恢复。 */
   handleAlert: (patientId: string, alertId: string, alertName: string) =>
     post<{ ok: boolean; handled_alerts: string[]; message: string }>('/api/emr/alerts/handle', {

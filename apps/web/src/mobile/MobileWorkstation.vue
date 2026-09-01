@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import MobileAnalysis from './MobileAnalysis.vue'
 import MobileMenu from './MobileMenu.vue'
@@ -74,6 +74,41 @@ watch(
 
 /** 未读角标：红色风险未处置的条数，落在「分析」上 */
 const analysisBadge = computed(() => ws.openRedAlerts.length)
+
+const unlocking = ref(false)
+
+/** 打开问诊面板并起播。多处入口共用一份，避免各写各的起播条件。 */
+function openVoice() {
+  voiceOpen.value = true
+  if (voice.state.value === 'idle') void voice.start()
+}
+
+/**
+ * 跳过问诊。与桌面端同一条路径、同一套后果说明。
+ *
+ * 移动端一度漏了整个门禁 —— 结果是对话页 0 张开场卡（空白屏）、
+ * 分析页八块全 0 且没有任何解释，医生只会以为「跑失败了」。
+ */
+async function skipInterview() {
+  try {
+    await ElMessageBox.confirm(
+      '将只用 HIS 已有资料生成分析，不含本次问诊内容。结果会标注「未含问诊」，' +
+        '病历草稿里无出处的段落一律写「未采集」。随后仍可开始问诊，问完重算一次。',
+      '跳过问诊，直接生成分析？',
+      { confirmButtonText: '跳过并生成', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  unlocking.value = true
+  try {
+    await ws.unlockAndAnalyse('skipped')
+  } catch (error) {
+    ElMessage.error(`生成失败：${(error as Error).message}`)
+  } finally {
+    unlocking.value = false
+  }
+}
 
 // ------------------------------------------------------------------ 开场卡片
 
@@ -157,7 +192,7 @@ const PROMPT_PRESETS = [
 ]
 
 const QUICK_ACTIONS: { icon: string; label: string; run: () => void }[] = [
-  { icon: '🎙', label: '语音问诊', run: () => { voiceOpen.value = true; if (voice.state.value === 'idle') void voice.start() } },
+  { icon: '🎙', label: '语音问诊', run: openVoice },
   { icon: '📄', label: '报告解读', run: () => void sendChat('请解读这位患者最近一次检查与检验报告，指出异常项及其临床意义。') },
   { icon: '🔍', label: '鉴别诊断', run: () => goAnalysis('鉴别诊断') },
   { icon: '➡️', label: '接诊下一位', run: nextPatient },
@@ -173,8 +208,7 @@ function onMenuPick(action: MenuAction) {
       goRecords(action.segment)
       break
     case 'voice':
-      voiceOpen.value = true
-      if (voice.state.value === 'idle') void voice.start()
+      openVoice()
       break
     case 'prompts':
       promptsOpen.value = true
@@ -241,6 +275,47 @@ function showDegraded() {
                 >
                   {{ act.text }}
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <!--
+            未解锁时的开场。不给空白屏 —— 医生进来第一眼必须知道
+            「现在该做什么」，而不是对着一片空白猜。
+          -->
+          <div v-if="!ws.analysisUnlocked" class="m-msg ai">
+            <span class="m-role">AI</span>
+            <div class="m-card">
+              <div class="m-card-head">
+                <span class="m-card-title">🔒 先问诊，再出分析</span>
+              </div>
+              <p class="m-card-line">
+                病情概要、鉴别诊断、共病、病历草稿是模型基于本次问诊推断的。
+                问诊前给出结论会让医生先看到答案再去找证据 —— 那是锚定，不是辅助。
+              </p>
+              <p class="m-card-line">
+                检查检验、健康档案、时间轴与硬规则红线不受影响，「记录」页现在就能看。
+              </p>
+              <div class="m-card-actions">
+                <button class="m-cbtn" type="button" @click="openVoice">● 开始语音问诊</button>
+                <button class="m-cbtn" type="button" :disabled="unlocking" @click="skipInterview">
+                  {{ unlocking ? '生成中…' : '跳过问诊，直接分析' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 解锁但跳过的，如实标出来 -->
+          <div v-else-if="!ws.interviewIncluded" class="m-msg ai">
+            <span class="m-role">AI</span>
+            <div class="m-card">
+              <div class="m-card-head">
+                <span class="m-card-title">未含问诊</span>
+                <span class="m-tone mid">仅基于 HIS 资料</span>
+              </div>
+              <p class="m-card-line">这份分析没有听过患者本次陈述。可随时开始问诊，问完重算一次。</p>
+              <div class="m-card-actions">
+                <button class="m-cbtn" type="button" @click="openVoice">● 开始语音问诊</button>
               </div>
             </div>
           </div>

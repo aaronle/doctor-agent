@@ -226,6 +226,26 @@ def unlock_analysis(body: UnlockIn, session: Session = Depends(get_session)) -> 
     return {"ok": True, **state}
 
 
+@router.get("/objective/{patient_id}")
+def objective_data(patient_id: str, session: Session = Depends(get_session)) -> dict:
+    """
+    这一场就诊的**客观资料**。确定性、毫秒级、不调模型。
+
+    **为什么要单独开**：改成问诊门禁之后发现，检查记录与时间轴原本是搭
+    `report-summary` 一起回来的 —— 而那个请求现在要等问诊。结果是规格里写着
+    「客观数据一进来就给」，实际上时间轴、检查子页、健康档案概览全是空的。
+    数据本身跟模型无关，只是当初图省事挂在了同一个出口上。
+
+    时间轴 = 种子历史 + 本次就诊的真实动作（审计流），两者都不依赖模型。
+    """
+    _patient_or_404(session, patient_id)
+    return {
+        "patient_id": patient_id,
+        "examinations": seed_items(session, "examination", patient_id),
+        "timeline": seed_items(session, "timeline", patient_id) + _timeline_from_audit(session, patient_id),
+    }
+
+
 @router.get("/red-alerts/{patient_id}")
 def red_alerts(patient_id: str, session: Session = Depends(get_session)) -> dict:
     """
