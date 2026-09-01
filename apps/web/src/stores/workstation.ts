@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { api, type PatientDetail, type PatientListItem, type ReportSummary } from '../api'
+import { api, type PatientDetail, type PatientListItem, type ReportSummary, type RiskItem, type VisitState } from '../api'
+import { log, time } from '../logging'
 
 /** 病历七段，顺序与后端 SECTION_KEYS 一致 */
 export const RECORD_SECTIONS = [
@@ -37,11 +38,92 @@ export const useWorkstation = defineStore('workstation', () => {
   /** 右侧 AI 生成的病历草稿，未确认前不进 record */
   const draft = ref<Record<string, string>>({})
 
+  /* ===================== 就诊状态机 ===================== */
+
+  /**
+   * 这一场就诊走到哪了。
+   *
+   * **为什么要有它**：改之前，八个 AI 标签页的结论是在医生跟患者说第一句话
+   * **之前**就算好的——只基于种子档案，不含任何问诊内容。摆在那里会让医生
+   * 先看到答案再去找证据，那是锚定，不是辅助。
+   *
+   * 现在：进入只加载客观数据与硬规则红线，问诊结束（或医生显式跳过）才算分析。
+   */
+  const visit = ref<VisitState | null>(null)
+  const analysisUnlocked = computed(() => Boolean(visit.value?.analysis_unlocked))
+  /** 分析里含不含本次问诊。跳过路径下界面要如实标「未含问诊」。 */
+  const interviewIncluded = computed(() => visit.value?.unlocked_by === 'interview')
+
+  /**
+   * 硬规则红色风险。**不锁**——纯代码判定，毫秒级，一进来就给。
+   * 让医生在不知道血钾 6.8 的情况下问完一整轮，是不能接受的。
+   */
+  const hardAlerts = ref<RiskItem[]>([])
+
+  async function loadVisitState() {
+    if (!patientId.value) return
+    try {
+      visit.value = await api.visitState(patientId.value)
+    } catch {
+      // 读不到就按「未解锁」处理：宁可多锁一次，也不要在问诊前把结论摆出来
+      visit.value = null
+    }
+  }
+
+  async function loadHardAlerts() {
+    if (!patientId.value) return
+    try {
+      const result = await api.redAlerts(patientId.value)
+      // `?? []` 不是防御性冗余：返回体缺 alerts 时，下游 redAlerts 的展开会抛
+      // 「not iterable」，而 Vue 的渲染函数一抛就是整棵树不渲染 —— 白屏。
+      hardAlerts.value = Array.isArray(result.alerts) ? result.alerts : []
+      restoreHandledAlerts(result.handled_alerts ?? [])
+      log('workstation', 'hard_alerts', { patient: patientId.value, open: result.open_count })
+    } catch {
+      hardAlerts.value = []
+    }
+  }
+
+  /**
+   * 解锁分析并算一次。
+   *
+   * 两条路径合成一个动作：问诊结束由 voice/complete 在服务端顺带解锁，
+   * 这里只需重拉状态再算；跳过则先显式解锁再算。
+   */
+  async function unlockAndAnalyse(reason: 'interview' | 'skipped') {
+    if (!patientId.value) return
+    log('workstation', 'unlock_analysis', { patient: patientId.value, reason })
+    if (reason === 'skipped') {
+      visit.value = await api.unlockAnalysis(patientId.value, 'skipped')
+    } else {
+      await loadVisitState()
+    }
+    await time('workstation', 'load_summary', () => loadSummary(true), { patient: patientId.value, reason })
+  }
+
   const degradedAgents = computed(() => summary.value?._meta.degraded_agents ?? [])
   const isDegraded = computed(() => degradedAgents.value.length > 0)
 
-  /** 红色风险。未逐条处置前阻断病历提交与诊断回写。 */
-  const redAlerts = computed(() => summary.value?.risk_alerts ?? [])
+  /**
+   * 红色风险。未逐条处置前阻断病历提交与诊断回写。
+   *
+   * 两个来源合并：**硬规则**（纯代码，一进来就有）+ 模型判定（分析生成后才有）。
+   * 只取 summary 的话，分析没出来之前红线就是空的——而提交病历这条路
+   * 在那时候本来就走得通，等于门禁在最需要它的阶段是敞开的。
+   */
+  const redAlerts = computed(() => {
+    const seen = new Set<string>()
+    const merged: RiskItem[] = []
+    const hard = Array.isArray(hardAlerts.value) ? hardAlerts.value : []
+    const fromModel = summary.value?.risk_alerts
+    for (const a of [...hard, ...(Array.isArray(fromModel) ? fromModel : [])]) {
+      if (!a?.id) continue
+      if (seen.has(a.id)) continue
+      seen.add(a.id)
+      merged.push(a)
+    }
+    return merged
+  })
   const handledAlerts = ref<Set<string>>(new Set())
   const openRedAlerts = computed(() => redAlerts.value.filter((a) => !handledAlerts.value.has(a.id)))
   const writeBackBlocked = computed(() => openRedAlerts.value.length > 0)
@@ -72,6 +154,9 @@ export const useWorkstation = defineStore('workstation', () => {
     draft.value = {}
     handledAlerts.value = new Set()
 
+    visit.value = null
+    hardAlerts.value = []
+
     loadingPatient.value = true
     try {
       patient.value = await api.patient(id)
@@ -79,7 +164,13 @@ export const useWorkstation = defineStore('workstation', () => {
       loadingPatient.value = false
     }
 
-    await loadSummary()
+    // 一进来只拉「不依赖问诊」的东西：硬规则红线 + 这场就诊的状态。
+    // **刻意不调 report-summary** —— 那四个岗位的结论要等问诊，见 visit 的注释。
+    await Promise.all([loadHardAlerts(), loadVisitState()])
+
+    // 已经解锁过的（问诊做完了、或之前跳过了），刷新后要把分析拿回来，
+    // 否则医生问完一轮刷新一下，八页又锁回去了。
+    if (analysisUnlocked.value) await loadSummary()
   }
 
   async function loadSummary(refresh = false) {
@@ -122,6 +213,13 @@ export const useWorkstation = defineStore('workstation', () => {
     summaryError,
     record,
     draft,
+    visit,
+    analysisUnlocked,
+    interviewIncluded,
+    hardAlerts,
+    loadVisitState,
+    loadHardAlerts,
+    unlockAndAnalyse,
     degradedAgents,
     isDegraded,
     redAlerts,

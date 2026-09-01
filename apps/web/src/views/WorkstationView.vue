@@ -360,6 +360,11 @@ async function restoreSavedRecord() {
   }
 }
 
+/** 跳到预警评估去处置。红线的处置入口只有一个，不在这里另开一套。 */
+function goHandleAlerts() {
+  window.dispatchEvent(new CustomEvent('da:open-tab', { detail: '预警评估' }))
+}
+
 function switchPatient(id: string) {
   router.push(`/outpatient/${id}`)
 }
@@ -438,6 +443,20 @@ onMounted(async () => {
         <el-tag size="small" type="success" round effect="light">{{ patient.visit_type }}</el-tag>
         <el-tag size="small" round effect="light" :type="riskType(patient.risk_level)">{{ patient.risk_level }}</el-tag>
       </div>
+    </div>
+
+    <!--
+      硬规则红线横幅。**任何状态都在场** —— 它是纯代码判定，不依赖模型也不依赖问诊。
+      让医生在不知道血钾 6.8 的情况下问完一整轮，是不能接受的，
+      所以它不跟 AI 分析一起锁在问诊门禁后面。
+    -->
+    <div v-if="ws.openRedAlerts.length" class="redline-banner">
+      <span class="rb-icon">⛔</span>
+      <span class="rb-title">硬规则红色风险 {{ ws.openRedAlerts.length }} 条</span>
+      <span class="rb-names">{{ ws.openRedAlerts.map((a) => a.name).join(' · ') }}</span>
+      <span class="rb-spacer" />
+      <span class="rb-note">纯代码规则判定，不依赖模型与问诊</span>
+      <el-button type="danger" size="small" @click="goHandleAlerts">逐条处置</el-button>
     </div>
 
     <div class="workstation-body">

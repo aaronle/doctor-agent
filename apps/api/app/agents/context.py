@@ -46,7 +46,13 @@ def seed_items(session: Session, kind: str, patient_id: str) -> list:
     return seed_payload(session, kind, patient_id).get("items", [])
 
 
-def build_context(session: Session, patient: Patient, *, include_dialog: bool = False) -> dict:
+def build_context(
+    session: Session,
+    patient: Patient,
+    *,
+    include_dialog: bool = False,
+    seed_dialog_fallback: bool = True,
+) -> dict:
     """装配送进模型的患者上下文。来源清晰、时间明确、最小充分。"""
     payload = patient.payload or {}
     ctx: dict = {
@@ -71,18 +77,32 @@ def build_context(session: Session, patient: Patient, *, include_dialog: bool = 
         ctx["examinations"] = examinations
 
     if include_dialog:
-        ctx["dialog_script"] = latest_dialog(session, patient.id)
+        ctx["dialog_script"] = latest_dialog(session, patient.id, seed_fallback=seed_dialog_fallback)
+        # 这一场就诊到底有没有真做过问诊。界面据此标「含本次问诊」还是「未含问诊」，
+        # 岗位也据此决定要不要往「患者自述」上下结论。
+        ctx["interview_done"] = has_interview(session, patient.id)
 
     return ctx
 
 
-def latest_dialog(session: Session, patient_id: str) -> list:
+def has_interview(session: Session, patient_id: str) -> bool:
+    """这一场就诊有没有真做过问诊（存在 VoiceSession 即为有）。"""
+    return session.scalar(
+        select(VoiceSession.id).where(VoiceSession.patient_id == patient_id).limit(1)
+    ) is not None
+
+
+def latest_dialog(session: Session, patient_id: str, *, seed_fallback: bool = True) -> list:
     """
     取本次就诊的问诊对话。
 
-    优先用**医生实际做过的那场问诊**，没有才退回演示脚本。
-    不这么做的话，病情概况、鉴别诊断这些分析永远停留在问诊之前 ——
-    医生问出来的新信息进不了上下文，等于白问。
+    优先用**医生实际做过的那场问诊**。没有做过时：
+
+    - `seed_fallback=True`（默认）退回演示脚本 —— 回归集与控制台试运行要靠它，
+      那些场景本来就不会有 VoiceSession。
+    - `seed_fallback=False` 返回空 —— **工作站走这条**。医生跳过问诊时，
+      拿一段他从没做过的对话去生成「病情概要」「鉴别诊断」，比不给分析更糟：
+      那是把演示数据当成了本次问诊的事实。
     """
     latest = session.scalar(
         select(VoiceSession)
@@ -96,7 +116,7 @@ def latest_dialog(session: Session, patient_id: str) -> list:
             for m in latest.messages
             if isinstance(m, dict) and m.get("text")
         ]
-    return seed_items(session, "dialog_script", patient_id)
+    return seed_items(session, "dialog_script", patient_id) if seed_fallback else []
 
 
 def abnormal_labs(ctx: dict) -> list[dict]:

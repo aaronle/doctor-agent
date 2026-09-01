@@ -45,11 +45,26 @@ const GAPS = [
   },
 ]
 
+/** 已解锁的就诊状态。绝大多数用例测的是解锁后的界面，前置就是「问诊已完成」。 */
+export const UNLOCKED_VISIT = {
+  patient_id: 'P001', interview_done: true, analysis_unlocked: true,
+  unlocked_by: 'interview', unlocked_at: '2026-09-01T09:00:00Z',
+}
+
 /** 组件挂载时会拉专项评估目录，其余接口按需返回空壳 */
 function stubFetch(quality?: unknown) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
+      if (String(url).includes('visit-state')) {
+        return new Response(JSON.stringify(UNLOCKED_VISIT), { status: 200 })
+      }
+      if (String(url).includes('red-alerts')) {
+        return new Response(
+          JSON.stringify({ patient_id: 'P001', alerts: [], handled_alerts: [], open_count: 0 }),
+          { status: 200 },
+        )
+      }
       if (String(url).includes('assessment')) {
         return new Response(JSON.stringify({ categories: [] }), { status: 200 })
       }
@@ -268,6 +283,9 @@ describe('病历质控提醒', () => {
       global: { plugins: [pinia, router, ElementPlus] },
       attachTo: document.body,
     })
+    // 这些用例不走 selectPatient，store 里的 visit 一直是 null，
+    // 受门禁的三页会整页让位给锁定卡，里面的元素取不到。
+    useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
     await wrapper.findAll('.ttab').find((t) => t.text().includes('病历管理'))!.trigger('click')
@@ -367,6 +385,9 @@ describe('诊断命令接进界面', () => {
       global: { plugins: [pinia, router, ElementPlus] },
       attachTo: document.body,
     })
+    // 这些用例不走 selectPatient，store 里的 visit 一直是 null，
+    // 受门禁的三页会整页让位给锁定卡，里面的元素取不到。
+    useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
     await wrapper.findAll('.ttab').find((t) => t.text().includes('诊断管理'))!.trigger('click')
@@ -444,6 +465,9 @@ describe('临床知识库', () => {
       global: { plugins: [pinia, router, ElementPlus] },
       attachTo: document.body,
     })
+    // 这些用例不走 selectPatient，store 里的 visit 一直是 null，
+    // 受门禁的三页会整页让位给锁定卡，里面的元素取不到。
+    useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
     await wrapper.find('.chat-textarea-wrap textarea').setValue('这个患者的胸闷怎么看')
@@ -465,6 +489,9 @@ describe('临床知识库', () => {
       global: { plugins: [pinia, router, ElementPlus] },
       attachTo: document.body,
     })
+    // 这些用例不走 selectPatient，store 里的 visit 一直是 null，
+    // 受门禁的三页会整页让位给锁定卡，里面的元素取不到。
+    useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
     await wrapper.find('.chat-textarea-wrap textarea').setValue('今天天气不错')
@@ -510,6 +537,17 @@ describe('预警评估 · 风险色点与动作', () => {
       vi.fn(async (url: string) => {
         const u = String(url)
         if (u.includes('assessment')) return new Response(JSON.stringify({ categories: [] }), { status: 200 })
+        // 这一场就诊已解锁：改成状态机之后，selectPatient 不再自动跑 report-summary，
+        // 只有解锁过的才会把分析拿回来。这几条测的是预警评估的渲染，前置就是「已解锁」。
+        if (u.includes('visit-state')) {
+          return new Response(
+            JSON.stringify({ patient_id: 'P001', interview_done: true, analysis_unlocked: true, unlocked_by: 'interview', unlocked_at: '' }),
+            { status: 200 },
+          )
+        }
+        if (u.includes('red-alerts')) {
+          return new Response(JSON.stringify({ patient_id: 'P001', alerts: [], handled_alerts: [], open_count: 0 }), { status: 200 })
+        }
         if (u.includes('report-summary')) {
           return new Response(JSON.stringify({ risk_assessments: RISKS, risk_alerts: [], todos: [], _meta: {} }), { status: 200 })
         }
@@ -521,6 +559,9 @@ describe('预警评估 · 风险色点与动作', () => {
       global: { plugins: [pinia, router, ElementPlus] },
       attachTo: document.body,
     })
+    // 这些用例不走 selectPatient，store 里的 visit 一直是 null，
+    // 受门禁的三页会整页让位给锁定卡，里面的元素取不到。
+    useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     await useWorkstation(pinia).selectPatient('P001')
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
     await wrapper.findAll('.ttab').find((t) => t.text().includes('预警评估'))!.trigger('click')
@@ -583,10 +624,13 @@ describe('专项评估默认态', () => {
         return new Response(JSON.stringify({}), { status: 200 })
       }),
     )
+    const pinia = createPinia()
     const wrapper = mount(AiEmrFloat, {
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [pinia, router, ElementPlus] },
       attachTo: document.body,
     })
+    // 专项评估在「智慧诊疗」页，那一页受问诊门禁
+    useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     await vi.waitFor(() => expect(wrapper.findAll('.ka-cat-header').length).toBe(2))
     return wrapper
   }
@@ -626,5 +670,100 @@ describe('专项评估默认态', () => {
       expect(src, `组件里不该出现评估条目名「${name}」`).not.toContain(name)
     }
     expect(src).toContain('default_expanded')
+  })
+})
+
+describe('问诊门禁', () => {
+  const LOCKED_VISIT = {
+    patient_id: 'P001', interview_done: false, analysis_unlocked: false,
+    unlocked_by: '', unlocked_at: '',
+  }
+
+  async function openLocked(visit: unknown = LOCKED_VISIT) {
+    stubFetch()
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    useWorkstation(pinia).visit = visit as never
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+    return wrapper
+  }
+
+  const goTab = async (wrapper: ReturnType<typeof mount>, tab: string) => {
+    await wrapper.findAll('.ttab').find((t) => t.text().includes(tab))!.trigger('click')
+    await wrapper.vm.$nextTick()
+  }
+
+  it('未问诊时，模型推断的四页锁着', async () => {
+    const wrapper = await openLocked()
+    const locked = wrapper.findAll('.ttab.locked').map((t) => t.text().replace('🔒', ''))
+    expect(locked).toEqual(['智慧诊疗', '病历管理', '诊断管理', '共病管理'])
+  })
+
+  it('客观数据那四页不锁 —— 尤其预警评估', async () => {
+    // 让医生在不知道危急值的情况下问完一整轮，是不能接受的
+    const wrapper = await openLocked()
+    const all = wrapper.findAll('.ttab').map((t) => t.text().replace('🔒', ''))
+    const locked = new Set(wrapper.findAll('.ttab.locked').map((t) => t.text().replace('🔒', '')))
+    for (const tab of ['预警评估', '医嘱管理', '健康档案', '时间轴']) {
+      expect(all).toContain(tab)
+      expect(locked.has(tab), `${tab} 不该被锁`).toBe(false)
+    }
+  })
+
+  it('锁着的页整页让位给说明卡，不显示空面板', async () => {
+    // 空面板会让医生以为「分析跑失败了」，而不是「还没到时候」
+    const wrapper = await openLocked()
+    expect(wrapper.find('.gate-pane').exists()).toBe(true)
+    expect(wrapper.find('.condition-overview-card').exists()).toBe(false)
+    expect(wrapper.find('.gate-title').text()).toContain('待问诊后生成')
+  })
+
+  it('说明卡写清为什么锁，并给两条出路', async () => {
+    const wrapper = await openLocked()
+    const text = wrapper.find('.gate-card').text()
+    expect(text).toContain('基于本次问诊')
+    expect(text).toContain('锚定')
+    const labels = wrapper.find('.gate-actions').findAll('button').map((b) => b.text())
+    expect(labels.some((l) => l.includes('开始语音问诊'))).toBe(true)
+    expect(labels.some((l) => l.includes('跳过问诊'))).toBe(true)
+  })
+
+  it('标签页不消失，只压暗 —— 消失会让人以为系统没这功能', async () => {
+    const wrapper = await openLocked()
+    expect(wrapper.findAll('.ttab')).toHaveLength(8)
+  })
+
+  it('切到不受门禁的页，正常显示内容而不是锁定卡', async () => {
+    const wrapper = await openLocked()
+    await goTab(wrapper, '时间轴')
+    expect(wrapper.find('.gate-pane').exists()).toBe(false)
+  })
+
+  it('问诊解锁后标「已按本次问诊生成」', async () => {
+    const wrapper = await openLocked(UNLOCKED_VISIT)
+    expect(wrapper.find('.gate-pane').exists()).toBe(false)
+    const banner = wrapper.find('.gate-banner')
+    expect(banner.text()).toContain('已按本次问诊生成')
+    expect(banner.classes()).not.toContain('skipped')
+  })
+
+  it('跳过解锁后必须如实标「未含问诊」', async () => {
+    // 否则医生会以为这份分析听过患者说话
+    const wrapper = await openLocked({
+      patient_id: 'P001', interview_done: false, analysis_unlocked: true,
+      unlocked_by: 'skipped', unlocked_at: '2026-09-01T09:00:00Z',
+    })
+    const banner = wrapper.find('.gate-banner')
+    expect(banner.text()).toContain('未含问诊')
+    expect(banner.classes()).toContain('skipped')
+  })
+
+  it('来源横幅只挂在受门禁的四页上 —— 客观数据没有「含不含问诊」之分', async () => {
+    const wrapper = await openLocked(UNLOCKED_VISIT)
+    await goTab(wrapper, '时间轴')
+    expect(wrapper.find('.gate-banner').exists()).toBe(false)
   })
 })

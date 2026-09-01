@@ -332,6 +332,20 @@ export interface EvalCaseResult {
 }
 
 /** 一个评测数据集。内容是 data/eval_datasets/*.json，开关落库。 */
+/**
+ * 这一场就诊走到哪了。
+ *
+ * `analysis_unlocked` 决定 AI 助手抽屉里那四块模型推断的内容给不给看；
+ * `unlocked_by` 决定界面标「含本次问诊」还是「未含问诊」。
+ */
+export interface VisitState {
+  patient_id: string
+  interview_done: boolean
+  analysis_unlocked: boolean
+  unlocked_by: '' | 'interview' | 'skipped'
+  unlocked_at: string
+}
+
 export interface EvalDataset {
   id: string
   name: string
@@ -458,6 +472,20 @@ export const api = {
   /** 重新接诊：把已完成的患者放回候诊队列（提交病历会让患者出队）。 */
   requeuePatient: (patientId: string) =>
     post<{ ok: boolean; message: string; changed: boolean }>('/api/his/patients/requeue', { patient_id: patientId }),
+
+  /** 这一场就诊的状态。刷新后据此恢复，否则问完一轮刷新就锁回去了。 */
+  visitState: (patientId: string) => get<VisitState>(`/api/emr/visit-state/${patientId}`),
+  /** 解锁 AI 分析。reason=interview 由问诊结束自动触发，skipped 是医生显式跳过。 */
+  unlockAnalysis: (patientId: string, reason: 'interview' | 'skipped') =>
+    post<VisitState & { ok: boolean }>('/api/emr/analysis/unlock', { patient_id: patientId, reason }),
+  /**
+   * 硬规则红色风险。纯代码判定、毫秒级，**不等问诊也不等 report-summary**。
+   * 让医生在不知道危急值的情况下问完一整轮，是不能接受的。
+   */
+  redAlerts: (patientId: string) =>
+    get<{ patient_id: string; alerts: RiskItem[]; handled_alerts: string[]; open_count: number }>(
+      `/api/emr/red-alerts/${patientId}`,
+    ),
 
   /** 记录一次红色风险处置。落患者主档 + 审计 —— 刷新后要能恢复。 */
   handleAlert: (patientId: string, alertId: string, alertName: string) =>

@@ -14,6 +14,50 @@ const ws = useWorkstation()
 const TABS = ['智慧诊疗', '预警评估', '病历管理', '诊断管理', '医嘱管理', '共病管理', '健康档案', '时间轴'] as const
 type Tab = (typeof TABS)[number]
 
+/**
+ * 需要等问诊才给的四块。
+ *
+ * 按「证据从哪来」分，不是按「重要不重要」分：这四块是模型**基于本次问诊**
+ * 推断的，问诊前给出结论会让医生先看到答案再去找证据 —— 那是锚定，不是辅助。
+ *
+ * 其余四块（预警评估、医嘱管理、健康档案、时间轴）来自 HIS 已有数据与
+ * 纯代码硬规则，与问诊无关，一进来就给。**预警评估尤其不能锁** ——
+ * 让医生在不知道危急值的情况下问完一整轮，是不能接受的。
+ */
+const INTERVIEW_GATED: readonly Tab[] = ['智慧诊疗', '病历管理', '诊断管理', '共病管理']
+
+function tabLocked(tab: Tab) {
+  return !ws.analysisUnlocked && INTERVIEW_GATED.includes(tab)
+}
+
+/** 当前这一页是不是锁着的。锁着时整页让位给说明卡，而不是显示空面板。 */
+const activeLocked = computed(() => tabLocked(activeTab.value))
+
+const unlocking = ref(false)
+
+/** 跳过问诊。二次确认里把后果讲清楚，而不是一句「确定吗」。 */
+async function skipInterview() {
+  try {
+    await ElMessageBox.confirm(
+      '将只用 HIS 已有资料（检验、检查、既往就诊、既往史）生成分析，不含本次问诊内容。\n\n' +
+        '生成结果会标注「未含问诊」，病历草稿里无出处的段落一律写「未采集」，不替患者编答案。\n' +
+        '随后仍可点「开始问诊」，问完再重算一次。',
+      '跳过问诊，直接生成分析？',
+      { confirmButtonText: '跳过并生成', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  unlocking.value = true
+  try {
+    await ws.unlockAndAnalyse('skipped')
+  } catch (error) {
+    ElMessage.error(`生成失败：${(error as Error).message}`)
+  } finally {
+    unlocking.value = false
+  }
+}
+
 const activeTab = ref<Tab>('智慧诊疗')
 const tipsOpen = ref(true)
 const panelOpen = ref(true)
@@ -64,6 +108,22 @@ function startResize(event: MouseEvent) {
 }
 
 const voice = useVoiceInterview(() => ws.patientId)
+
+/**
+ * 外部（红线横幅的「逐条处置」）要求切到某个标签页。
+ *
+ * 用事件而不是把 activeTab 提到 store：标签页是这个组件自己的呈现状态，
+ * 提到 store 会让两个组件共同拥有它，改一处必然漏一处。
+ */
+function onOpenTab(e: Event) {
+  const tab = (e as CustomEvent).detail as Tab
+  if (TABS.includes(tab)) {
+    tipsOpen.value = true
+    activeTab.value = tab
+  }
+}
+onMounted(() => window.addEventListener('da:open-tab', onOpenTab))
+onBeforeUnmount(() => window.removeEventListener('da:open-tab', onOpenTab))
 
 const summary = computed(() => ws.summary)
 const patient = computed(() => ws.patient)
@@ -834,7 +894,9 @@ async function finishAndGenerate() {
     }
 
     actionStep.value = '重新分析病情、诊断与风险…'
-    await ws.loadSummary(true)
+    // 走状态机：voice/complete 已在服务端把这一场标为「问诊解锁」，
+    // 这里重拉状态再算，八个标签页随之解锁。
+    await ws.unlockAndAnalyse('interview')
     if (ws.summaryError) throw new Error(ws.summaryError)
 
     actionStep.value = '起草病历…'
@@ -1055,10 +1117,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             v-for="tab in TABS"
             :key="tab"
             class="ttab"
-            :class="{ active: activeTab === tab }"
+            :class="{ active: activeTab === tab, locked: tabLocked(tab) }"
+            :title="tabLocked(tab) ? '待问诊结束后生成' : ''"
             @click="activeTab = tab"
           >
-            {{ tab }}
+            <span v-if="tabLocked(tab)" class="ttab-lock">🔒</span>{{ tab }}
             <span v-if="tab === '诊断管理' && summary?.suspected_diagnoses?.length" class="ttab-dot primary">
               {{ summary.suspected_diagnoses.length }}
             </span>
@@ -1070,8 +1133,64 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         </div>
 
         <div v-loading="ws.loadingSummary" class="tips-tab-body">
+          <!--
+            锁定说明。**整页让位给它**，而不是显示一个空面板 ——
+            空面板会让医生以为「分析跑失败了」，而不是「还没到时候」。
+
+            也不让标签页消失：消失会让人以为系统没这功能（与移动端 ＋ 菜单
+            里那三个「工作站专属」同一个道理）。
+          -->
+          <div v-if="activeLocked" class="gate-pane">
+            <div class="gate-card">
+              <div class="gate-icon">🔒</div>
+              <div class="gate-title">AI 分析待问诊后生成</div>
+              <p class="gate-why">
+                病情概要、鉴别诊断、共病管理、病历草稿这四块，是模型<b>基于本次问诊</b>推断的。
+                问诊前给出结论会让医生先看到答案再去找证据 —— 那是锚定，不是辅助。
+              </p>
+              <p class="gate-why">
+                预警评估、医嘱管理、健康档案、时间轴来自 HIS 已有数据与纯代码硬规则，与问诊无关，现在就能点。
+              </p>
+              <div class="gate-actions">
+                <el-button type="primary" size="small" :loading="voice.state.value === 'playing'" @click="voice.start()">
+                  ● 开始语音问诊
+                </el-button>
+                <el-button size="small" :loading="unlocking" @click="skipInterview">跳过问诊，直接分析</el-button>
+              </div>
+              <p class="gate-foot">
+                跳过入口不能少：复诊、患者不配合、医生已自行问完 —— 这些情况下分析不能因此永远出不来。
+              </p>
+              <div v-if="voice.active.value" class="gate-progress">
+                <div class="gate-progress-bar">
+                  <div
+                    class="gate-progress-done"
+                    :style="{ width: `${Math.round((voice.doneQuestions.value.length / Math.max(1, voice.questions.value.length)) * 100)}%` }"
+                  />
+                </div>
+                <span class="gate-progress-text">
+                  问诊进行中 · AI 追问提示 {{ voice.doneQuestions.value.length }}/{{ voice.questions.value.length }} 已问到
+                  · 已播 {{ voice.messages.value.length }} 轮
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!--
+            解锁后的横幅。标明「含本次问诊」还是「未含问诊」——
+            跳过路径下必须如实标，否则医生会以为这份分析听过患者说话。
+          -->
+          <div v-else-if="ws.analysisUnlocked && INTERVIEW_GATED.includes(activeTab)" class="gate-banner"
+            :class="{ skipped: !ws.interviewIncluded }">
+            <span v-if="ws.interviewIncluded">✓ 已按本次问诊生成</span>
+            <span v-else>⚠ 未含问诊 · 仅基于 HIS 已有资料</span>
+            <span class="gate-banner-meta">
+              <template v-if="ws.interviewIncluded">对话 {{ voice.messages.value.length }} 轮</template>
+              <template v-else>随后可点「开始问诊」，问完重算一次</template>
+            </span>
+          </div>
+
           <!-- ---------------- 智慧诊疗 ---------------- -->
-          <div v-show="activeTab === '智慧诊疗'" class="tips-tab-pane">
+          <div v-if="!tabLocked('智慧诊疗')" v-show="activeTab === '智慧诊疗'" class="tips-tab-pane">
             <div ref="columnsEl" class="analysis-columns">
               <div class="analysis-left" :style="{ flex: `0 0 calc(${leftRatio}% - 4px)` }">
                 <div class="condition-overview-card">
@@ -1347,7 +1466,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           </div>
 
           <!-- ---------------- 病历管理 ---------------- -->
-          <div v-show="activeTab === '病历管理'" class="tips-tab-pane record-pane">
+          <div v-if="!tabLocked('病历管理')" v-show="activeTab === '病历管理'" class="tips-tab-pane record-pane">
             <div class="record-layout">
               <div class="record-main">
                 <div class="btab-writeback-bar">
@@ -1446,7 +1565,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           </div>
 
           <!-- ---------------- 诊断管理 ---------------- -->
-          <div v-show="activeTab === '诊断管理'" class="tips-tab-pane">
+          <div v-if="!tabLocked('诊断管理')" v-show="activeTab === '诊断管理'" class="tips-tab-pane">
             <div class="tab-section">
               <div class="tab-section-title">
                 疑似诊断
@@ -1563,7 +1682,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           </div>
 
           <!-- ---------------- 共病管理 ---------------- -->
-          <div v-show="activeTab === '共病管理'" class="tips-tab-pane">
+          <div v-if="!tabLocked('共病管理')" v-show="activeTab === '共病管理'" class="tips-tab-pane">
             <div class="tab-section">
               <div class="tab-section-title">共病</div>
 

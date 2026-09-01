@@ -150,3 +150,12 @@
 /* 「已暂存 / 已提交 · 第 N 版」提示。医生需要一眼看到「存没存住」——
    此前这个按钮只弹一句成功文案，实际什么都没写。 */
 .saved-hint{margin-left:8px;font-size:11px;color:#16a34a}
+
+/* 硬规则红线横幅。任何状态都在场 —— 它不依赖模型也不依赖问诊，
+   跟 AI 分析一起锁在问诊门禁后面是危险的。 */
+.redline-banner{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#fff2f2;border-bottom:1px solid #f8d2d2}
+.rb-icon{font-size:13px;line-height:1}
+.rb-title{font-size:12px;font-weight:700;color:#e6191a}
+.rb-names{font-size:11px;color:#e6191a}
+.rb-spacer{flex:1}
+.rb-note{font-size:10px;color:#c96a6a}

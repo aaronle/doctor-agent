@@ -77,6 +77,36 @@ async function enter(page, url) {
   }
 }
 
+/**
+ * 把这一位患者的这场就诊推进到「问诊已完成」。
+ *
+ * 改成问诊状态机之后，智慧诊疗 / 病历管理 / 诊断管理 / 共病管理四页在问诊前是
+ * 锁着的（整页让位给说明卡）——不先解锁，这四页一个元素都取不到，
+ * 比出来会是「重建版缺一大片」，而那是状态差异不是漏做。
+ *
+ * 走 voice/complete 而不是 analysis/unlock：前者会落一份真实 VoiceSession，
+ * 上下文里就有对话，产出的内容量与原件可比；后者是「跳过」，没有对话，
+ * 分析会明显更薄，比的就不是同一个东西了。
+ */
+async function ensureAnalysisUnlocked(page, apiBase, patientId) {
+  await page.evaluate(async ({ base, pid }) => {
+    const state = await fetch(`${base}/api/emr/visit-state/${pid}`).then((r) => r.json()).catch(() => null);
+    if (state?.analysis_unlocked) return;
+    await fetch(`${base}/api/emr/voice/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patient_id: pid,
+        conversation_summary: '门禁脚本：以种子对话推进到问诊完成态',
+        messages: [
+          { role: 'doctor', text: '最近情况怎么样？' },
+          { role: 'patient', text: '和上次差不多，没有明显好转。' },
+        ],
+      }),
+    });
+  }, { base: apiBase, pid: patientId });
+}
+
 /** 确保 AI 浮层开着 —— 关掉的话一个标签页都点不到 */
 async function ensureFloat(page) {
   const round = page.locator('.ai-float-btn').first();
@@ -132,6 +162,8 @@ const appPage = await browser.newPage({ viewport: VIEWPORT });
 
 await enter(refPage, `http://127.0.0.1:${REF_PORT}/#/login`);
 await enter(appPage, `${APP_URL}/outpatient/list`);
+// 受门禁的四页要先解锁，否则会被报「缺一大片」——那是状态差异不是漏做
+await ensureAnalysisUnlocked(appPage, APP_URL, 'P001');
 
 const refClasses = await classesPerTab(refPage, async () => {
   await refPage.evaluate(() => { location.hash = '/outpatient/P001'; });

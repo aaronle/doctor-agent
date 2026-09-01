@@ -15,6 +15,17 @@ from app.agents.risk import hard_rule_alerts
 # ------------------------------------------------------------------ 基础与配置
 
 
+
+def _unlock(client, patient_id: str) -> None:
+    """
+    把这场就诊推进到「分析已生成」。
+
+    改成问诊状态机之后，未生成分析不得写回 —— 提交病历与诊断回写都会 409。
+    这些用例测的是写回本身，前置就是「分析已生成」。
+    """
+    client.post("/api/emr/analysis/unlock", json={"patient_id": patient_id, "reason": "skipped"})
+
+
 def test_health_reports_fingerprint(client):
     body = client.get("/api/health").json()
     assert body["ok"] is True
@@ -378,6 +389,7 @@ def test_diagnosis_write_back_rejects_primary_outside_selection(client):
 
 
 def test_diagnosis_write_back_persists_and_audits(client):
+    _unlock(client, "P003")
     body = client.post(
         "/api/emr/diagnosis/write-back",
         json={"patient_id": "P003", "diagnoses": ["甲状腺功能亢进", "甲状腺肿"], "primary": "甲状腺功能亢进", "handled_alerts": []},
@@ -1127,6 +1139,7 @@ def test_submit_record_actually_persists(client):
     **实际什么都没写** —— 医生以为存下了，刷新就没了。伪造的成功文案
     是最不该出现的一种缺陷：它让人对系统建立错误的信任。
     """
+    _unlock(client, "P003")
     body = client.post(
         "/api/emr/record/submit",
         json={"patient_id": "P003", "fields": {"chief_complaint": "头晕 3 天", "present_illness": "起病急"}},
@@ -1206,6 +1219,7 @@ def test_versions_increment_and_history_is_kept(client):
 
 def test_save_leaves_an_audit_trail(client):
     """落库必须留审计 —— 「写入本地库并留审计」不能只是一句文案。"""
+    _unlock(client, "P003")
     from app.database import SessionLocal
     from app.models import AuditLog
 
@@ -1314,6 +1328,7 @@ def test_requeue_puts_a_finished_patient_back(client):
     出队是不可逆的单向操作 —— 误点一次，医生的列表里就再也找不到这个人。
     必须有一条明确的退路。
     """
+    _unlock(client, "P003")
     client.post("/api/emr/record/submit", json={"patient_id": "P003", "fields": {"chief_complaint": "x"}})
     assert "P003" not in {p["id"] for p in client.get("/api/his/patients").json()}
 
@@ -1749,3 +1764,162 @@ def test_every_event_line_is_valid_json(caplog):
 
     for record in caplog.records:
         json.loads(record.getMessage())  # 抛异常即失败
+
+
+# ================================================================ 就诊状态机
+
+def test_visit_starts_locked(client):
+    """一进来分析是锁着的 —— 那八页的结论不该在医生开口之前就摆出来。"""
+    body = client.get("/api/emr/visit-state/P002").json()
+    assert body["analysis_unlocked"] is False
+    assert body["interview_done"] is False
+    assert body["unlocked_by"] == ""
+
+
+def test_red_alerts_are_available_before_any_interview(client):
+    """
+    危急值不能等。硬规则是纯代码判定，不调模型，一进来就该给 ——
+    让医生在不知道血钾 6.8 的情况下问完一整轮，是不能接受的。
+    """
+    body = client.get("/api/emr/red-alerts/P001").json()
+    assert "alerts" in body
+    assert isinstance(body["open_count"], int)
+    # 不依赖模型：这个端点必须毫秒级，不能触发四岗位并发
+    for alert in body["alerts"]:
+        assert alert.get("source"), "硬规则每条都要带来源，否则医生无从核实"
+
+
+def test_skip_unlocks_and_is_recorded_as_skipped(client):
+    """跳过入口不能少，但要留下「这次没问诊」的痕迹。"""
+    from app.database import SessionLocal
+    from app.models import AuditLog
+
+    body = client.post("/api/emr/analysis/unlock", json={"patient_id": "P003", "reason": "skipped"}).json()
+    assert body["analysis_unlocked"] is True
+    assert body["unlocked_by"] == "skipped"
+    assert body["interview_done"] is False, "跳过不等于问过"
+
+    session = SessionLocal()
+    try:
+        row = (
+            session.query(AuditLog)
+            .filter(AuditLog.action == "analysis_unlock", AuditLog.patient_id == "P003")
+            .order_by(AuditLog.id.desc())
+            .first()
+        )
+    finally:
+        session.close()
+    assert row and row.detail["reason"] == "skipped"
+
+
+def test_unlock_state_survives_reload(client):
+    """刷新一下八页又锁回去，等于让医生重问一遍。"""
+    client.post("/api/emr/analysis/unlock", json={"patient_id": "P007", "reason": "skipped"})
+    assert client.get("/api/emr/visit-state/P007").json()["analysis_unlocked"] is True
+
+
+def test_unknown_unlock_reason_is_rejected(client):
+    """闭集。`reason` 决定界面标「含本次问诊」还是「未含问诊」，不能随便传。"""
+    assert client.post(
+        "/api/emr/analysis/unlock", json={"patient_id": "P001", "reason": "whatever"}
+    ).status_code == 400
+
+
+def test_workstation_does_not_borrow_the_demo_script_as_this_visit_dialog():
+    """
+    跳过问诊时**不能**拿演示脚本当本次问诊。
+
+    那比不给分析更糟：等于把一段医生从没做过的对话，当成了本次就诊的事实，
+    再据此生成「病情概要」「鉴别诊断」。
+    """
+    from app.agents.context import latest_dialog
+    from app.database import SessionLocal
+
+    session = SessionLocal()
+    try:
+        # 回归集与控制台试运行靠种子回落，默认必须保留
+        assert latest_dialog(session, "P001"), "默认要有种子回落，否则回归集没有对话可判"
+        # 工作站这条路不回落
+        assert latest_dialog(session, "P001", seed_fallback=False) == []
+    finally:
+        session.close()
+
+
+def test_finishing_the_interview_unlocks_and_marks_it_as_interviewed(client):
+    """问诊结束是主路径：自动解锁，且标为 interview 而不是 skipped。"""
+    resp = client.post("/api/emr/voice/complete", json={
+        "patient_id": "P004",
+        "conversation_summary": "医生：头晕多久了\n患者：一个月",
+        "messages": [{"role": "doctor", "text": "头晕多久了"}, {"role": "patient", "text": "一个月"}],
+    })
+    assert resp.status_code == 200
+
+    state = client.get("/api/emr/visit-state/P004").json()
+    assert state["analysis_unlocked"] is True
+    assert state["unlocked_by"] == "interview"
+    assert state["interview_done"] is True
+
+
+def test_after_a_real_interview_the_dialog_comes_from_it(client):
+    """
+    问诊做过之后，上下文里的对话必须是**医生实际问的那场**，
+    不是演示脚本 —— 否则这一场问诊等于白做。
+    """
+    from app.agents.context import latest_dialog
+    from app.database import SessionLocal
+
+    client.post("/api/emr/voice/complete", json={
+        "patient_id": "P005",
+        "conversation_summary": "医生：家里有糖尿病史吗\n患者：父亲有",
+        "messages": [{"role": "doctor", "text": "家里有糖尿病史吗"}, {"role": "patient", "text": "父亲有"}],
+    })
+
+    session = SessionLocal()
+    try:
+        dialog = latest_dialog(session, "P005", seed_fallback=False)
+    finally:
+        session.close()
+    assert [t["text"] for t in dialog] == ["家里有糖尿病史吗", "父亲有"]
+
+
+def test_cannot_write_back_before_analysis_exists(client):
+    """
+    分析还没生成过就不能写回。
+
+    改成问诊状态机之后这里差点漏出一个洞：锁着的时候模型红线还不存在，
+    而种子病例又不命中硬规则，于是「未处置红线数」为 0、门禁放行 ——
+    医生可以在从没跑过风险分析的情况下提交病历。
+    把加载时机往后挪，就必须把这一条补上，否则等于把门禁的分母改小了。
+    """
+    resp = client.post("/api/emr/record/submit", json={
+        "patient_id": "P006",
+        "fields": {"chief_complaint": "测试"},
+        "handled_alerts": [],
+    })
+    assert resp.status_code == 409
+    assert "尚未生成 AI 分析" in resp.json()["detail"]
+
+    # 诊断回写走同一道门
+    resp = client.post("/api/emr/diagnosis/write-back", json={
+        "patient_id": "P006", "diagnoses": ["2型糖尿病"], "primary": "2型糖尿病", "handled_alerts": [],
+    })
+    assert resp.status_code == 409
+
+
+def test_write_back_opens_once_analysis_is_generated(client):
+    """跳过问诊也算生成过 —— 医生显式承担了「未含问诊」这个代价。"""
+    client.post("/api/emr/analysis/unlock", json={"patient_id": "P002", "reason": "skipped"})
+    resp = client.post("/api/emr/record/submit", json={
+        "patient_id": "P002",
+        "fields": {"chief_complaint": "胸闷气短 1 个月"},
+        "handled_alerts": [],
+    })
+    assert resp.status_code == 200, resp.json()
+
+
+def test_stash_is_not_gated_by_analysis(client):
+    """暂存的用途就是「还没弄完，先存着」，不该被任何门禁挡。"""
+    resp = client.post("/api/emr/record/stash", json={
+        "patient_id": "P007", "fields": {"chief_complaint": "先记一句"},
+    })
+    assert resp.status_code == 200

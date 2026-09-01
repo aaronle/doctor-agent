@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useWorkstation } from './workstation'
 import type { ReportSummary, RiskItem } from '../api'
@@ -94,11 +94,19 @@ describe('工作站状态', () => {
     ws.draft = { chief_complaint: '上一位患者的草稿' }
     expect(ws.writeBackBlocked).toBe(false)
 
-    // 新患者同样带一条未处置的红色风险
+    // 新患者同样带一条未处置的红色风险。
+    // visit-state 给「已解锁」：改成状态机后，selectPatient 只对解锁过的就诊拉分析。
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        const body = url.includes('/report-summary/') ? makeSummary([{ id: 'r9' }]) : { id: 'P002', name: '张某' }
+        const u = String(url)
+        let body: unknown = { id: 'P002', name: '张某' }
+        if (u.includes('/report-summary/')) body = makeSummary([{ id: 'r9' }])
+        else if (u.includes('visit-state')) {
+          body = { patient_id: 'P002', interview_done: true, analysis_unlocked: true, unlocked_by: 'interview', unlocked_at: '' }
+        } else if (u.includes('red-alerts')) {
+          body = { patient_id: 'P002', alerts: [], handled_alerts: [], open_count: 0 }
+        }
         return new Response(JSON.stringify(body), { status: 200 })
       }),
     )
@@ -109,5 +117,110 @@ describe('工作站状态', () => {
     expect(ws.openRedAlerts.map((a) => a.id)).toEqual(['r9'])
     expect(ws.writeBackBlocked).toBe(true)
     vi.unstubAllGlobals()
+  })
+})
+
+describe('就诊状态机', () => {
+  // 必须自己重置：上一个 describe 的 beforeEach 不覆盖这里，
+  // 沿用同一个 store 的话 patientId 已是 P002，selectPatient 会因 id 相同直接返回。
+  beforeEach(() => setActivePinia(createPinia()))
+
+  /** 一进来只该拉客观数据，不该跑那四个岗位 */
+  function stubEntry(unlocked: boolean, alerts: { id: string; level?: string }[] = []) {
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url)
+        calls.push(u)
+        let body: unknown = { id: 'P002', name: '张某' }
+        if (u.includes('visit-state')) {
+          body = {
+            patient_id: 'P002', interview_done: unlocked, analysis_unlocked: unlocked,
+            unlocked_by: unlocked ? 'interview' : '', unlocked_at: '',
+          }
+        } else if (u.includes('red-alerts')) {
+          body = { patient_id: 'P002', alerts, handled_alerts: [], open_count: alerts.length }
+        } else if (u.includes('/report-summary/')) {
+          body = makeSummary([{ id: 'model-red' }])
+        } else if (u.includes('analysis/unlock')) {
+          body = { ok: true, patient_id: 'P002', interview_done: false, analysis_unlocked: true, unlocked_by: 'skipped', unlocked_at: '' }
+        }
+        return new Response(JSON.stringify(body), { status: 200 })
+      }),
+    )
+    return calls
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('一进来不跑 report-summary —— 那四个岗位的结论要等问诊', async () => {
+    const calls = stubEntry(false)
+    const ws = useWorkstation()
+    await ws.selectPatient('P002')
+
+    expect(ws.analysisUnlocked).toBe(false)
+    expect(calls.some((u) => u.includes('/report-summary/')), '未解锁时不该调分析').toBe(false)
+    // 但客观数据要拉
+    expect(calls.some((u) => u.includes('red-alerts'))).toBe(true)
+    expect(calls.some((u) => u.includes('visit-state'))).toBe(true)
+  })
+
+  it('已解锁的就诊，刷新后要把分析拿回来', async () => {
+    // 否则医生问完一轮、刷新一下，八页又锁回去了
+    const calls = stubEntry(true)
+    const ws = useWorkstation()
+    await ws.selectPatient('P002')
+
+    expect(ws.analysisUnlocked).toBe(true)
+    expect(calls.some((u) => u.includes('/report-summary/'))).toBe(true)
+  })
+
+  it('硬规则红线不等分析 —— 危急值一进来就在门禁里', async () => {
+    // 只取 summary 的话，分析没出来之前 redAlerts 是空的，
+    // 而提交病历那条路在那时候本来就走得通，等于门禁在最需要它的阶段敞开
+    stubEntry(false, [{ id: 'hard-k' }])
+    const ws = useWorkstation()
+    await ws.selectPatient('P002')
+
+    expect(ws.redAlerts.map((a) => a.id)).toEqual(['hard-k'])
+    expect(ws.writeBackBlocked).toBe(true)
+  })
+
+  it('硬规则与模型红线合并去重，不重复计数', async () => {
+    stubEntry(true, [{ id: 'model-red' }])
+    const ws = useWorkstation()
+    await ws.selectPatient('P002')
+    expect(ws.redAlerts.map((a) => a.id)).toEqual(['model-red'])
+  })
+
+  it('跳过问诊会解锁并标 skipped —— 界面据此标「未含问诊」', async () => {
+    stubEntry(false)
+    const ws = useWorkstation()
+    await ws.selectPatient('P002')
+    expect(ws.interviewIncluded).toBe(false)
+
+    await ws.unlockAndAnalyse('skipped')
+    expect(ws.analysisUnlocked).toBe(true)
+    expect(ws.interviewIncluded, '跳过不等于问过').toBe(false)
+  })
+
+  it('换患者时状态归零，不把上一位的解锁带过来', async () => {
+    stubEntry(true)
+    const ws = useWorkstation()
+    await ws.selectPatient('P002')
+    expect(ws.analysisUnlocked).toBe(true)
+
+    stubEntry(false)
+    await ws.selectPatient('P003')
+    expect(ws.analysisUnlocked).toBe(false)
+  })
+
+  it('红线接口返回体缺 alerts 时不能把工作站搞挂', async () => {
+    // Vue 的渲染函数一抛就是整棵树不渲染 —— 白屏，不是局部失败
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })))
+    const ws = useWorkstation()
+    await ws.selectPatient('P002')
+    expect(ws.redAlerts).toEqual([])
   })
 })

@@ -47,6 +47,36 @@ const PROPS = ['fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor
  * 关掉（比如为了露出被盖住的阳性结果），下一个场景就点不到标签页，直接超时。
  * 与其要求每个场景自己收尾，不如让依赖浮层的场景自己确保前置状态。
  */
+/**
+ * 把这一位患者的这场就诊推进到「问诊已完成」。
+ *
+ * 改成问诊状态机之后，智慧诊疗 / 病历管理 / 诊断管理 / 共病管理四页在问诊前是
+ * 锁着的（整页让位给说明卡）——不先解锁，这四页一个元素都取不到，
+ * 比出来会是「重建版缺一大片」，而那是状态差异不是漏做。
+ *
+ * 走 voice/complete 而不是 analysis/unlock：前者会落一份真实 VoiceSession，
+ * 上下文里就有对话，产出的内容量与原件可比；后者是「跳过」，没有对话，
+ * 分析会明显更薄，比的就不是同一个东西了。
+ */
+async function ensureAnalysisUnlocked(page, apiBase, patientId) {
+  await page.evaluate(async ({ base, pid }) => {
+    const state = await fetch(`${base}/api/emr/visit-state/${pid}`).then((r) => r.json()).catch(() => null);
+    if (state?.analysis_unlocked) return;
+    await fetch(`${base}/api/emr/voice/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patient_id: pid,
+        conversation_summary: '门禁脚本：以种子对话推进到问诊完成态',
+        messages: [
+          { role: 'doctor', text: '最近情况怎么样？' },
+          { role: 'patient', text: '和上次差不多，没有明显好转。' },
+        ],
+      }),
+    });
+  }, { base: apiBase, pid: patientId });
+}
+
 async function ensureAiFloat(page) {
   const round = page.locator('.ai-float-btn').first();
   if (await round.isVisible().catch(() => false)) {
@@ -312,6 +342,8 @@ await refPage.waitForTimeout(1500);
 const appPage = await browser.newPage({ viewport: VIEWPORT });
 await appPage.goto(`${APP_URL}/outpatient/list`, { waitUntil: 'networkidle' });
 await appPage.waitForTimeout(1500);
+// 两位取样患者都推进到「问诊已完成」，否则受门禁的四页取不到元素
+for (const pid of ['P001', 'P006']) await ensureAnalysisUnlocked(appPage, APP_URL, pid);
 
 let total = 0;
 let diffs = 0;

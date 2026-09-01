@@ -248,3 +248,54 @@ describe('医嘱三子页', () => {
     expect(rows).toContain('待出结果')
   })
 })
+
+describe('硬规则红线横幅', () => {
+  /**
+   * 它不跟 AI 分析一起锁在问诊门禁后面 —— 让医生在不知道血钾 6.8 的情况下
+   * 问完一整轮，是不能接受的。
+   */
+  it('未问诊、分析还锁着时，红线照样显示', async () => {
+    const wrapper = await render()
+    const ws = useWorkstation()
+    ws.visit = { patient_id: 'P001', interview_done: false, analysis_unlocked: false, unlocked_by: '', unlocked_at: '' } as never
+    ws.hardAlerts = [{ id: 'k', name: '血钾 6.8 mmol/L', level: '高风险', color: '#e6191a', summary: '危急值' }] as never
+    await wrapper.vm.$nextTick()
+
+    const banner = wrapper.find('.redline-banner')
+    expect(banner.exists()).toBe(true)
+    expect(banner.text()).toContain('血钾 6.8')
+    expect(banner.text()).toContain('不依赖模型与问诊')
+  })
+
+  it('处置完就收起 —— 留着一条已闭环的红线只会让人麻木', async () => {
+    const wrapper = await render()
+    const ws = useWorkstation()
+    ws.hardAlerts = [{ id: 'k', name: '血钾 6.8 mmol/L', level: '高风险', color: '#e6191a', summary: '' }] as never
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.redline-banner').exists()).toBe(true)
+
+    ws.markAlertHandled('k')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.redline-banner').exists()).toBe(false)
+  })
+
+  it('没有红线时不占位', async () => {
+    const wrapper = await render()
+    expect(wrapper.find('.redline-banner').exists()).toBe(false)
+  })
+
+  it('「逐条处置」发事件切到预警评估，不另开一套处置入口', async () => {
+    const wrapper = await render()
+    const ws = useWorkstation()
+    ws.hardAlerts = [{ id: 'k', name: '血钾 6.8', level: '高风险', color: '#e6191a', summary: '' }] as never
+    await wrapper.vm.$nextTick()
+
+    const seen: string[] = []
+    const onTab = (e: Event) => seen.push((e as CustomEvent).detail as string)
+    window.addEventListener('da:open-tab', onTab)
+    await wrapper.find('.redline-banner button').trigger('click')
+    window.removeEventListener('da:open-tab', onTab)
+
+    expect(seen).toEqual(['预警评估'])
+  })
+})

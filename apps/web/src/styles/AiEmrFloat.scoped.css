@@ -861,3 +861,28 @@
 .kb-body table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
 .kb-body th,.kb-body td{border:1px solid #e8ecf2;padding:5px 8px;text-align:left}
 .kb-body th{background:#f8fafc;font-weight:600}
+
+/* ---------------------------------------------------------------- 问诊门禁
+ * 这四块是模型基于本次问诊推断的，问诊前锁着。样式刻意做成「说明卡」而不是
+ * 空状态：空面板会让医生以为分析跑失败了，而不是还没到时候。 */
+.gate-pane{padding:18px;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;height:100%}
+.gate-card{width:100%;max-width:560px;display:flex;flex-direction:column;align-items:center;gap:9px;padding:24px 22px;border:1px dashed #dfe3e9;border-radius:10px;background:#f7f9fc;text-align:center}
+.gate-icon{font-size:22px;line-height:1}
+.gate-title{font-size:14px;font-weight:700;color:#1a2a4a}
+.gate-why{margin:0;font-size:12px;line-height:1.65;color:#6b7280;text-align:left;width:100%}
+.gate-why b{color:#374151}
+.gate-actions{display:flex;gap:8px;padding-top:2px}
+.gate-foot{margin:0;font-size:11px;line-height:1.6;color:#9ca3af;text-align:left;width:100%}
+.gate-progress{width:100%;display:flex;flex-direction:column;gap:5px;padding-top:6px}
+.gate-progress-bar{height:6px;border-radius:3px;background:#fff;border:1px solid #e0e4ea;overflow:hidden}
+.gate-progress-done{height:100%;background:#1677ff;transition:width .3s}
+.gate-progress-text{font-size:11px;color:#1677ff;font-weight:500}
+
+/* 锁着的标签页压暗但留在原位 —— 消失会让人以为系统没这功能 */
+.ttab.locked{opacity:.45}
+.ttab-lock{font-size:9px;margin-right:3px}
+
+/* 解锁后的来源横幅。跳过路径必须如实标「未含问诊」 */
+.gate-banner{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:7px 11px;border-radius:6px;background:#eefaf0;color:#16a34a;font-size:11px;font-weight:600}
+.gate-banner.skipped{background:#fffaeb;color:#d97706}
+.gate-banner-meta{margin-left:auto;font-weight:400;color:#6b7280}

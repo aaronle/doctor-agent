@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -36,7 +37,7 @@ from ..agents import (
     voice_summary_agent,
 )
 from .. import cache
-from ..agents.context import build_context, latest_dialog, seed_items, seed_payload
+from ..agents.context import build_context, has_interview, latest_dialog, seed_items, seed_payload
 from ..audit import next_id, record_audit
 from ..schemas import StrictIn
 from ..database import SessionLocal, get_session
@@ -141,6 +142,111 @@ def knowledge_detail(key: str) -> dict:
 # ------------------------------------------------------------------ 聚合读取
 
 
+# ------------------------------------------------------------------ 就诊状态机
+
+"""
+桌面端的问诊流程分三态：进入 → 问诊中 → 已生成。
+
+**为什么要有这个状态**：改之前，八个 AI 标签页的结论是在医生跟患者说第一句话
+**之前**就算好的 —— 只基于种子档案，不含任何问诊内容。摆在那里会让医生先看到
+答案再去找证据，那是锚定，不是辅助。
+
+**什么锁、什么不锁**，按「证据从哪来」分：
+
+| 不锁（一进来就给） | 锁（问诊后才给） |
+| --- | --- |
+| 硬规则红色风险 —— 纯代码判定，危急值不能等 | 病情概要 |
+| 阳性结果、检查检验 —— HIS 已有 | 鉴别诊断 |
+| 健康档案、时间轴 —— HIS 已有 | 共病管理 |
+| 专项评估目录 —— 静态字典 | 病历草稿 |
+
+锁着的部分**留在原位并说明原因**，不是让它消失：消失会让医生以为系统没这功能。
+"""
+
+UNLOCK_REASONS = {"interview", "skipped"}
+
+
+def _visit_state(session: Session, patient) -> dict:
+    payload = patient.payload or {}
+    unlock = payload.get("analysis_unlock") or {}
+    return {
+        "patient_id": patient.id,
+        "interview_done": has_interview(session, patient.id),
+        "analysis_unlocked": bool(unlock.get("reason")),
+        "unlocked_by": unlock.get("reason", ""),
+        "unlocked_at": unlock.get("at", ""),
+    }
+
+
+def _unlock_analysis(session: Session, patient, reason: str) -> dict:
+    payload = patient.payload or {}
+    payload["analysis_unlock"] = {"reason": reason, "at": datetime.now(UTC).isoformat()}
+    patient.payload = payload
+    flag_modified(patient, "payload")
+    record_audit(
+        session,
+        action="analysis_unlock",
+        entity="patient",
+        entity_id=patient.id,
+        patient_id=patient.id,
+        detail={"reason": reason},
+    )
+    event("analysis_unlock", patient=patient.id, reason=reason)
+    return _visit_state(session, patient)
+
+
+@router.get("/visit-state/{patient_id}")
+def visit_state(patient_id: str, session: Session = Depends(get_session)) -> dict:
+    """
+    这一场就诊走到哪了。刷新页面后要能恢复 ——
+    否则医生问完一轮、刷新一下，八个标签页又锁回去了。
+    """
+    return _visit_state(session, _patient_or_404(session, patient_id))
+
+
+class UnlockIn(StrictIn):
+    patient_id: str
+    reason: str = "skipped"
+
+
+@router.post("/analysis/unlock")
+def unlock_analysis(body: UnlockIn, session: Session = Depends(get_session)) -> dict:
+    """
+    解锁 AI 分析。
+
+    两条路径：问诊结束（`interview`，由 voice/complete 自动调）与
+    医生显式跳过（`skipped`）。**跳过这条不能少** —— 复诊、患者不配合、
+    医生已自行问完，这些情况下分析不能因此永远出不来。
+    """
+    if body.reason not in UNLOCK_REASONS:
+        raise HTTPException(status_code=400, detail=f"未知解锁原因：{body.reason}")
+    patient = _patient_or_404(session, body.patient_id)
+    state = _unlock_analysis(session, patient, body.reason)
+    session.commit()
+    return {"ok": True, **state}
+
+
+@router.get("/red-alerts/{patient_id}")
+def red_alerts(patient_id: str, session: Session = Depends(get_session)) -> dict:
+    """
+    硬规则红色风险。**纯代码判定，不调模型，毫秒级返回。**
+
+    单独开这个端点，是为了让工作站一进来就能显示危急值 —— 不必等
+    report-summary 那 18–20 秒的四岗位并发，更不能等问诊结束。
+    让医生在不知道血钾 6.8 的情况下问完一整轮，是不能接受的。
+    """
+    patient = _patient_or_404(session, patient_id)
+    ctx = build_context(session, patient)
+    alerts = hard_rule_alerts(ctx)
+    handled = (patient.payload or {}).get("handled_alerts", [])
+    return {
+        "patient_id": patient_id,
+        "alerts": alerts,
+        "handled_alerts": handled,
+        "open_count": len([a for a in alerts if a["id"] not in handled]),
+    }
+
+
 @router.get("/report-summary/{patient_id}")
 async def report_summary(
     patient_id: str,
@@ -148,7 +254,9 @@ async def report_summary(
     session: Session = Depends(get_session),
 ) -> dict:
     patient = _patient_or_404(session, patient_id)
-    ctx = build_context(session, patient, include_dialog=True)
+    # seed_dialog_fallback=False：医生跳过问诊时，拿一段他从没做过的演示对话
+    # 去生成「病情概要」「鉴别诊断」，比不给分析更糟 —— 那是把演示数据当事实。
+    ctx = build_context(session, patient, include_dialog=True, seed_dialog_fallback=False)
 
     cache_key = cache.context_key(patient_id, ctx)
     if not refresh:
@@ -750,6 +858,8 @@ async def voice_complete(body: VoiceCompleteIn, session: Session = Depends(get_s
         patient_id=body.patient_id,
         detail={"provider": outcome.provider, "turns": len(body.messages)},
     )
+    # 问诊结束即解锁分析。这是主路径 —— 跳过是例外，不是常态。
+    _unlock_analysis(session, patient, "interview")
     session.commit()
 
     return {
@@ -796,9 +906,23 @@ def _assert_red_alerts_closed(session: Session, patient, handled: list[str], *, 
     抽成函数是因为提交病历与回写诊断都要用它 —— 各写一份的话，
     哪天规则改了必然漏掉一处，而漏掉的那处就是一个能绕过红线的入口。
     """
+    # 分析还没生成过就不能写回。
+    #
+    # 改成问诊状态机之后这里差点漏出一个洞：锁着的时候模型红线还不存在，
+    # 而种子病例又不命中硬规则，于是 open_red 为空、门禁放行 —— 医生可以在
+    # 从没跑过风险分析的情况下提交病历。改之前一进来就跑分析，红线总是在的；
+    # 把加载时机往后挪，就必须把这一条补上，否则等于把门禁的分母改小了。
+    state = _visit_state(session, patient)
+    if not state["analysis_unlocked"]:
+        event("redline_blocked", patient=patient.id, action=action, reason="analysis_not_generated")
+        raise HTTPException(
+            status_code=409,
+            detail=f"本次就诊尚未生成 AI 分析，风险未经评估，已阻断{action}。请先完成问诊，或选择「跳过问诊，直接分析」。",
+        )
+
     ctx = build_context(session, patient)
     hard = hard_rule_alerts(ctx)
-    cached = cache.get(cache.context_key(patient.id, build_context(session, patient, include_dialog=True)))
+    cached = cache.get(cache.context_key(patient.id, build_context(session, patient, include_dialog=True, seed_dialog_fallback=False)))
     model_alerts = (cached or {}).get("risk_alerts", [])
     all_red = {a["id"] for a in hard} | {a["id"] for a in model_alerts if a.get("level") == "高风险"}
     open_red = sorted(all_red - set(handled or []))
