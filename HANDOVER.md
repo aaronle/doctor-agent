@@ -195,6 +195,9 @@ Figma：**AI 门诊工作站 · 一期设计系统**
 - [x] Nginx 站点，两个 SSE 端点 `proxy_buffering off`（certbot 重写后已复查仍在）
 - [x] Certbot 独立证书，至 2026-11-29，续期演练通过
 - [x] 公网逐功能验收
+- [x] 2026-09-01 移动端发布并公网复验：390×844 零元素溢出、零控制台报错，
+      对话往返 2.3s，三个面板零可点写入动作；桌面 1600px 仍是 `.workstation-page`
+      且「提交病历」在位；同机 aits/site/nginx 全部 200
 - [ ] 模型配额是否需要与 Ticket System 分开计（两者共用同一个网关和同一把 key）
 
 备案不阻塞：`aaronhealth.cn` 已备案（`粤ICP备2026119734号`，主体乐颖，服务器

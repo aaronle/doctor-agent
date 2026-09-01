@@ -27,9 +27,9 @@ Langfuse，且不允许使用真实患者数据。
 `.env.runtime` 以 `env.runtime.example` 为模板，权限必须为 `600`，其中包含
 `AI_API_KEY`。该文件不进 Git、不进日志、不下发前端、不出现在健康接口。
 
-## 部署前必读：这台机器的三个坑
+## 部署前必读：这台机器的四个坑
 
-首次部署实测踩到，写下来避免重犯。
+实测踩到，写下来避免重犯。
 
 **1. Docker Hub 拉不动，用腾讯云内网镜像源**
 
@@ -63,6 +63,43 @@ SQLite 报 `unable to open database file`。
 
 正解是让容器以数据目录属主的 uid 运行（compose 里的 `user: "1000:1000"`），
 并把目录 chown 成同一 uid —— 比 chmod 777 或加回 CAP_DAC_OVERRIDE 都干净。
+
+**4. `--exclude 'data'` 会连源码里的 `apps/api/app/data/` 一起排掉**
+
+2026-09-01 发布移动端时实测踩到：本意是排掉运行时数据目录，但 rsync 的
+`--exclude 'data'` 是**不锚定**的，任何层级的 `data` 目录都会命中，包括
+源码里的 `apps/api/app/data/`（`assessment_catalog.json`、`knowledge_base.json`）。
+
+第一段 rsync 把它排在了 `/tmp/da-src/` 之外，第二段
+`sudo rsync -a --delete /tmp/da-src/ /opt/doctor-agent/source/` 没有任何 exclude，
+于是把它从服务器源码树里删了。镜像重建后 `/api/emr/assessment-catalog` 返回 500：
+
+```
+FileNotFoundError: '/app/apps/api/app/data/assessment_catalog.json'
+```
+
+**排除模式一律加前导斜杠锚定到根**：
+
+```sh
+rsync -az --delete \
+  --exclude '/.git' --exclude 'node_modules' --exclude '/.venv' \
+  --exclude '/apps/web/dist' --exclude '/.env' --exclude '/data' \
+  -e "ssh -i ~/.ssh/id_ed25519" ./ ubuntu@81.71.155.220:/tmp/da-src/
+```
+
+（`node_modules` 是有意不锚定的 —— 它在每个 workspace 下都有。）
+
+持久化的 SQLite 在 `/opt/doctor-agent/data/`，**不在 `source/` 里**，
+所以这次没被波及。但这正说明第二段 rsync 的 `--delete` 作用域必须只有
+`source/`，绝不能指向 `/opt/doctor-agent/`。
+
+发布后至少要打一次这两个读文件的端点，光看 `/api/health` 发现不了 ——
+健康接口不读这两个 JSON：
+
+```sh
+curl -fsS -o /dev/null -w "catalog %{http_code}\n" http://127.0.0.1:3400/api/emr/assessment-catalog
+curl -fsS -o /dev/null -w "kb      %{http_code}\n" http://127.0.0.1:3400/api/emr/knowledge
+```
 
 ## 候选验证
 
