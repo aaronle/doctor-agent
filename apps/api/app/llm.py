@@ -95,9 +95,11 @@ class LlmClient:
             body["response_format"] = {"type": "json_object"}
         if stream:
             body["stream"] = True
-        # Haiku 用于结构化临床输出，必须可复现；温度固定为 0
-        if "haiku" in model:
-            body["temperature"] = 0
+        # 结构化临床输出必须可复现：同一份上下文两次生成的病历应当一致，否则无法复核。
+        # **温度固定为 0，与用哪个模型无关。** 早先这里写的是 `if "haiku" in model`，
+        # 把模型名当成了判据 —— 2026-09-02 换到 Sonnet 后这个分支再也不触发，
+        # 温度悄悄变成网关默认值。判据应该是「这是不是临床结构化输出」，而不是模型叫什么。
+        body["temperature"] = 0
         return body
 
     async def complete_json(

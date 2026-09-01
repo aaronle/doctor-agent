@@ -5,3 +5,16 @@ pydantic-settings==2.10.1
 python-multipart==0.0.20
 httpx==0.28.1
 pytest==8.4.1
+
+# ---------------------------------------------------------------- 编排层
+# AgentScope 锁 1.x：2.x 是破坏性重写（ReActAgent 被移除），且 1.x 是参考项目
+# patient-agents 在跑的版本，两边可以互相搬 skill。升级前先读 2.0 迁移指南。
+agentscope==1.0.20
+# agentscope 1.0.20 依赖 mcp 的 streamablehttp_client；新版 mcp 把它改名成
+# streamable_http_client，不锁会在 import agentscope 时直接崩。
+mcp==1.27.1
+# agentscope.evaluate 无条件 import tqdm，但它自己没声明这个依赖
+tqdm==4.67.1
+# 解析 SKILL.md 的 YAML frontmatter
+python-frontmatter==1.1.0
+PyYAML==6.0.2

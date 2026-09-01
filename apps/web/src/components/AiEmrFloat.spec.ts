@@ -767,3 +767,52 @@ describe('问诊门禁', () => {
     expect(wrapper.find('.gate-banner').exists()).toBe(false)
   })
 })
+
+describe('风险名按等级着色', () => {
+  /**
+   * 这个映射原本由还原度门禁守着。但 `.ra-card-name` 的颜色绑在 `risk.color` 上，
+   * 而风险等级是**模型判的** —— 2026-09-02 换到 Sonnet 5 后同一个病例的首条风险
+   * 由高风险变中风险，颜色红变橙，门禁把内容差异报成了还原度差异。
+   *
+   * 那条比对已按选择器豁免 `color`，映射改由这里守：换个地方守，不是放掉。
+   */
+  const ALERTS = [
+    { id: 'a1', name: '心肌缺血迹象', level: '高风险', color: 'danger', summary: 's' },
+    { id: 'a2', name: '低血糖风险', level: '中风险', color: 'warning', summary: 's' },
+  ]
+
+  it('danger 用 .ra-name-danger，warning 用 .ra-name-warning', async () => {
+    stubFetch()
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    ws.visit = UNLOCKED_VISIT as never
+    ws.summary = { risk_assessments: ALERTS, risk_alerts: [], _meta: {} } as never
+    await wrapper.vm.$nextTick()
+
+    const names = wrapper.findAll('.ra-card-name')
+    expect(names).toHaveLength(2)
+    expect(names[0].classes()).toContain('ra-name-danger')
+    expect(names[1].classes()).toContain('ra-name-warning')
+  })
+
+  it('卡片底色跟着同一个判据走，不另起一套', async () => {
+    stubFetch()
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] },
+      attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    ws.visit = UNLOCKED_VISIT as never
+    ws.summary = { risk_assessments: ALERTS, risk_alerts: [], _meta: {} } as never
+    await wrapper.vm.$nextTick()
+
+    const cards = wrapper.findAll('.ra-card')
+    expect(cards[0].classes()).toContain('ra-card-danger')
+    expect(cards[1].classes()).toContain('ra-card-warning')
+  })
+})

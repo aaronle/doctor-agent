@@ -1,0 +1,23 @@
+# Worker：共病管理
+#
+# 挂载的 skill、暴露给 Master 的工具名、模型参数在此显式声明。
+# 一份通用工厂（worker_factory.build_worker）负责组装，代码里没有 if/elif。
+name: comorbidity
+display-name: 共病管理
+
+# system prompt = 平台安全层 + 本文件的 prompt（如有）+ 各 skill 正文按序拼接
+# 工具白名单 = 各 skill 声明的 tools 并集
+skills:
+  - comorbidity-management
+
+# Master 分发时暴露的工具名
+worker-tool-name: call_comorbidity_management
+
+# description 缺省取第一个 skill 的 description；需要独立文案时在此覆盖
+# description: ...
+
+# 缺省回退 settings.DEFAULT_MODEL（claude-sonnet-5）
+# model: claude-sonnet-5
+
+# ReAct 最大迭代轮数（缺省 8）
+# max-iters: 8

@@ -21,6 +21,9 @@ from .models import AgentVersion
 
 # 模型档位是稳定别名。业务代码只认档位，不认具体模型名 ——
 # 换 Haiku 版本或接院内模型时，医生端调用协议不动。
+# 三个档位当前都落到同一个模型（Sonnet 5）。**保留档位这层抽象**是有意的：
+# 它让「换模型」成为改一处映射的事，而不是去六个岗位配置里逐个改 model ID。
+# 将来若要给鉴别诊断单独上 Opus，只需把 clinical_reasoning 指到 smart。
 MODEL_TIERS: dict[str, str] = {
     "clinical_fast": "fast",
     "clinical_reasoning": "fast",

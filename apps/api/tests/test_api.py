@@ -1949,3 +1949,204 @@ def test_objective_timeline_includes_this_visit_actions(client):
     })
     after = client.get("/api/emr/objective/P006").json()["timeline"]
     assert len(after) > before
+
+
+def test_clinical_output_temperature_is_pinned_regardless_of_model():
+    """
+    结构化临床输出必须可复现：同一份上下文两次生成的病历应当一致，否则无法复核。
+
+    早先这里写的是 `if "haiku" in model` —— 把模型名当成了判据。2026-09-02 换到
+    Sonnet 后那个分支再也不触发，温度悄悄变成网关默认值。判据应该是
+    「这是不是临床结构化输出」，而不是模型叫什么。
+    """
+    from app.llm import ChatMessage, LlmClient
+
+    client = LlmClient()
+    msgs = [ChatMessage(role="user", content="x")]
+    for model in ("claude-sonnet-5", "claude-haiku-4-5-20251001", "some-future-model"):
+        body = client._body(msgs, model=model, json_mode=True, stream=False)
+        assert body.get("temperature") == 0, f"{model} 的温度没有固定为 0"
+
+
+def test_default_models_are_sonnet5():
+    """一期六个岗位统一用 Sonnet 5。"""
+    from app.config import get_ai_settings
+
+    ai = get_ai_settings()
+    assert "sonnet-5" in ai.fast_model, ai.fast_model
+    assert "sonnet-5" in ai.smart_model, ai.smart_model
+
+
+# ================================================================ 编排层（AgentScope）
+
+def test_topology_exposes_all_four_layers(client):
+    """
+    拓扑要能看出 Master / Worker / Skill / Tool 四层的装配。
+    这是 CI/CD 平台「智能体」那一侧的数据源 —— 界面不该去翻 YAML。
+    """
+    body = client.get("/api/orchestration/topology").json()
+
+    assert body["master"]["name"] == "doctor"
+    assert body["master"]["has_persona"], "Master 是医生本人，必须有 persona，不是纯路由"
+    assert len(body["master"]["workflow"]) == 6
+
+    names = {w["name"] for w in body["workers"]}
+    assert names == {"summary", "diagnosis", "record", "risk", "comorbidity", "voice"}
+
+    for w in body["workers"]:
+        assert w["skills"], f"{w['name']} 没挂 skill"
+        assert w["tool_name"].startswith("call_")
+        for s in w["skills"]:
+            assert s["tools"], f"{s['name']} 没声明任何工具"
+            assert s["prompt_chars"] > 200, f"{s['name']} 的 SKILL.md 正文太短，像是没写完"
+
+
+def test_every_declared_tool_is_registered():
+    """
+    SKILL.md 里打错一个工具名，等于那个能力悄悄消失 —— Agent 看起来一切正常，
+    只是再也不会去查那份数据。必须在测试里炸，而不是在跑的时候。
+    """
+    from app.orchestration import TOOL_REGISTRY, load_all_skills
+
+    unknown: dict[str, list[str]] = {}
+    for name, manifest in load_all_skills().items():
+        missing = [t for t in manifest.all_tools if t not in TOOL_REGISTRY]
+        if missing:
+            unknown[name] = missing
+    assert not unknown, f"声明了未注册的工具：{unknown}"
+
+
+def test_every_worker_skill_exists():
+    """agent_configs 里引用了不存在的 skill，装配时才炸就太晚了。"""
+    from app.orchestration import load_all_agents, load_all_skills
+
+    skills = load_all_skills()
+    _master, workers = load_all_agents()
+    for name, profile in workers.items():
+        for s in profile.skills:
+            assert s in skills, f"worker {name} 引用了不存在的 skill：{s}"
+
+
+def test_exactly_one_master():
+    """两个 Master 或零个 Master 都是配置事故，必须在加载时就报出来。"""
+    from app.orchestration import load_all_agents
+
+    master, workers = load_all_agents()
+    assert master.is_master and not master.skills
+    assert all(not w.is_master for w in workers.values())
+
+
+def test_safety_layer_comes_first_and_is_not_editable():
+    """
+    顺序即优先级：安全层必须在最前，后面的内容不得覆盖它的红线。
+    这一条如果坏了，「不得自行确诊」「未问诊不写否认」就成了摆设。
+    """
+    from app.orchestration import SAFETY_LAYER, load_all_agents, load_all_skills
+    from app.orchestration.worker_factory import _system_prompt
+
+    skills = load_all_skills()
+    _master, workers = load_all_agents()
+    profile = workers["record"]
+    prompt = _system_prompt(profile, [skills[s] for s in profile.skills], patient_id="P001")
+
+    assert prompt.startswith(SAFETY_LAYER), "安全层必须排在最前"
+    for red_line in ("不做确诊", "未问诊不写否认", "不得编造", "硬规则判定不可推翻"):
+        assert red_line in prompt, f"安全层缺少红线：{red_line}"
+
+
+def test_patient_placeholder_is_substituted():
+    """占位符没替换掉的话，工具调用会带着 <PATIENT_ID> 去查，查不到任何东西。"""
+    from app.orchestration import load_all_agents, load_all_skills
+    from app.orchestration.worker_factory import PATIENT_ID_PLACEHOLDER, _system_prompt
+
+    skills = load_all_skills()
+    _master, workers = load_all_agents()
+    profile = workers["summary"]
+    prompt = _system_prompt(profile, [skills[s] for s in profile.skills], patient_id="P001")
+    assert PATIENT_ID_PLACEHOLDER not in prompt
+    assert "P001" in prompt
+
+
+def test_tools_are_read_only():
+    """
+    一期不给 Agent 自主写入的能力。Agent 能改病历 = 未确认写回，那是零容忍红线。
+    这条测试盯的是「有没有人往注册表里加了一个写工具」。
+    """
+    from app.orchestration import TOOL_REGISTRY
+
+    # 按**动词前缀**判，不按子串：get_current_orders 是读，create_order 才是写。
+    # 用子串会把名词里带 order/write 的读工具一起误伤，然后有人为了让测试过而放宽它。
+    read_verbs = ("get_", "search_", "list_", "run_", "check_")
+    write_verbs = ("create_", "update_", "delete_", "submit_", "write_", "set_", "apply_", "send_")
+
+    bad_prefix = [n for n in TOOL_REGISTRY if n.startswith(write_verbs)]
+    assert not bad_prefix, f"注册表里出现了写入工具：{bad_prefix}"
+
+    not_read = [n for n in TOOL_REGISTRY if not n.startswith(read_verbs)]
+    assert not not_read, f"工具名必须以只读动词开头，便于一眼看出是读是写：{not_read}"
+
+
+def test_tool_returns_structured_not_prose(client):
+    """工具只负责事实，措辞是 skill 的事。返回体必须是可解析的 JSON。"""
+    import json
+
+    from app.orchestration.tools import get_patient
+
+    resp = get_patient("P001")
+    payload = json.loads(resp.content[0]["text"])
+    assert payload["found"] is True
+    assert payload["id"] == "P001"
+
+
+def test_tool_says_not_found_instead_of_empty_shell():
+    """
+    查不到就如实说查不到。返回空壳会让模型分不清
+    「没有这项检查」和「这项检查全正常」—— 那是两件完全不同的事。
+    """
+    import json
+
+    from app.orchestration.tools import get_lab_results
+
+    payload = json.loads(get_lab_results("P999").content[0]["text"])
+    assert payload["found"] is False
+    assert "P999" in payload["reason"]
+
+
+def test_interview_tool_never_borrows_the_demo_script():
+    """
+    没做过问诊时不得回落演示脚本。拿一段医生从没做过的对话当本次问诊的事实，
+    比没有对话更糟。
+    """
+    import json
+
+    from app.orchestration.tools import get_interview_dialog
+
+    payload = json.loads(get_interview_dialog("P002").content[0]["text"])
+    assert payload["turns"] == 0
+    assert payload["found"] is False
+    assert "臆测" in payload["note"]
+
+
+def test_department_tool_is_a_closed_set():
+    """推荐科室必须来自闭集 —— 患者会照着去挂号，挂不到就是医院的事故。"""
+    import json
+
+    from app.orchestration.tools import search_department
+
+    payload = json.loads(search_department("骨").content[0]["text"])
+    assert payload["departments"] == ["骨科"]
+    miss = json.loads(search_department("外星科").content[0]["text"])
+    assert miss["found"] is False
+    assert miss["all_departments"], "未命中时要把闭集给出来，否则模型只能自己编"
+
+
+def test_unknown_worker_is_404(client):
+    assert client.post(
+        "/api/orchestration/workers/nope/run", json={"patient_id": "P001", "task": "x"}
+    ).status_code == 404
+
+
+def test_unknown_patient_is_404(client):
+    assert client.post(
+        "/api/orchestration/ask", json={"patient_id": "P999", "question": "x"}
+    ).status_code in (404, 503)

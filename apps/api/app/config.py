@@ -34,7 +34,10 @@ class AiSettings(BaseSettings):
 
     api_key: str = ""
     base_url: str = "https://www.meatdc.com/v1"
-    fast_model: str = "claude-haiku-4-5-20251001"
+    # 2026-09-02 由 Haiku 4.5 换到 Sonnet 5。六个岗位做的是「读证据 → 下结论 → 标依据」，
+    # Haiku 在这类任务上更早停手、更容易漏掉该查的工具，产出常是「血糖控制不佳」这种
+    # 没有数值的空话。临床上「少查一次」的代价高于多花的那几秒。
+    fast_model: str = "claude-sonnet-5"
     smart_model: str = "claude-sonnet-5"
     timeout_ms: int = 45000
     # "rules" 时全部 Agent 走确定性本地规则，不调模型；用于离线开发与测试

@@ -22,6 +22,11 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY apps/api/app /app/apps/api/app
 
+# 编排层的两份声明式资产。**必须进镜像** —— 少了它们服务能起来，
+# 但 /api/orchestration/topology 会 500，六个 worker 一个都装不出来。
+COPY apps/api/skills /app/apps/api/skills
+COPY apps/api/agent_configs /app/apps/api/agent_configs
+
 # 临床种子。启动时由 app/seed.py 导入，路径按 apps/api/app 上溯三层解析，
 # 因此镜像内必须保持与仓库一致的相对位置，否则启动建库后无数据。
 COPY references/ui-demo/extracted/fixtures /app/references/ui-demo/extracted/fixtures

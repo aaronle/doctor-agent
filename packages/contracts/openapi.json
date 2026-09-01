@@ -69,6 +69,129 @@
         }
       }
     },
+    "/api/orchestration/topology": {
+      "get": {
+        "tags": [
+          "orchestration"
+        ],
+        "summary": "Topology",
+        "description": "编排拓扑：Master / Worker / Skill / Tool 四层的当前装配。\n\n这是 CI/CD 平台「智能体」那一侧的数据源 —— 界面上要能看出\n「哪个 worker 挂了哪些 skill、能调哪些工具」，而不是去翻 YAML。",
+        "operationId": "topology_api_orchestration_topology_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Topology Api Orchestration Topology Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orchestration/ask": {
+      "post": {
+        "tags": [
+          "orchestration"
+        ],
+        "summary": "Ask Master",
+        "description": "问主诊医生。Master 自行决定叫哪些助手、要不要采纳。\n\n**不做流式**：Master 的价值在于它对多个 worker 结果的取舍，\n那个判断只有在全部 worker 回来之后才成立。中途流式吐字会让使用者\n看到尚未被取舍的中间结论，那比等一会儿更糟。",
+        "operationId": "ask_master_api_orchestration_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ask Master Api Orchestration Ask Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orchestration/workers/{worker_name}/run": {
+      "post": {
+        "tags": [
+          "orchestration"
+        ],
+        "summary": "Run Worker",
+        "description": "单独跑一个 worker，绕过 Master。\n\n用途是调试与回归：要判断「是这个岗位的 skill 写坏了，还是 Master 派错了活」，\n就必须能单独驱动它。",
+        "operationId": "run_worker_api_orchestration_workers__worker_name__run_post",
+        "parameters": [
+          {
+            "name": "worker_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Worker Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerRunIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Run Worker Api Orchestration Workers  Worker Name  Run Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/his/patients": {
       "get": {
         "tags": [
@@ -2269,6 +2392,39 @@
         ],
         "title": "AlertHandleIn"
       },
+      "AskIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "workers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "patient_id",
+          "question"
+        ],
+        "title": "AskIn"
+      },
       "ChatIn": {
         "properties": {
           "patient_id": {
@@ -2863,6 +3019,25 @@
           "patient_id"
         ],
         "title": "VoiceTurnIn"
+      },
+      "WorkerRunIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "patient_id",
+          "task"
+        ],
+        "title": "WorkerRunIn"
       }
     }
   }

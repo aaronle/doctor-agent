@@ -1,0 +1,28 @@
+# Master Agent —— 医生本人。
+#
+# skills 为空即表示这是 Master（见 agent_loader.load_all_agents）。
+# 它不是路由器：有自己的人格（persona）、记忆（InMemoryMemory）与执业规则，
+# workers 是他手下的专科助手，回答对他是建议而非结论。
+name: doctor
+display-name: 主诊医生
+
+# 无 skills = Master
+skills: []
+
+prompt-file: prompts/doctor-persona.md
+
+# 常规顺序（写进 prompt 作为建议，不是死流程）。
+# 看诊不是固定流程：危急值优先、患者不配合时跳过问诊、复诊直接看趋势，都由 Master 判断。
+workflow:
+  - call_risk_management
+  - call_voice_interview
+  - call_condition_summary
+  - call_differential_diagnosis
+  - call_comorbidity_management
+  - call_record_generation
+
+# 缺省回退 settings.DEFAULT_MODEL（claude-sonnet-5）
+# model: claude-sonnet-5
+
+# Master 要串六个助手，轮数给得比 worker 宽
+max-iters: 12

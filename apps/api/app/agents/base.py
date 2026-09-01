@@ -183,7 +183,7 @@ class Agent:
 
         outcome = AgentOutcome(
             data=data,
-            provider="haiku",
+            provider=result.model or "claude",
             model=result.model,
             elapsed_ms=result.elapsed_ms,
         )

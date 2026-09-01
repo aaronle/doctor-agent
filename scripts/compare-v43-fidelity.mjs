@@ -33,6 +33,24 @@ const VIEWPORT = { width: 1600, height: 1000 };
 // 不是还原度差异。真正决定观感的是字号、字重、行高、配色与盒模型内距。
 const PROPS = ['fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor', 'padding', 'borderRadius'];
 
+/**
+ * 逐选择器豁免的属性，**必须写明理由**。
+ *
+ * 这里放的是「取值由模型输出决定」的属性 —— 与上面刻意不比 width/height 同一类原因：
+ * 那不是还原度差异，是内容差异。
+ *
+ * `.ra-card-name` 的颜色绑在 `risk.color`（danger/warning）上，而风险等级是模型判的。
+ * 2026-09-02 把模型从 Haiku 换到 Sonnet 5 之后，P006 首条风险由高风险变中风险，
+ * 颜色随之红变橙 —— 样式规则本身（.ra-name-danger #e6191a / .ra-name-warning #e6a23c）
+ * 一个字没改。
+ *
+ * **豁免不等于不管**：这两个类名到颜色的映射由单元测试盯着
+ * （AiEmrFloat.spec.ts「风险名按等级着色」），换个地方守，不是放掉。
+ */
+const PROP_EXEMPTIONS = {
+  '.ra-card-name': ['color'],
+};
+
 // 每个页面挑一组有代表性的 class 做比对
 /**
  * 把 ＋ 菜单点到「确定展开」。
@@ -375,7 +393,8 @@ for (const target of PAGES) {
     if (!ref[selector]) { console.log(`  ? ${selector.padEnd(22)} 原件中不存在，跳过`); continue; }
     if (!app[selector]) { console.log(`  ✗ ${selector.padEnd(22)} 重建版缺失该元素`); missing += 1; continue; }
 
-    const bad = PROPS.filter((p) => ref[selector][p] !== app[selector][p]);
+    const exempt = PROP_EXEMPTIONS[selector] || [];
+    const bad = PROPS.filter((p) => !exempt.includes(p) && ref[selector][p] !== app[selector][p]);
     total += 1;
     if (!bad.length) {
       console.log(`  ✓ ${selector.padEnd(22)} 一致`);
