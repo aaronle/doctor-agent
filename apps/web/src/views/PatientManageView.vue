@@ -4,13 +4,16 @@ import { useRouter } from 'vue-router'
 import { Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
+import MobilePatientManage from '../mobile/MobilePatientManage.vue'
 import { api, type PatientListItem } from '../api'
+import { useIsMobile } from '../composables/useMediaQuery'
 import { useSession } from '../stores/session'
 
 type ManagedPatient = PatientListItem & { in_queue: boolean; reminded: boolean }
 
 const router = useRouter()
 const session = useSession()
+const isMobile = useIsMobile()
 
 const rows = ref<ManagedPatient[]>([])
 const loading = ref(false)
@@ -38,8 +41,12 @@ function riskType(level: string) {
 }
 
 async function requeue(row: ManagedPatient) {
+  await requeueById(row.id)
+}
+
+async function requeueById(id: string) {
   try {
-    const result = await api.requeuePatient(row.id)
+    const result = await api.requeuePatient(id)
     ElMessage.success(result.message)
     await load()
   } catch (error) {
@@ -86,7 +93,21 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="pm-page">
+  <!--
+    移动端把九列表格换成卡片：390px 里九列必然溢出，而 overflow:hidden
+    会把溢出的列裁掉 —— 不是「要横滑」，是够不着。
+  -->
+  <MobilePatientManage
+    v-if="isMobile"
+    :rows="rows"
+    :loading="loading"
+    @refresh="load"
+    @remind="remind"
+    @requeue="requeueById"
+    @logout="logout"
+  />
+
+  <div v-else class="pm-page">
     <div class="his-header">
       <div class="his-header-left">
         <span class="his-logo">🏥</span>

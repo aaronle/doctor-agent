@@ -4,11 +4,14 @@ import { useRouter } from 'vue-router'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
+import MobileOutpatientList from '../mobile/MobileOutpatientList.vue'
 import { api, type PatientListItem } from '../api'
+import { useIsMobile } from '../composables/useMediaQuery'
 import { useSession } from '../stores/session'
 
 const router = useRouter()
 const session = useSession()
+const isMobile = useIsMobile()
 
 const patients = ref<PatientListItem[]>([])
 const loading = ref(false)
@@ -63,7 +66,22 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="his-list-page">
+  <!--
+    移动端是另一套信息架构（页头压成一行、筛选进抽屉、按钮改「接诊」），
+    不是桌面版的响应式重排 —— 所以整块换掉，而不是加 media query。
+    桌面分支一字未动，还原度门禁与类名覆盖率检查都在 1600px 下跑，不受影响。
+  -->
+  <MobileOutpatientList
+    v-if="isMobile"
+    :patients="patients"
+    :loading="loading"
+    :doctor-name="session.doctorName"
+    :today="today"
+    @refresh="load"
+    @logout="logout"
+  />
+
+  <div v-else class="his-list-page">
     <div class="his-header">
       <div class="his-header-left">
         <span class="his-logo">🏥</span>

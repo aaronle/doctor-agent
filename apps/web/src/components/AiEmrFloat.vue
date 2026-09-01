@@ -3,8 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { api, streamSse, type KnowledgeEntry, type KnowledgeItem, type RecordQuality, type RiskItem, type TodoItem } from '../api'
+import { api, streamSse, type RecordQuality, type RiskItem, type TodoItem } from '../api'
 import { RECORD_SECTIONS, useWorkstation } from '../stores/workstation'
+import { useCopilotChat } from '../composables/useCopilotChat'
 import { useVoiceInterview } from '../composables/useVoiceInterview'
 import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '../composables/diagnosisCommands'
 
@@ -931,96 +932,34 @@ async function addManualDiagnosis() {
 
 // ---------------------------------------------------------------- 对话
 
-const chatInput = ref('')
-const chatMessages = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
-const chatting = ref(false)
-
 /**
- * 对话区自动滚到底，让新播出的一条始终可见。
- * 必须放在 chatMessages 声明之后 —— 放前面会在模块求值时命中暂时性死区，
- * 整个组件挂载失败（构建不报错，只在运行时炸）。
- */
-const chatScrollEl = ref<HTMLElement | null>(null)
-
-watch(
-  () => [voice.messages.value.length, chatMessages.value.length],
-  async () => {
-    await nextTick()
-    const el = chatScrollEl.value
-    if (el) el.scrollTop = el.scrollHeight
-  },
-)
-
-/* ===================== 临床知识库 ===================== */
-
-/**
- * 每条助手回复命中的知识库条目。key 是消息下标。
+ * 对话逻辑与移动端对话页共用同一个 composable —— 同一个流式端点、同一套
+ * 知识库匹配。抄一份到移动端的话，以后修一个必漏一个。
  *
- * 原件靠在回复里嵌 `<a class="kb-link">` 锚点触发，我们的回复是纯文本
- * （见诊断命令那节，理由是 XSS），所以改为：回复完成后拿全文去服务端做
- * 关键词匹配，命中的条目以按钮形式挂在气泡下方。不改变界面形状。
+ * 诊断命令通过 onCommand 注入，不下沉到公共层：它读写的是本组件的勾选
+ * 状态，移动端没有诊断面板，执行了也看不见。
  */
-const kbHits = ref<Map<number, KnowledgeItem[]>>(new Map())
-const kbDialogOpen = ref(false)
-const kbEntry = ref<KnowledgeEntry | null>(null)
-const kbLoading = ref(false)
-
-async function matchKnowledge(index: number, text: string) {
-  if (!text.trim()) return
-  try {
-    const { items } = await api.knowledgeMatch(text)
-    if (items.length) kbHits.value = new Map(kbHits.value).set(index, items)
-  } catch {
-    // 匹配失败不影响回复本身，静默即可
-  }
-}
-
-async function openKnowledge(key: string) {
-  kbDialogOpen.value = true
-  kbLoading.value = true
-  kbEntry.value = null
-  try {
-    kbEntry.value = await api.knowledgeEntry(key)
-  } catch (error) {
-    ElMessage.error(`词条加载失败：${(error as Error).message}`)
-    kbDialogOpen.value = false
-  } finally {
-    kbLoading.value = false
-  }
-}
-
-async function sendChat(preset?: string) {
-  const text = (preset ?? chatInput.value).trim()
-  if (!text || chatting.value) return
-  chatInput.value = ''
-  chatMessages.value.push({ role: 'user', content: text })
-
+const {
+  chatInput,
+  chatMessages,
+  chatting,
+  chatScrollEl,
+  kbHits,
+  kbDialogOpen,
+  kbEntry,
+  kbLoading,
+  scrollToBottom,
+  openKnowledge,
+  sendChat,
+} = useCopilotChat({
+  patientId: () => ws.patientId,
   // 诊断命令在本地结算，不走模型：结果必须确定，而且要立刻反映到勾选状态上。
   // 交给模型的话，「删除诊断」可能被答成一段说明文字，界面纹丝不动。
-  if (applyDiagnosisCommand(text)) return
+  onCommand: (text) => applyDiagnosisCommand(text),
+})
 
-  chatMessages.value.push({ role: 'assistant', content: '' })
-  const index = chatMessages.value.length - 1
-  chatting.value = true
-
-  try {
-    await streamSse(
-      '/api/emr/copilot/chat',
-      { patient_id: ws.patientId, messages: chatMessages.value.slice(0, -1).map((m) => ({ role: m.role, content: m.content })) },
-      (event) => {
-        if (event.type === 'token') {
-          chatMessages.value[index].content += String(event.token)
-        }
-      },
-    )
-  } catch (error) {
-    chatMessages.value[index].content = `（请求失败：${(error as Error).message}）`
-  } finally {
-    chatting.value = false
-  }
-  // 回复完整后再匹配：流式过程中文本还不全，会漏掉后半段里的关键词
-  void matchKnowledge(index, chatMessages.value[index].content)
-}
+/** 对话区自动滚到底，让新播出的一条始终可见。问诊对话也计入。 */
+watch(() => [voice.messages.value.length, chatMessages.value.length], scrollToBottom)
 
 // ---------------------------------------------------------------- 生成与更新
 

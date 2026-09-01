@@ -1,6 +1,6 @@
 # Doctor Agent 项目交接手册
 
-更新时间：2026-08-29（Asia/Shanghai）
+更新时间：2026-09-01（Asia/Shanghai）
 项目目录：`/Users/leying/Documents/北大医疗/AI Native Systems/projects/doctor-agent`
 远程仓库：`https://github.com/aaronle/doctor-agent`（**私有**）
 项目状态：一期七功能已按 V4.3 界面基准实现完毕，六个岗位接真实 Claude Haiku。
@@ -9,6 +9,8 @@
 2026-11-29，`certbot.timer` 自动续期，续期演练已通过。公网实测：真实模型端到端 17.8s
 零降级，五个入口与控制台全部 200，两个 SSE 端点真流式（块间隔 11.9ms / 20.9ms，与服务端
 节流的 12ms / 20ms 吻合），密钥无泄露，同机另外三个站点未受影响。
+**2026-09-01 增加移动端**：≤768px 走另一套信息架构（落地即对话、对话/分析/记录三档、
+**不写 HIS/EMR**），见 [`docs/product/12-移动端需求规格说明书.md`](docs/product/12-移动端需求规格说明书.md)。
 
 本文件是 Doctor Agent 项目的当前接手入口。
 
@@ -20,9 +22,12 @@
    数据契约、功能增强清单与遗留缺口。每条都标了【原件】/【增强】/【缺口】。
    从下一次开始，流程按「需求 Markdown → UI/UX → 测试用例 → 编码 → 测试 → 部署」
    正向走，这份文档是起点。
-3. 阅读 [`docs/product/09-一期需求规划说明书.md`](docs/product/09-一期需求规划说明书.md) —— 一期的执行契约。
-4. 阅读 [`docs/product/08-V4.3界面基准与后端API契约.md`](docs/product/08-V4.3界面基准与后端API契约.md) —— 界面与 API 的唯一事实源。
-5. 根据任务所属条线阅读对应详细 Markdown。
+3. 阅读 [`docs/product/12-移动端需求规格说明书.md`](docs/product/12-移动端需求规格说明书.md)
+   —— ≤768px 下是**另一套信息架构**（落地即对话、三档切换、**不写 HIS/EMR**），
+   不是响应式重排。改任何页面前先确认移动端分支要不要跟着改。
+4. 阅读 [`docs/product/09-一期需求规划说明书.md`](docs/product/09-一期需求规划说明书.md) —— 一期的执行契约。
+5. 阅读 [`docs/product/08-V4.3界面基准与后端API契约.md`](docs/product/08-V4.3界面基准与后端API契约.md) —— 界面与 API 的唯一事实源。
+6. 根据任务所属条线阅读对应详细 Markdown。
 
 ```sh
 cd "/Users/leying/Documents/北大医疗/AI Native Systems/projects/doctor-agent"
@@ -69,6 +74,7 @@ npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + C
 | 改了什么 | 必须同步改 |
 | --- | --- |
 | UI/UX | `docs/product/09-一期需求规划说明书.md` 对应功能段 + 该行为的测试 + 跑 `npm run fidelity` |
+| **移动端 UI/UX** | `docs/product/12-移动端需求规格说明书.md` + `apps/web/src/mobile/*.spec.ts`。移动端是另一套 IA，桌面改了它不会自动跟着改 |
 | **新增界面** | 还要给 `extract-v43-dom.mjs` 加采集态、给 `compare-v43-fidelity.mjs` 加场景 —— 否则它落在门禁外 |
 | API 形状 | `docs/product/08-V4.3界面基准与后端API契约.md` + `apps/api/tests/test_api.py` + 重跑 `contracts:export` |
 | Agent 输出结构 | 规格里该岗位的输出约束 + 对应校验测试 |
@@ -98,6 +104,7 @@ npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + C
 doctor-agent/
 ├── apps/
 │   ├── web/            Vue 3 + Element Plus + Pinia，五路由六组件
+│   │   └── src/mobile/ 移动端组件（≤768px 才挂载，类名一律 m- 前缀）
 │   └── api/            FastAPI + SQLAlchemy + SQLite
 │       └── app/
 │           ├── agents/     六个岗位 + 上下文装配 + 提示词分层
@@ -137,6 +144,7 @@ Figma：**AI 门诊工作站 · 一期设计系统**
 | 00 · 设计令牌 | 23 个颜色令牌 + 13 个尺寸/字号令牌，均为 Figma Variables |
 | 01 · 组件库 | 待建 |
 | 02 · 页面骨架 | 待建 |
+| 04 · 移动端 | 六屏 390×844：对话 / ＋菜单 / 分析 / 记录 / 候诊 / 患者管理 |
 
 令牌取值**全部来自 V4.3 编译产物**（`scripts/extract-v43-assets.mjs`），不是取色器估的。
 其中 `字号/base = 12` 标了重点：那是 `--el-font-size-base`，不是 Element Plus 默认的 14px。

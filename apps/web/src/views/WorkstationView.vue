@@ -5,7 +5,9 @@ import { ArrowLeft, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import AiEmrFloat from '../components/AiEmrFloat.vue'
+import MobileWorkstation from '../mobile/MobileWorkstation.vue'
 import { api, type LabResult, type PatientOrder } from '../api'
+import { useIsMobile } from '../composables/useMediaQuery'
 import { useSession } from '../stores/session'
 import { useWorkstation } from '../stores/workstation'
 
@@ -13,6 +15,7 @@ const route = useRoute()
 const router = useRouter()
 const session = useSession()
 const ws = useWorkstation()
+const isMobile = useIsMobile()
 
 const sidebarCollapsed = ref(true)
 const orderTab = ref<'drug' | 'exam' | 'lab'>('drug')
@@ -395,7 +398,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="workstation-page">
+  <!--
+    移动端是另一套信息架构：落地即对话，底部三档切换，且**不写 HIS/EMR**
+    （提交病历、回写诊断、开立医嘱都不在移动端提供）。桌面端三层固定宽度的
+    面板在 390px 里一次只能显示一个，响应式重排救不了，只能换掉整块。
+  -->
+  <MobileWorkstation v-if="isMobile" />
+
+  <div v-else class="workstation-page">
     <div class="his-header">
       <div class="his-header-left">
         <el-button text class="back-btn" :icon="ArrowLeft" @click="router.push('/outpatient/list')">候诊列表</el-button>

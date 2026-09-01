@@ -395,3 +395,85 @@
 .ec-chip.good{background:#f0fdf4;color:#16a34a}
 .ec-chip.bad{background:#fff0f0;color:#e6191a}
 .ec-detail{margin-top:5px;font-size:11px;color:#e6191a;line-height:1.6}
+
+/*
+ * 移动端。控制台面向管理员与调优人员，不做「对话优先」那套诊间动线，
+ * 只保证一件事：在手机上每一块都够得着、能滚动，而不是被裁在屏幕外。
+ *
+ * 三处必改：左右分栏改上下；240px 的岗位侧栏改成横向滚动的一行；
+ * 输入控件字号提到 16px（iOS 对更小的字号会在聚焦时自动放大整页）。
+ */
+@media (max-width: 768px) {
+  .admin-page {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .admin-header {
+    height: auto;
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .admin-title {
+    font-size: 13px;
+  }
+
+  .admin-sub {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .admin-body {
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-side {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px;
+  }
+
+  .admin-side-title {
+    display: none;
+  }
+
+  .agent-item {
+    flex: 0 0 auto;
+    width: 148px;
+  }
+
+  .admin-main {
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .admin-main-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .admin-tabs {
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .admin-pane {
+    overflow: visible;
+  }
+
+  .admin-page textarea,
+  .admin-page input {
+    font-size: 16px;
+  }
+}
