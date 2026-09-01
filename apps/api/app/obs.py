@@ -67,7 +67,9 @@ def _clean(payload: dict[str, Any]) -> dict[str, Any]:
 def event(name: str, **fields: Any) -> None:
     """记一条结构化事件。单行 JSON，便于 grep 与 jq。"""
     payload = {"event": name, **_clean(fields)}
-    logger.info(json.dumps(payload, ensure_ascii=False))
+    # 紧凑分隔符：默认的 ", " / ": " 会让 grep '"event":"agent_run"' 匹配不上，
+    # 而 grep 是排障时最顺手的第一道筛子。顺带每行省几十字节。
+    logger.info(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
 
 
 @contextmanager

@@ -1698,3 +1698,34 @@ def test_redline_block_is_logged(client, caplog):
     gate = [e for e in events if e.get("event") in {"redline_blocked", "redline_passed"}]
     assert gate, "红线门禁无论放行还是拦截，都必须留下一条事件"
     assert gate[-1]["patient"] == "P001"
+
+
+def test_all_events_share_one_field_vocabulary(caplog):
+    """
+    跨事件查询要能一次捞全。
+
+    `llm_call` 原本自己拼 JSON 且用驼峰 `elapsedMs`，而其余事件用 `ms` ——
+    `jq 'select(.ms>15000)'` 会静默漏掉整整一类，偏偏 llm_call 正是排查
+    「哪一步慢」时最该看的一类。
+    """
+    import json
+
+    from app.llm import LlmClient
+
+    with caplog.at_level("INFO", logger="doctor_agent.event"):
+        LlmClient()._log("summary", "m", 1, 100, "ok", 0.0)
+
+    payload = json.loads(caplog.records[-1].getMessage())
+    assert payload["event"] == "llm_call"
+    assert "ms" in payload and "elapsedMs" not in payload
+    assert "request_bytes" in payload and "requestBytes" not in payload
+
+
+def test_event_json_is_compact_enough_to_grep(caplog):
+    """默认分隔符会输出 `"event": "x"`，让 grep '"event":"x"' 匹配不上。"""
+    from app.obs import event
+
+    with caplog.at_level("INFO", logger="doctor_agent.event"):
+        event("agent_run", agent="record")
+
+    assert '"event":"agent_run"' in caplog.records[-1].getMessage()

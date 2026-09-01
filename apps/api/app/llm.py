@@ -17,6 +17,7 @@ from typing import AsyncIterator
 import httpx
 
 from .config import get_ai_settings
+from .obs import event
 
 logger = logging.getLogger("doctor_agent.llm")
 
@@ -237,20 +238,21 @@ class LlmClient:
         self._log(agent_key, target_model, 1, len(payload), "ok-stream", started)
 
     def _log(self, agent_key: str, model: str, attempt: int, request_bytes: int, status: str, started: float) -> None:
-        # 结构化单行 JSON。只记通道层事实，绝不记密钥与病历内容。
-        logger.info(
-            json.dumps(
-                {
-                    "event": "llm_call",
-                    "agent": agent_key,
-                    "model": model,
-                    "attempt": attempt,
-                    "requestBytes": request_bytes,
-                    "status": status,
-                    "elapsedMs": int((time.monotonic() - started) * 1000),
-                },
-                ensure_ascii=False,
-            )
+        """
+        通道层事实。只记形状与耗时，绝不记密钥与病历内容。
+
+        走 obs.event 而不是自己拼 JSON：字段名要跟其余事件一致（`ms` 而不是
+        `elapsedMs`），否则 `jq 'select(.ms>15000)'` 这类跨事件查询会静默漏掉
+        整整一类 —— 而 llm_call 恰恰是排查「哪一步慢」时最该看的一类。
+        """
+        event(
+            "llm_call",
+            agent=agent_key,
+            model=model,
+            attempt=attempt,
+            request_bytes=request_bytes,
+            status=status,
+            ms=int((time.monotonic() - started) * 1000),
         )
 
 
