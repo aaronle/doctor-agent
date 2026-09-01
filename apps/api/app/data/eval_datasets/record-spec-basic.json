@@ -1,0 +1,171 @@
+{
+  "id": "record-spec-basic",
+  "name": "病历书写基本规范 · 门诊字段完整性",
+  "description": "依据原卫生部《病历书写基本规范》第二章对门（急）诊病历的规定，逐条校验模型产出的病历段落是否齐备。初诊比复诊多要求既往史；规范里的「医师签名」不在此集校验，理由见 eval_cases.check_spec_visit_metadata。",
+  "source": "规范倒推",
+  "reference": "《病历书写基本规范》第二章 门（急）诊病历书写要求",
+  "default_enabled": true,
+  "cases": [
+    {
+      "id": "GB-001",
+      "name": "复诊 · 内分泌科（P001）",
+      "agent_key": "record",
+      "patient_id": "P001",
+      "checks": [
+        {
+          "name": "复诊必备段落",
+          "kind": "spec_required_fields",
+          "args": {}
+        },
+        {
+          "name": "有数据的段落不得写未采集",
+          "kind": "spec_no_blank_with_evidence",
+          "args": {}
+        },
+        {
+          "name": "就诊时间与科别",
+          "kind": "spec_visit_metadata",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "GB-002",
+      "name": "复诊 · 心内科（P002）",
+      "agent_key": "record",
+      "patient_id": "P002",
+      "checks": [
+        {
+          "name": "复诊必备段落",
+          "kind": "spec_required_fields",
+          "args": {}
+        },
+        {
+          "name": "有数据的段落不得写未采集",
+          "kind": "spec_no_blank_with_evidence",
+          "args": {}
+        },
+        {
+          "name": "就诊时间与科别",
+          "kind": "spec_visit_metadata",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "GB-003",
+      "name": "复诊 · 内分泌科（P003）",
+      "agent_key": "record",
+      "patient_id": "P003",
+      "checks": [
+        {
+          "name": "复诊必备段落",
+          "kind": "spec_required_fields",
+          "args": {}
+        },
+        {
+          "name": "有数据的段落不得写未采集",
+          "kind": "spec_no_blank_with_evidence",
+          "args": {}
+        },
+        {
+          "name": "就诊时间与科别",
+          "kind": "spec_visit_metadata",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "GB-004",
+      "name": "初诊 · 神经内科（P004）",
+      "agent_key": "record",
+      "patient_id": "P004",
+      "checks": [
+        {
+          "name": "初诊必备段落",
+          "kind": "spec_required_fields",
+          "args": {}
+        },
+        {
+          "name": "有数据的段落不得写未采集",
+          "kind": "spec_no_blank_with_evidence",
+          "args": {}
+        },
+        {
+          "name": "就诊时间与科别",
+          "kind": "spec_visit_metadata",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "GB-005",
+      "name": "初诊 · 内分泌科（P005）",
+      "agent_key": "record",
+      "patient_id": "P005",
+      "checks": [
+        {
+          "name": "初诊必备段落",
+          "kind": "spec_required_fields",
+          "args": {}
+        },
+        {
+          "name": "有数据的段落不得写未采集",
+          "kind": "spec_no_blank_with_evidence",
+          "args": {}
+        },
+        {
+          "name": "就诊时间与科别",
+          "kind": "spec_visit_metadata",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "GB-006",
+      "name": "复诊 · 神经内科（P006）",
+      "agent_key": "record",
+      "patient_id": "P006",
+      "checks": [
+        {
+          "name": "复诊必备段落",
+          "kind": "spec_required_fields",
+          "args": {}
+        },
+        {
+          "name": "有数据的段落不得写未采集",
+          "kind": "spec_no_blank_with_evidence",
+          "args": {}
+        },
+        {
+          "name": "就诊时间与科别",
+          "kind": "spec_visit_metadata",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "GB-007",
+      "name": "复诊 · 内分泌科（P007）",
+      "agent_key": "record",
+      "patient_id": "P007",
+      "checks": [
+        {
+          "name": "复诊必备段落",
+          "kind": "spec_required_fields",
+          "args": {}
+        },
+        {
+          "name": "有数据的段落不得写未采集",
+          "kind": "spec_no_blank_with_evidence",
+          "args": {}
+        },
+        {
+          "name": "就诊时间与科别",
+          "kind": "spec_visit_metadata",
+          "args": {}
+        }
+      ]
+    }
+  ]
+}

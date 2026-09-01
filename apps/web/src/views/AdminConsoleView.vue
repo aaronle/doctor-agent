@@ -2,7 +2,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { api, type AgentSummary, type AgentDetail, type AgentRunLog, type CompareResult, type EvalResult } from '../api'
+import {
+  api,
+  type AgentSummary,
+  type AgentDetail,
+  type AgentRunLog,
+  type CompareResult,
+  type EvalDataset,
+  type EvalResult,
+} from '../api'
 
 /**
  * Agent 配置与运行控制台。
@@ -48,7 +56,45 @@ const comparison = ref<CompareResult | null>(null)
 
 const evaluating = ref(false)
 const evalResult = ref<EvalResult | null>(null)
-const evalCases = ref<{ id: string; name: string; patient_id: string; checks: string[] }[]>([])
+const evalCases = ref<
+  { id: string; name: string; patient_id: string; dataset_id: string; dataset_name: string; checks: string[] }[]
+>([])
+
+/* ===================== 评测数据集 ===================== */
+
+const datasets = ref<EvalDataset[]>([])
+const togglingDataset = ref('')
+
+async function loadDatasets() {
+  try {
+    datasets.value = (await api.adminEvalDatasets()).datasets
+  } catch (error) {
+    ElMessage.error(`数据集加载失败：${(error as Error).message}`)
+  }
+}
+
+/**
+ * 启停一个数据集。
+ *
+ * 切完要重拉用例清单 —— 停用了却还列着它的用例，医生会以为下次还会跑。
+ * 已有的评测结果一并清掉：那份结果的分母是旧的，留着比没有更误导。
+ */
+async function toggleDataset(dataset: EvalDataset, enabled: boolean) {
+  togglingDataset.value = dataset.id
+  try {
+    datasets.value = (await api.adminToggleEvalDataset(dataset.id, enabled)).datasets
+    evalResult.value = null
+    await loadEvalCases()
+  } catch (error) {
+    ElMessage.error(`切换失败：${(error as Error).message}`)
+    await loadDatasets()
+  } finally {
+    togglingDataset.value = ''
+  }
+}
+
+/** 当前岗位会跑到的用例数。跟「该集共 N 条」不是一回事 —— 一个集可能跨多个岗位。 */
+const activeCaseCount = computed(() => evalCases.value.length)
 
 /** 只有变化过的字段值得看 —— 几十个 same 会把两条真差异淹掉 */
 const changedFields = computed(() =>
@@ -182,7 +228,10 @@ function statusType(status: string) {
   return 'info'
 }
 
-onMounted(loadOverview)
+onMounted(async () => {
+  await loadOverview()
+  await loadDatasets()
+})
 </script>
 
 <template>
@@ -382,8 +431,45 @@ onMounted(loadOverview)
               <span class="eval-stat"><i>通过</i><b class="good">{{ evalResult.passed }}</b></span>
               <span class="eval-stat"><i>失败</i><b class="bad">{{ evalResult.failed }}</b></span>
               <span class="eval-stat"><i>用例</i><b>{{ evalResult.total }}</b></span>
+              <span v-if="evalResult.datasets?.length" class="eval-stat ds">
+                <i>数据集</i><b>{{ evalResult.datasets.map((d) => d.name).join('、') }}</b>
+              </span>
             </template>
             <span class="tune-note">校验全部是确定性规则，不用模型给模型打分</span>
+          </div>
+
+          <!--
+            数据集管理。用例来自 data/eval_datasets/*.json，开关落库。
+            把「跑了哪几集」摆在结果上方，是因为通过率必须有分母 ——
+            关掉半个数据集也能把百分比刷上去。
+          -->
+          <div class="ds-panel">
+            <div class="ds-panel-head">
+              <span class="ds-panel-title">评测数据集</span>
+              <span class="ds-panel-note">
+                停用的不参与运行。当前岗位共 <b>{{ activeCaseCount }}</b> 条用例会跑。
+              </span>
+            </div>
+            <div v-for="ds in datasets" :key="ds.id" class="ds-row" :class="{ off: !ds.enabled, broken: !!ds.error }">
+              <el-switch
+                :model-value="ds.enabled"
+                :disabled="!!ds.error || togglingDataset === ds.id"
+                size="small"
+                @change="(v: boolean) => toggleDataset(ds, v)"
+              />
+              <div class="ds-main">
+                <div class="ds-title">
+                  {{ ds.name }}
+                  <span class="ds-tag">{{ ds.source }}</span>
+                  <span class="ds-count">{{ ds.case_count }} 条 · {{ ds.agents.join('/') || '—' }}</span>
+                </div>
+                <div class="ds-desc">{{ ds.description }}</div>
+                <div v-if="ds.reference" class="ds-ref">依据：{{ ds.reference }}</div>
+                <!-- 加载失败的照样列出来，带着原因。静默藏起来等于少跑一集却看不出来 -->
+                <div v-if="ds.error" class="ds-error">✕ 加载失败，本集不参与运行：{{ ds.error }}</div>
+              </div>
+            </div>
+            <div v-if="!datasets.length" class="ds-empty">还没有任何数据集。</div>
           </div>
 
           <div v-if="!evalResult && !evaluating" class="tune-empty">
@@ -391,6 +477,7 @@ onMounted(loadOverview)
             <ul class="eval-preview">
               <li v-for="c in evalCases" :key="c.id">
                 <b>{{ c.id }}</b> {{ c.name }} · {{ c.patient_id }}
+                <span class="eval-ds">{{ c.dataset_name }}</span>
                 <span class="eval-checks">{{ c.checks.join(' / ') }}</span>
               </li>
             </ul>

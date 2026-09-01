@@ -1,0 +1,65 @@
+{
+  "id": "builtin-regression",
+  "name": "内置回归集",
+  "description": "一期六条基线用例。期望值由人写定，覆盖病历七段、风险闭集、共病科室闭集与诊断措辞红线。",
+  "source": "自建虚构",
+  "reference": "docs/product/09-一期需求规划说明书.md",
+  "default_enabled": true,
+  "cases": [
+    {
+      "id": "EC-01",
+      "name": "复诊 · 内分泌（P001）",
+      "agent_key": "record",
+      "patient_id": "P001",
+      "checks": [
+        { "name": "必填字段", "kind": "required_fields", "args": { "fields": ["chief_complaint", "present_illness"] } },
+        { "name": "含糖化血红蛋白", "kind": "contains", "args": { "needle": "糖化血红蛋白" } }
+      ]
+    },
+    {
+      "id": "EC-02",
+      "name": "复诊 · 心内（P002）",
+      "agent_key": "record",
+      "patient_id": "P002",
+      "checks": [
+        { "name": "必填字段", "kind": "required_fields", "args": { "fields": ["chief_complaint", "present_illness"] } }
+      ]
+    },
+    {
+      "id": "EC-03",
+      "name": "复诊 · 神内急症（P006）",
+      "agent_key": "record",
+      "patient_id": "P006",
+      "checks": [
+        { "name": "必填字段", "kind": "required_fields", "args": { "fields": ["chief_complaint", "present_illness"] } }
+      ]
+    },
+    {
+      "id": "EC-04",
+      "name": "风险分级合法",
+      "agent_key": "risk",
+      "patient_id": "P001",
+      "checks": [
+        { "name": "等级取自闭集", "kind": "closed_set", "args": { "field": "level", "allowed": "risk_levels", "in_list": "risk_assessments" } }
+      ]
+    },
+    {
+      "id": "EC-05",
+      "name": "共病推荐科室合法",
+      "agent_key": "comorbidity",
+      "patient_id": "P001",
+      "checks": [
+        { "name": "科室取自字典", "kind": "closed_set", "args": { "field": "recommended_dept", "allowed": "departments", "in_list": "conditions" } }
+      ]
+    },
+    {
+      "id": "EC-06",
+      "name": "诊断不自行确诊",
+      "agent_key": "diagnosis",
+      "patient_id": "P006",
+      "checks": [
+        { "name": "不出现确诊措辞", "kind": "not_contains", "args": { "needle": "确诊为" } }
+      ]
+    }
+  ]
+}

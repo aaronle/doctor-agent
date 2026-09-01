@@ -331,6 +331,22 @@ export interface EvalCaseResult {
   checks: EvalCheck[]
 }
 
+/** 一个评测数据集。内容是 data/eval_datasets/*.json，开关落库。 */
+export interface EvalDataset {
+  id: string
+  name: string
+  description: string
+  /** 自建虚构 / 规范倒推 / 外部导入 —— 决定这一集的可信来源 */
+  source: string
+  /** 依据出处，如规范条文或需求文档 */
+  reference: string
+  enabled: boolean
+  case_count: number
+  agents: string[]
+  /** 加载/编译失败的原因。非空时该集不参与运行，但仍然列出来 */
+  error: string
+}
+
 export interface EvalResult {
   total: number
   passed: number
@@ -338,6 +354,8 @@ export interface EvalResult {
   config_version: string
   config_source: string
   cases: EvalCaseResult[]
+  /** 本次实际跑到的数据集。没有它，「通过率」就没有分母 */
+  datasets?: { id: string; name: string; case_count: number }[]
 }
 
 export const api = {
@@ -364,9 +382,21 @@ export const api = {
   adminCompare: (key: string, patientId: string) =>
     post<CompareResult>(`/api/admin/agents/${key}/compare`, { patient_id: patientId }),
   adminEvalCases: (key: string) =>
-    get<{ cases: { id: string; name: string; agent_key: string; patient_id: string; checks: string[] }[] }>(
-      `/api/admin/eval-cases?agent_key=${key}`,
-    ),
+    get<{
+      cases: {
+        id: string; name: string; agent_key: string; patient_id: string
+        dataset_id: string; dataset_name: string; checks: string[]
+      }[]
+    }>(`/api/admin/eval-cases?agent_key=${key}`),
+
+  /** 数据集清单与启停状态 */
+  adminEvalDatasets: () => get<{ datasets: EvalDataset[] }>('/api/admin/eval-datasets'),
+  /** 启用/停用一个数据集。服务端留审计。 */
+  adminToggleEvalDataset: (id: string, enabled: boolean) =>
+    request<{ ok: boolean; datasets: EvalDataset[] }>(`/api/admin/eval-datasets/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
   adminRunEval: (key: string, use: 'draft' | 'published') =>
     post<EvalResult>(`/api/admin/agents/${key}/eval`, { use }),
 

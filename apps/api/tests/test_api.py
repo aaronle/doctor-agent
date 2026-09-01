@@ -1429,3 +1429,185 @@ def test_all_input_models_forbid_extra_fields():
         for m in re.finditer(r"class (\w+)\(BaseModel\):", path.read_text(encoding="utf-8")):
             offenders.append(f"{path.name}:{m.group(1)}")
     assert not offenders, f"这些入参模型未继承 StrictIn：{offenders}"
+
+
+# ================================================================ 评测数据集
+
+def test_datasets_are_listed_with_counts_and_source(client):
+    """数据集清单要能看出「这一集从哪来、多少条、跑不跑」。"""
+    body = client.get("/api/admin/eval-datasets").json()
+    by_id = {d["id"]: d for d in body["datasets"]}
+
+    assert "builtin-regression" in by_id
+    assert "record-spec-basic" in by_id
+
+    spec = by_id["record-spec-basic"]
+    assert spec["case_count"] == 7, "规范集应覆盖全部七个种子病例"
+    assert spec["source"] == "规范倒推"
+    assert "病历书写基本规范" in spec["reference"]
+    assert spec["agents"] == ["record"]
+
+
+def test_no_dataset_fails_to_load(client):
+    """
+    加载出错的数据集会被列出来但不参与运行。这条保证仓库里现有的数据集
+    全都能编译 —— 一个 kind 打错字，整集静默作废，报告上却看不出来。
+    """
+    body = client.get("/api/admin/eval-datasets").json()
+    broken = [(d["id"], d["error"]) for d in body["datasets"] if d["error"]]
+    assert not broken, f"有数据集加载失败：{broken}"
+
+
+def test_disabled_dataset_drops_out_of_the_case_list(client):
+    """停用一个数据集，它的用例就不该再出现在清单里。"""
+    before = client.get("/api/admin/eval-cases?agent_key=record").json()["cases"]
+    assert {c["dataset_id"] for c in before} == {"builtin-regression", "record-spec-basic"}
+
+    try:
+        client.patch("/api/admin/eval-datasets/record-spec-basic", json={"enabled": False})
+        after = client.get("/api/admin/eval-cases?agent_key=record").json()["cases"]
+        assert {c["dataset_id"] for c in after} == {"builtin-regression"}
+        assert len(after) < len(before)
+    finally:
+        client.patch("/api/admin/eval-datasets/record-spec-basic", json={"enabled": True})
+
+    restored = client.get("/api/admin/eval-cases?agent_key=record").json()["cases"]
+    assert len(restored) == len(before)
+
+
+def test_toggling_a_dataset_leaves_an_audit_trail(client):
+    """「那次为什么没跑到」要能查。"""
+    from app.database import SessionLocal
+    from app.models import AuditLog
+
+    client.patch("/api/admin/eval-datasets/builtin-regression", json={"enabled": False})
+    client.patch("/api/admin/eval-datasets/builtin-regression", json={"enabled": True})
+
+    session = SessionLocal()
+    try:
+        rows = (
+            session.query(AuditLog)
+            .filter(AuditLog.action == "eval_dataset_toggle")
+            .order_by(AuditLog.id.desc())
+            .limit(2)
+            .all()
+        )
+    finally:
+        session.close()
+    assert len(rows) == 2
+    assert [r.detail["enabled"] for r in rows] == [True, False]
+
+
+def test_unknown_dataset_id_is_404(client):
+    assert client.patch("/api/admin/eval-datasets/no-such-set", json={"enabled": False}).status_code == 404
+
+
+def test_unknown_check_kind_raises_instead_of_being_skipped():
+    """
+    静默跳过一条不认识的检查，等于让它悄悄消失，而报告上一切正常。
+    这里要求它抛出来。
+    """
+    import pytest
+
+    from app.eval_cases import build_check
+
+    with pytest.raises(ValueError, match="未知检查项 kind"):
+        build_check({"name": "x", "kind": "definitely_not_a_check"})
+
+
+def test_registry_covers_every_kind_used_by_the_shipped_datasets():
+    """数据集里用到的 kind 必须都在注册表里 —— 打错字要在测试里炸，不是在跑评测时。"""
+    import json
+    from pathlib import Path
+
+    from app.eval_cases import CHECK_REGISTRY
+    from app.eval_datasets import DATASET_DIR
+
+    used = set()
+    for path in Path(DATASET_DIR).glob("*.json"):
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        for case in raw.get("cases") or []:
+            for check in case.get("checks") or []:
+                used.add(check.get("kind"))
+    unknown = used - set(CHECK_REGISTRY)
+    assert not unknown, f"数据集用到了注册表里没有的 kind：{unknown}"
+
+
+# ------------------------------------------------- 《病历书写基本规范》检查项
+
+def test_spec_required_fields_distinguishes_first_and_return_visit():
+    """初诊比复诊多要求既往史。少了这一条区分，两种病历用同一把尺子。"""
+    from app.eval_cases import check_spec_required_fields
+
+    filled = {
+        "chief_complaint": "血糖高", "present_illness": "两周",
+        "physical_exam": "无殊", "auxiliary_exam": "空腹血糖 8.5",
+        "preliminary_diagnosis": "2型糖尿病",
+    }
+
+    ok, _ = check_spec_required_fields({"fields": filled}, {"is_return_visit": True})
+    assert ok, "复诊不要求单列既往史"
+
+    ok, detail = check_spec_required_fields({"fields": filled}, {"is_return_visit": False})
+    assert not ok and "既往史" in detail, "初诊缺既往史应判不合格"
+
+
+def test_spec_required_fields_accepts_uncollected():
+    """如实写「未采集」是合规记录；规范要的是有这一栏并作了交代。"""
+    from app.agents.record import UNCOLLECTED
+    from app.eval_cases import check_spec_required_fields
+
+    data = {"fields": {
+        "chief_complaint": "血糖高", "present_illness": "两周",
+        "physical_exam": UNCOLLECTED, "auxiliary_exam": UNCOLLECTED,
+        "preliminary_diagnosis": "2型糖尿病",
+    }}
+    ok, _ = check_spec_required_fields(data, {"is_return_visit": True})
+    assert ok
+
+
+def test_spec_flags_blank_section_when_context_has_the_data():
+    """患者有九项异常检验，辅助检查却写「未采集」——那是漏记。"""
+    from app.agents.record import UNCOLLECTED
+    from app.eval_cases import check_spec_no_blank_with_evidence
+
+    data = {"fields": {"auxiliary_exam": UNCOLLECTED}}
+    ok, detail = check_spec_no_blank_with_evidence(data, {"lab_results": [{"name": "空腹血糖"}]})
+    assert not ok and "辅助检查" in detail
+
+    ok, _ = check_spec_no_blank_with_evidence(data, {"lab_results": []})
+    assert ok, "上下文没有检验时，写未采集是对的"
+
+
+def test_spec_visit_metadata_does_not_require_doctor():
+    """
+    `doctor` 刻意不进 Agent 上下文。硬查一个不存在的键，会让每条用例都挂在
+    同一条误报上 —— 误报比没有校验更糟。
+    """
+    from app.eval_cases import check_spec_visit_metadata
+
+    ok, _ = check_spec_visit_metadata({}, {"visit_date": "2026-06-17", "dept": "内分泌科"})
+    assert ok
+
+    ok, detail = check_spec_visit_metadata({}, {"visit_date": "", "dept": "内分泌科"})
+    assert not ok and "就诊时间" in detail
+
+
+def test_negation_sourced_from_master_record_is_not_fabrication():
+    """
+    P005 的主档既往史原文就是「否认其他慢病史，家族有糖尿病史（父亲）」。
+    模型照抄是正确行为；只看本次对话的话会被判成伪造 ——
+    这是回归集扩到七个病例后抓出的第一个问题，抓的是校验本身。
+    """
+    from app.eval_cases import check_no_unasked_negation
+
+    data = {"fields": {"past_history": "否认其他慢病史，家族有糖尿病史（父亲）。"}}
+
+    ok, detail = check_no_unasked_negation(data, {"dialog_script": "医生：血糖高多久了", "past_history": ""})
+    assert not ok, "主档也没有出处时，仍应判为伪造"
+
+    ok, _ = check_no_unasked_negation(
+        data,
+        {"dialog_script": "医生：血糖高多久了", "past_history": "否认其他慢病史，家族有糖尿病史（父亲）。"},
+    )
+    assert ok, "主档里本来就记着这句，照抄不是伪造"

@@ -1833,13 +1833,92 @@
         }
       }
     },
+    "/api/admin/eval-datasets": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Eval Datasets",
+        "description": "数据集清单与启停状态。加载出错的也列出来，带着错误 —— 不静默藏起来。",
+        "operationId": "list_eval_datasets_api_admin_eval_datasets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Eval Datasets Api Admin Eval Datasets Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/eval-datasets/{dataset_id}": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Toggle Eval Dataset",
+        "description": "启用/停用一个数据集。留审计 —— 「那次为什么没跑到」要能查。",
+        "operationId": "toggle_eval_dataset_api_admin_eval_datasets__dataset_id__patch",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetToggleIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Toggle Eval Dataset Api Admin Eval Datasets  Dataset Id  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/eval-cases": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "List Eval Cases",
-        "description": "回归集用例清单。期望值由人写在 eval_cases.py，不自动生成。",
+        "description": "回归集用例清单 —— 只列**已启用**数据集里的。期望值由人写在数据集里，不自动生成。",
         "operationId": "list_eval_cases_api_admin_eval_cases_get",
         "parameters": [
           {
@@ -2081,6 +2160,20 @@
           "patient_id"
         ],
         "title": "ConsultationIn"
+      },
+      "DatasetToggleIn": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "DatasetToggleIn"
       },
       "DiagnosisWriteBackIn": {
         "properties": {

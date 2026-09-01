@@ -238,3 +238,18 @@ class OperationLog(Base):
     elapsed_ms: Mapped[float] = mapped_column(Float, default=0.0)
     error_code: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+class EvalDatasetState(Base):
+    """
+    评测数据集的启停状态。
+
+    只存开关，不存内容 —— 数据集本身是 `app/data/eval_datasets/*.json`，
+    属于只读的事实；「这次跑不跑」是环境状态，两者分开。
+    库里没有某个数据集的记录时，取文件里的 default_enabled。
+    """
+
+    __tablename__ = "eval_dataset_states"
+
+    dataset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

@@ -26,7 +26,7 @@ from ..agents import AGENT_REGISTRY, PROMPT_BUNDLE_VERSION
 from ..agents import base as agent_base
 from ..audit import DEMO_ACTOR, record_audit
 from ..agents.context import build_context
-from ..eval_cases import UNIVERSAL_CHECKS, cases_for
+from ..eval_datasets import active_cases, describe as describe_datasets, set_enabled, universal_checks
 from ..schemas import StrictIn
 from ..database import SessionLocal, get_session
 from ..models import AgentRun, AgentVersion, Patient
@@ -510,19 +510,55 @@ class EvalIn(StrictIn):
     use: str = "draft"
 
 
+class DatasetToggleIn(StrictIn):
+    enabled: bool
+
+
+@router.get("/eval-datasets")
+def list_eval_datasets(session: Session = Depends(get_session)) -> dict:
+    """数据集清单与启停状态。加载出错的也列出来，带着错误 —— 不静默藏起来。"""
+    return {"datasets": describe_datasets(session)}
+
+
+@router.patch("/eval-datasets/{dataset_id}")
+def toggle_eval_dataset(
+    dataset_id: str, body: DatasetToggleIn, session: Session = Depends(get_session)
+) -> dict:
+    """启用/停用一个数据集。留审计 —— 「那次为什么没跑到」要能查。"""
+    known = {d["id"] for d in describe_datasets(session)}
+    if dataset_id not in known:
+        raise HTTPException(status_code=404, detail=f"未知数据集：{dataset_id}")
+    set_enabled(session, dataset_id, body.enabled)
+    record_audit(
+        session,
+        action="eval_dataset_toggle",
+        entity="eval_dataset",
+        entity_id=dataset_id,
+        detail={"enabled": body.enabled},
+    )
+    # 开关与留痕同一个事务：不该出现「开关变了但查不到谁改的」
+    session.commit()
+    return {"ok": True, "datasets": describe_datasets(session)}
+
+
 @router.get("/eval-cases")
-def list_eval_cases(agent_key: str = "") -> dict:
-    """回归集用例清单。期望值由人写在 eval_cases.py，不自动生成。"""
+def list_eval_cases(agent_key: str = "", session: Session = Depends(get_session)) -> dict:
+    """
+    回归集用例清单 —— 只列**已启用**数据集里的。期望值由人写在数据集里，不自动生成。
+    """
+    universal = [n for n, _ in universal_checks()]
     return {
         "cases": [
             {
-                "id": c["id"],
-                "name": c["name"],
-                "agent_key": c["agent_key"],
-                "patient_id": c["patient_id"],
-                "checks": [name for name, _ in c["checks"]] + [n for n, _ in UNIVERSAL_CHECKS],
+                "id": c.id,
+                "name": c.name,
+                "agent_key": c.agent_key,
+                "patient_id": c.patient_id,
+                "dataset_id": c.dataset_id,
+                "dataset_name": c.dataset_name,
+                "checks": [name for name, _ in c.checks] + universal,
             }
-            for c in cases_for(agent_key)
+            for c in active_cases(session, agent_key)
         ]
     }
 
@@ -537,20 +573,29 @@ async def run_eval(agent_key: str, body: EvalIn, session: Session = Depends(get_
     """
     agent = _agent_or_404(agent_key)
     config = _config_for(session, agent, body.use)
-    cases = cases_for(agent_key)
+    # 只跑已启用数据集里的用例。跑了哪些数据集要随结果报出来 ——
+    # 否则「87% 通过」这个数字没有分母，关掉半个数据集也能刷上去。
+    cases = active_cases(session, agent_key)
+    ran_datasets = [
+        {"id": d["id"], "name": d["name"], "case_count": d["case_count"]}
+        for d in describe_datasets(session)
+        if d["enabled"] and not d["error"] and any(c.dataset_id == d["id"] for c in cases)
+    ]
     if not cases:
-        return {"total": 0, "passed": 0, "failed": 0, "cases": []}
+        return {"total": 0, "passed": 0, "failed": 0, "datasets": ran_datasets, "cases": []}
 
+    universal = universal_checks()
     gate = asyncio.Semaphore(EVAL_CONCURRENCY)
 
-    async def one(case: dict) -> dict:
+    async def one(case) -> dict:
         async with gate:
             inner = SessionLocal()
             try:
-                patient = inner.get(Patient, case["patient_id"])
+                patient = inner.get(Patient, case.patient_id)
                 if patient is None:
                     return {
-                        "case_id": case["id"], "name": case["name"], "patient_id": case["patient_id"],
+                        "case_id": case.id, "name": case.name, "patient_id": case.patient_id,
+                        "dataset_id": case.dataset_id, "dataset_name": case.dataset_name,
                         "passed": False, "degraded": False, "elapsed_ms": 0,
                         "checks": [{"name": "病例存在", "passed": False, "detail": "用例引用的病例不存在"}],
                     }
@@ -560,7 +605,7 @@ async def run_eval(agent_key: str, body: EvalIn, session: Session = Depends(get_
                 inner.close()
 
         results = []
-        for name, fn in list(case["checks"]) + UNIVERSAL_CHECKS:
+        for name, fn in list(case.checks) + universal:
             try:
                 ok, detail = fn(outcome.data, ctx)
             except Exception as exc:  # 校验本身出错要看得见，不能静默算通过
@@ -568,9 +613,11 @@ async def run_eval(agent_key: str, body: EvalIn, session: Session = Depends(get_
             results.append({"name": name, "passed": ok, "detail": detail})
 
         return {
-            "case_id": case["id"],
-            "name": case["name"],
-            "patient_id": case["patient_id"],
+            "case_id": case.id,
+            "name": case.name,
+            "patient_id": case.patient_id,
+            "dataset_id": case.dataset_id,
+            "dataset_name": case.dataset_name,
             # 降级时输出来自本地规则，判定结果说明不了提示词的好坏，单独标出来
             "degraded": outcome.degraded,
             "elapsed_ms": outcome.elapsed_ms,
@@ -586,5 +633,6 @@ async def run_eval(agent_key: str, body: EvalIn, session: Session = Depends(get_
         "failed": len(rows) - passed,
         "config_version": config.version,
         "config_source": config.source,
+        "datasets": ran_datasets,
         "cases": list(rows),
     }
