@@ -63,7 +63,10 @@ const conclusion = computed(() => summary.value?.overall_conclusion ?? {})
 const diagnoses = computed(() => summary.value?.suspected_diagnoses ?? [])
 const risks = computed(() => summary.value?.risk_assessments ?? [])
 const comorbidity = computed(() => summary.value?.comorbidity)
-const todos = computed(() => summary.value?.todos ?? [])
+/** 处置建议的条数 = 推荐复查 + 推荐用药。AI 处置单已下线，不再计入。 */
+const adviceCount = computed(
+  () => (summary.value?.recommended_exams?.length ?? 0) + (summary.value?.recommended_orders?.length ?? 0),
+)
 
 const labs = computed<LabResult[]>(() => patient.value?.lab_results ?? [])
 
@@ -276,15 +279,11 @@ function riskTone(level = '') {
     <section class="m-sec" data-sec="处置建议">
       <button class="m-sec-head" type="button" @click="toggle('处置建议')">
         <span class="m-sec-title">处置建议</span>
-        <span class="m-sec-badge">{{ todos.length }}</span>
+        <span class="m-sec-badge">{{ adviceCount }}</span>
         <span class="m-spacer" />
         <span class="m-chev">{{ open.has('处置建议') ? '▾' : '▸' }}</span>
       </button>
       <div v-if="open.has('处置建议')" class="m-sec-body">
-        <div v-for="item in todos" :key="item.id" class="m-item">
-          <div class="m-row">{{ item.text }}</div>
-          <div class="m-row-sub">{{ item.category }} · {{ item.priority }} · 依据 {{ item.source }}</div>
-        </div>
         <div v-for="item in summary?.recommended_exams ?? []" :key="item.id" class="m-item">
           <div class="m-row m-row-strong">推荐复查 · {{ item.name }}</div>
           <div class="m-row-sub">{{ item.type }} · {{ item.basis }}</div>

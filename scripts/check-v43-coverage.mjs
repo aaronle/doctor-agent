@@ -80,6 +80,26 @@ async function ensureFloat(page) {
   }
 }
 
+/**
+ * 专项评估卡的说明行（.ka-card-detail-row 等）只在**展开态**才渲染。
+ *
+ * 两边的默认态是不同的：原件默认展开前两条，重建版一律折叠（产品决策，
+ * 见 assessment_catalog.json 的 note）。不先统一成展开，重建版就会被报
+ * 「缺 3 个类」——那是默认态差异，不是漏做。
+ *
+ * 「确保展开」而不是「点一下」：盲点会把原件那张已展开的收起来，
+ * 于是反过来变成原件缺类。
+ */
+async function ensureFirstAssessmentCardOpen(page) {
+  const card = page.locator('.ka-card').first();
+  if (!(await card.isVisible().catch(() => false))) return;
+  const collapsed = await card.evaluate((el) => el.classList.contains('collapsed')).catch(() => false);
+  if (collapsed) {
+    await card.click().catch(() => {});
+    await page.waitForTimeout(400);
+  }
+}
+
 async function classesPerTab(page, gotoPatient) {
   const result = {};
   await gotoPatient();
@@ -87,6 +107,7 @@ async function classesPerTab(page, gotoPatient) {
   for (const tab of TABS) {
     await page.locator('.ttab').filter({ hasText: tab }).first().click().catch(() => {});
     await page.waitForTimeout(700);
+    if (tab === '智慧诊疗') await ensureFirstAssessmentCardOpen(page);
     result[tab] = await page.evaluate(collectClasses, '.tips-tab-pane:not([style*="display: none"])');
   }
   return result;

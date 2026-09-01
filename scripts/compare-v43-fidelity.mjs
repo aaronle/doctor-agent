@@ -133,6 +133,21 @@ const PAGES = [
         await cat.click();
         await page.waitForTimeout(400);
       }
+      // 评估卡的**默认态**两边不同：原件默认展开前两条说明，重建版一律折叠
+      // （产品决策，见 assessment_catalog.json 的 note）。所以这里要把第一张卡
+      // 「确保展开」再取样 —— 比的是卡片展开后长得对不对，不是默认开还是关。
+      // 同样是「确保」不是「点一下」：盲点会把原件那张已展开的收起来。
+      const card = page.locator('.ka-card').first();
+      if (await card.isVisible().catch(() => false)) {
+        const collapsed = await card.evaluate((el) => el.classList.contains('collapsed'));
+        if (collapsed) {
+          await card.click();
+          // 点完鼠标还停在卡上，取到的会是 :hover 色（.ka-card-danger:hover 是
+          // #ffe8e8，静止态是 #fff5f5）—— 挪开再取样，否则比出来的是悬停差异。
+          await page.mouse.move(0, 0);
+          await page.waitForTimeout(400);
+        }
+      }
     },
     selectors,
   })),
