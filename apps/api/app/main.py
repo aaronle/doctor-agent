@@ -29,6 +29,7 @@ from .routers import config as config_router
 from .routers import emr as emr_router
 from .routers import his as his_router
 from .seed import seed_database
+from .obs import event
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("doctor_agent")
@@ -44,7 +45,10 @@ async def lifespan(_: FastAPI):
     session = SessionLocal()
     try:
         counts = seed_database(session)
-        logger.info('{"event":"seed","result":%s}', counts)
+        # 走 obs.event 而不是自己拼：原先用 %s 插 Python dict，产出的是
+        # {'skipped': 1} —— 单引号不是合法 JSON，`docker logs | jq` 一碰到它
+        # 就整条管道报错退出，等于全部事件都查不了。
+        event("seed", **{k: v for k, v in counts.items()})
     finally:
         session.close()
     yield

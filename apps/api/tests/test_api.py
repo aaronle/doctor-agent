@@ -1729,3 +1729,23 @@ def test_event_json_is_compact_enough_to_grep(caplog):
         event("agent_run", agent="record")
 
     assert '"event":"agent_run"' in caplog.records[-1].getMessage()
+
+
+def test_every_event_line_is_valid_json(caplog):
+    """
+    每一行都必须能被 jq 解析。
+
+    启动那条 seed 日志原先用 `%s` 插 Python dict，产出 `{'skipped': 1}` ——
+    单引号不是合法 JSON，`docker logs | jq` 一碰到它就整条管道报错退出，
+    于是**全部事件都查不了**。一行坏的能废掉整个日志。
+    """
+    import json
+
+    from app.obs import event
+
+    with caplog.at_level("INFO", logger="doctor_agent.event"):
+        event("seed", patients=7, skipped=1)
+        event("agent_run", agent="record", ms=8900)
+
+    for record in caplog.records:
+        json.loads(record.getMessage())  # 抛异常即失败
