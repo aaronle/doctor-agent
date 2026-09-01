@@ -198,6 +198,13 @@ Figma：**AI 门诊工作站 · 一期设计系统**
 - [x] 2026-09-01 移动端发布并公网复验：390×844 零元素溢出、零控制台报错，
       对话往返 2.3s，三个面板零可点写入动作；桌面 1600px 仍是 `.workstation-page`
       且「提交病历」在位；同机 aits/site/nginx 全部 200
+- [x] 2026-09-01 撤下 AI 处置单（`57b0ffa`）后重新发布并公网复验：`release=0.3.0-mvp`、
+      `ai=configured`、6 个岗位、`runtime_mode=live`；五个入口全 200；
+      **`/api/emr/assessment-catalog` 与 `/api/emr/knowledge` 均 200** —— 健康接口不读这两个
+      JSON，是坑之四的专项复查；线上目录 33 项、默认展开 0 项，与本次产品决策一致；
+      两条 SSE 都是真流式（病历生成 104 块、中位间隔 8.9ms，对齐 12ms 节流；
+      对话 18 块、中位间隔 291ms 为模型实时吐字）；同机 aits(3100)/site(3200) 均 200、
+      nginx active、`proxy_buffering off` 仍在第 28 行；证书至 2026-11-29（剩 88 天）
 - [ ] 模型配额是否需要与 Ticket System 分开计（两者共用同一个网关和同一把 key）
 
 备案不阻塞：`aaronhealth.cn` 已备案（`粤ICP备2026119734号`，主体乐颖，服务器
