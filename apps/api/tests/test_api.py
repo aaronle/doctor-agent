@@ -1611,3 +1611,90 @@ def test_negation_sourced_from_master_record_is_not_fabrication():
         {"dialog_script": "医生：血糖高多久了", "past_history": "否认其他慢病史，家族有糖尿病史（父亲）。"},
     )
     assert ok, "主档里本来就记着这句，照抄不是伪造"
+
+
+# ================================================================ 结构化事件日志
+
+def test_event_never_logs_content(caplog):
+    """
+    正文绝不进日志。
+
+    一期是虚构数据，但日志会被复制进工单、粘进聊天 —— 这个习惯必须现在就立住。
+    要看内容去 agent_runs 表，那里有权限边界。
+    """
+    import json
+
+    from app.obs import event
+
+    with caplog.at_level("INFO", logger="doctor_agent.event"):
+        event("agent_run", agent="record", patient="P001",
+              prompt="你是接入医院门诊工作站的临床辅助智能体",
+              fields={"chief_complaint": "血糖控制不佳"},
+              api_key="sk-should-never-appear")
+
+    payload = json.loads(caplog.records[-1].getMessage())
+    assert payload["agent"] == "record"
+    assert payload["patient"] == "P001"
+    # 正文换成长度：既能判断「是不是空的」，又不泄露内容
+    assert "prompt" not in payload and payload["prompt_len"] > 0
+    assert "fields" not in payload and payload["fields_len"] > 0
+    assert "api_key" not in payload
+    assert "sk-should-never-appear" not in caplog.records[-1].getMessage()
+
+
+def test_event_is_single_line_json(caplog):
+    """单行 JSON —— 多行的话 grep 只会捞到半条。"""
+    from app.obs import event
+
+    with caplog.at_level("INFO", logger="doctor_agent.event"):
+        event("redline_blocked", patient="P001", action="提交", open_count=2)
+
+    message = caplog.records[-1].getMessage()
+    assert "\n" not in message
+    import json
+    assert json.loads(message)["event"] == "redline_blocked"
+
+
+def test_timed_records_duration_on_failure_too(caplog):
+    """「失败得多快」本身是线索：3ms 多半是本地校验，20s 多半是网关超时。"""
+    import json
+
+    import pytest
+
+    from app.obs import timed
+
+    with caplog.at_level("INFO", logger="doctor_agent.event"):
+        with pytest.raises(ValueError):
+            with timed("report_summary", patient="P001"):
+                raise ValueError("boom")
+
+    payload = json.loads(caplog.records[-1].getMessage())
+    assert payload["ok"] is False
+    assert "ValueError" in payload["error"]
+    assert isinstance(payload["ms"], (int, float))
+
+
+def test_redline_block_is_logged(client, caplog):
+    """
+    红线拦截必须留日志 —— 这是零容忍门禁真正生效的证据。
+    只有审计没有日志的话，「那次到底拦没拦住」得翻库才知道。
+    """
+    import json
+
+    with caplog.at_level("INFO", logger="doctor_agent.event"):
+        # 不带 handled_alerts 提交，若该病例有红线则应被拦
+        client.post("/api/emr/record/submit", json={
+            "patient_id": "P001",
+            "fields": {"chief_complaint": "测试"},
+            "handled_alerts": [],
+        })
+
+    events = []
+    for record in caplog.records:
+        try:
+            events.append(json.loads(record.getMessage()))
+        except (ValueError, TypeError):
+            continue
+    gate = [e for e in events if e.get("event") in {"redline_blocked", "redline_passed"}]
+    assert gate, "红线门禁无论放行还是拦截，都必须留下一条事件"
+    assert gate[-1]["patient"] == "P001"

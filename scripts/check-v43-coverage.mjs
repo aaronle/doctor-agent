@@ -62,7 +62,13 @@ function collectClasses(root) {
   return [...out];
 }
 
-async function login(page, url) {
+/**
+ * 进到候诊列表。
+ *
+ * 原件要先过登录页；重建版已于 2026-09-01 移除登录（一期无 SSO），直接就是列表。
+ * 所以这里按「有登录按钮就点，没有就算了」处理，两边共用一个入口函数。
+ */
+async function enter(page, url) {
   await page.goto(url, { waitUntil: 'networkidle' });
   const btn = page.getByRole('button', { name: '进入门诊工作站' });
   if (await btn.isVisible().catch(() => false)) {
@@ -124,8 +130,8 @@ const browser = await chromium.launch();
 const refPage = await browser.newPage({ viewport: VIEWPORT });
 const appPage = await browser.newPage({ viewport: VIEWPORT });
 
-await login(refPage, `http://127.0.0.1:${REF_PORT}/#/login`);
-await login(appPage, `${APP_URL}/login`);
+await enter(refPage, `http://127.0.0.1:${REF_PORT}/#/login`);
+await enter(appPage, `${APP_URL}/outpatient/list`);
 
 const refClasses = await classesPerTab(refPage, async () => {
   await refPage.evaluate(() => { location.hash = '/outpatient/P001'; });

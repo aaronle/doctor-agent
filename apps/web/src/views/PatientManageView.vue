@@ -84,10 +84,6 @@ function reset() {
   riskFilter.value = ''
 }
 
-function logout() {
-  session.logout()
-  router.push('/login')
-}
 
 onMounted(load)
 </script>
@@ -104,7 +100,6 @@ onMounted(load)
     @refresh="load"
     @remind="remind"
     @requeue="requeueById"
-    @logout="logout"
   />
 
   <div v-else class="pm-page">
@@ -117,7 +112,6 @@ onMounted(load)
       <div class="his-header-right">
         <el-button text size="small" @click="router.push('/outpatient/list')">候诊列表</el-button>
         <span class="his-date">{{ session.doctorName }} · {{ today }}</span>
-        <el-button text type="danger" size="small" @click="logout">退出</el-button>
       </div>
     </div>
 

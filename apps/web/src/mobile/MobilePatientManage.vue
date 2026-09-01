@@ -23,7 +23,6 @@ const emit = defineEmits<{
   refresh: []
   remind: [string[]]
   requeue: [string]
-  logout: []
 }>()
 
 const router = useRouter()
@@ -67,7 +66,6 @@ function reset() {
       </div>
       <span class="m-spacer" />
       <button class="m-btn link" type="button" @click="filterOpen = true">筛选</button>
-      <button class="m-btn link" type="button" @click="emit('logout')">退出</button>
     </div>
 
     <div class="m-body">

@@ -25,9 +25,13 @@
 3. 阅读 [`docs/product/12-移动端需求规格说明书.md`](docs/product/12-移动端需求规格说明书.md)
    —— ≤768px 下是**另一套信息架构**（落地即对话、三档切换、**不写 HIS/EMR**），
    不是响应式重排。改任何页面前先确认移动端分支要不要跟着改。
-4. 阅读 [`docs/product/09-一期需求规划说明书.md`](docs/product/09-一期需求规划说明书.md) —— 一期的执行契约。
-5. 阅读 [`docs/product/08-V4.3界面基准与后端API契约.md`](docs/product/08-V4.3界面基准与后端API契约.md) —— 界面与 API 的唯一事实源。
-6. 根据任务所属条线阅读对应详细 Markdown。
+   **控制台也有移动端**（`MobileAdminConsole.vue`），它保留写入动作。
+   **登录页已移除**：一期无 SSO，那道门形同虚设，根路径直接进候诊列表。
+4. 排障前读 [`docs/product/13-日志与可观测性说明.md`](docs/product/13-日志与可观测性说明.md)
+   —— 四层日志各管一段，以及「正文绝不进日志」这条硬约束。
+5. 阅读 [`docs/product/09-一期需求规划说明书.md`](docs/product/09-一期需求规划说明书.md) —— 一期的执行契约。
+6. 阅读 [`docs/product/08-V4.3界面基准与后端API契约.md`](docs/product/08-V4.3界面基准与后端API契约.md) —— 界面与 API 的唯一事实源。
+7. 根据任务所属条线阅读对应详细 Markdown。
 
 ```sh
 cd "/Users/leying/Documents/北大医疗/AI Native Systems/projects/doctor-agent"
@@ -75,6 +79,7 @@ npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + C
 | --- | --- |
 | UI/UX | `docs/product/09-一期需求规划说明书.md` 对应功能段 + 该行为的测试 + 跑 `npm run fidelity` |
 | **移动端 UI/UX** | `docs/product/12-移动端需求规格说明书.md` + `apps/web/src/mobile/*.spec.ts`。移动端是另一套 IA，桌面改了它不会自动跟着改 |
+| **新增埋点** | `docs/product/13-日志与可观测性说明.md` 的埋点表；新字段若可能含正文，必须加进 `obs.py` 的 `_REDACTED` |
 | **新增界面** | 还要给 `extract-v43-dom.mjs` 加采集态、给 `compare-v43-fidelity.mjs` 加场景 —— 否则它落在门禁外 |
 | API 形状 | `docs/product/08-V4.3界面基准与后端API契约.md` + `apps/api/tests/test_api.py` + 重跑 `contracts:export` |
 | Agent 输出结构 | 规格里该岗位的输出约束 + 对应校验测试 |
@@ -104,13 +109,17 @@ npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + C
 doctor-agent/
 ├── apps/
 │   ├── web/            Vue 3 + Element Plus + Pinia，五路由六组件
-│   │   └── src/mobile/ 移动端组件（≤768px 才挂载，类名一律 m- 前缀）
+│   │   ├── src/mobile/    移动端组件（≤768px 才挂载，类名一律 m- 前缀）
+│   │   └── src/logging.ts 前端结构化日志，挂 window.__da
 │   └── api/            FastAPI + SQLAlchemy + SQLite
 │       └── app/
 │           ├── agents/     六个岗位 + 上下文装配 + 提示词分层
 │           ├── routers/    his / emr / config
 │           ├── llm.py      OpenAI 兼容网关客户端
-│           └── cache.py    聚合结果缓存
+│           ├── obs.py      结构化事件日志（正文不入日志）
+│           ├── cache.py    聚合结果缓存
+│           ├── eval_datasets.py       评测数据集加载与启停
+│           └── data/eval_datasets/    数据集本体（JSON，可开可关）
 ├── references/ui-demo/
 │   ├── AI-HIS门诊模块V4.3.html   不可修改的原件（MD5 df95a09b…）
 │   └── extracted/               全部抽取产物，脚本可复现
@@ -145,6 +154,7 @@ Figma：**AI 门诊工作站 · 一期设计系统**
 | 01 · 组件库 | 待建 |
 | 02 · 页面骨架 | 待建 |
 | 04 · 移动端 | 六屏 390×844：对话 / ＋菜单 / 分析 / 记录 / 候诊 / 患者管理 |
+| 05 · 控制台移动端 | 五屏 390×844：配置 / 岗位切换 / 回归集·数据集管理 / 回归集·结果 / 运行日志 |
 
 令牌取值**全部来自 V4.3 编译产物**（`scripts/extract-v43-assets.mjs`），不是取色器估的。
 其中 `字号/base = 12` 标了重点：那是 `--el-font-size-base`，不是 Element Plus 默认的 14px。
@@ -183,7 +193,9 @@ Figma：**AI 门诊工作站 · 一期设计系统**
 3. Worker、智能体岗位与 Sub-agent 的定义和运行边界（待讨论）。
 4. **专科口径冲突**：V4.3 患者是内分泌／心内／神内，既有文档写的是内科／骨科／妇科。
    一期以 V4.3 为准，产品文档是否同步修订待确认。
-5. 金标准病例、评测集结构、准确性指标。
+5. ~~金标准病例、评测集结构、准确性指标~~ —— 已落地第一步：评测数据集可管理，
+   首个规范倒推数据集接入（见 `11-Agent控制台需求规格说明书.md` §3.5–3.6）。
+   下一步是用 Synthea 造中文虚构病例扩量。
 6. 33 项专项评估的颗粒度与 Agent 化路径（一期只做目录展示）。
 7. 负责人、项目节奏、环境和发布路径。
 

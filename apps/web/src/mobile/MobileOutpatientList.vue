@@ -22,7 +22,7 @@ const props = defineProps<{
   today: string
 }>()
 
-const emit = defineEmits<{ refresh: []; logout: [] }>()
+const emit = defineEmits<{ refresh: [] }>()
 
 const router = useRouter()
 
@@ -68,7 +68,6 @@ function reset() {
       </div>
       <span class="m-spacer" />
       <span class="m-tag ok">AI 已就绪</span>
-      <button class="m-btn link" type="button" @click="emit('logout')">退出</button>
     </div>
 
     <div class="m-toolbar">

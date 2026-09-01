@@ -3,29 +3,26 @@ import { ref } from 'vue'
 
 const STORAGE_KEY = 'doctor-agent.session'
 
+/** 演示口径下的默认接诊医生。页头与候诊列表都要显示一个名字。 */
+export const DEFAULT_DOCTOR = '张医生'
+
 /**
  * 医生会话。
  *
- * 一期没有医院 SSO：任意账号密码即可进入，与 V4.3 的演示口径一致。
- * 登录态存 sessionStorage 而非 localStorage —— 关掉标签页即失效，
- * 演示机上不会留下一个长期有效的「已登录」状态。
+ * **一期没有登录**：没有医院 SSO，原先那道「任意账号密码都能进」的登录页
+ * 是纯摆设 —— 既拖慢演示，又让人误以为这里有身份边界。已于 2026-09-01 移除，
+ * 直接进候诊列表。
+ *
+ * 这里只留一个可改的医生名：页头要显示接诊医生，将来接 SSO 时这个 store
+ * 就是落点，不必再把身份概念重新引一遍。
  */
 export const useSession = defineStore('session', () => {
-  const stored = sessionStorage.getItem(STORAGE_KEY)
-  const doctorName = ref(stored ?? '')
-  const loggedIn = ref(Boolean(stored))
+  const doctorName = ref(sessionStorage.getItem(STORAGE_KEY) || DEFAULT_DOCTOR)
 
-  function login(name: string) {
-    doctorName.value = name || '张医生'
-    loggedIn.value = true
+  function setDoctor(name: string) {
+    doctorName.value = name || DEFAULT_DOCTOR
     sessionStorage.setItem(STORAGE_KEY, doctorName.value)
   }
 
-  function logout() {
-    doctorName.value = ''
-    loggedIn.value = false
-    sessionStorage.removeItem(STORAGE_KEY)
-  }
-
-  return { doctorName, loggedIn, login, logout }
+  return { doctorName, setDoctor }
 })

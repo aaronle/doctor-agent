@@ -1,232 +1,29 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { onMounted } from 'vue'
 
-import {
-  api,
-  type AgentSummary,
-  type AgentDetail,
-  type AgentRunLog,
-  type CompareResult,
-  type EvalDataset,
-  type EvalResult,
-} from '../api'
+import MobileAdminConsole from '../mobile/MobileAdminConsole.vue'
+import { useAdminConsole } from '../composables/useAdminConsole'
+import { useIsMobile } from '../composables/useMediaQuery'
 
 /**
- * Agent 配置与运行控制台。
+ * Agent 配置与运行控制台（桌面）。
  *
  * 面向产品管理员与调优人员，**不是医生端的第八个功能** —— 单独挂在 /admin，
  * 不占用 V4.3 定义的五个医生端页面，也不复用医生端的 scoped 样式。
- */
-
-const loading = ref(false)
-const agents = ref<AgentSummary[]>([])
-const tiers = ref<{ tier: string; label: string; model: string }[]>([])
-const bundleVersion = ref('')
-
-const activeKey = ref('')
-const detail = ref<AgentDetail | null>(null)
-const runs = ref<AgentRunLog[]>([])
-const tab = ref<'config' | 'tune' | 'eval' | 'versions' | 'runs'>('config')
-
-/** 草稿编辑区。与已发布配置分开，未发布不影响线上。 */
-const draft = ref({ model_tier: 'clinical_fast', role_prompt: '', note: '' })
-
-/**
- * 可调参数。两个都带上下限，且**服务端也会拦** —— 界面能绕过。
  *
- * temperature 临床岗位默认 0：调高会让同一份病历每次生成不同，无法复核。
- * max_tokens 太小会截断 JSON，整个岗位跟着降级（一期真踩过）。
+ * 状态全在 `useAdminConsole`，与移动版共用同一份。这里只负责桌面的排布。
  */
-const params = ref<{ temperature: number; max_tokens: number }>({ temperature: 0, max_tokens: 4096 })
-const saving = ref(false)
 
-const dirty = computed(() => {
-  if (!detail.value) return false
-  const base = detail.value.draft ?? detail.value.running
-  return draft.value.role_prompt !== base.role_prompt || draft.value.model_tier !== base.model_tier
-})
+const isMobile = useIsMobile()
 
-
-/* ===================== 试运行与调优 ===================== */
-
-const dryPatient = ref('P001')
-const comparing = ref(false)
-const comparison = ref<CompareResult | null>(null)
-
-const evaluating = ref(false)
-const evalResult = ref<EvalResult | null>(null)
-const evalCases = ref<
-  { id: string; name: string; patient_id: string; dataset_id: string; dataset_name: string; checks: string[] }[]
->([])
-
-/* ===================== 评测数据集 ===================== */
-
-const datasets = ref<EvalDataset[]>([])
-const togglingDataset = ref('')
-
-async function loadDatasets() {
-  try {
-    datasets.value = (await api.adminEvalDatasets()).datasets
-  } catch (error) {
-    ElMessage.error(`数据集加载失败：${(error as Error).message}`)
-  }
-}
-
-/**
- * 启停一个数据集。
- *
- * 切完要重拉用例清单 —— 停用了却还列着它的用例，医生会以为下次还会跑。
- * 已有的评测结果一并清掉：那份结果的分母是旧的，留着比没有更误导。
- */
-async function toggleDataset(dataset: EvalDataset, enabled: boolean) {
-  togglingDataset.value = dataset.id
-  try {
-    datasets.value = (await api.adminToggleEvalDataset(dataset.id, enabled)).datasets
-    evalResult.value = null
-    await loadEvalCases()
-  } catch (error) {
-    ElMessage.error(`切换失败：${(error as Error).message}`)
-    await loadDatasets()
-  } finally {
-    togglingDataset.value = ''
-  }
-}
-
-/** 当前岗位会跑到的用例数。跟「该集共 N 条」不是一回事 —— 一个集可能跨多个岗位。 */
-const activeCaseCount = computed(() => evalCases.value.length)
-
-/** 只有变化过的字段值得看 —— 几十个 same 会把两条真差异淹掉 */
-const changedFields = computed(() =>
-  (comparison.value?.diff ?? []).filter((d) => d.kind !== 'same'),
-)
-
-function fieldText(side: 'published' | 'draft', field: string) {
-  const value = comparison.value?.[side].output?.[field]
-  if (value === undefined) return '（无此字段）'
-  return typeof value === 'string' ? value : JSON.stringify(value, null, 2)
-}
-
-async function runCompare() {
-  if (!activeKey.value) return
-  comparing.value = true
-  comparison.value = null
-  try {
-    comparison.value = await api.adminCompare(activeKey.value, dryPatient.value)
-  } catch (error) {
-    ElMessage.error(`试运行失败：${(error as Error).message}`)
-  } finally {
-    comparing.value = false
-  }
-}
-
-async function runEval() {
-  if (!activeKey.value) return
-  evaluating.value = true
-  evalResult.value = null
-  try {
-    evalResult.value = await api.adminRunEval(activeKey.value, 'draft')
-  } catch (error) {
-    ElMessage.error(`回归集执行失败：${(error as Error).message}`)
-  } finally {
-    evaluating.value = false
-  }
-}
-
-async function loadEvalCases() {
-  if (!activeKey.value) return
-  try {
-    evalCases.value = (await api.adminEvalCases(activeKey.value)).cases
-  } catch {
-    evalCases.value = []
-  }
-}
-
-async function loadOverview() {
-  loading.value = true
-  try {
-    const result = await api.adminAgents()
-    agents.value = result.agents
-    tiers.value = result.model_tiers
-    bundleVersion.value = result.prompt_bundle_version
-    if (!activeKey.value && result.agents.length) await select(result.agents[0].agent_key)
-  } catch (error) {
-    ElMessage.error(`加载失败：${(error as Error).message}`)
-  } finally {
-    loading.value = false
-  }
-}
-
-async function select(key: string) {
-  activeKey.value = key
-  // 清掉上一个岗位的结果 —— 留着会让人对着 A 的输出判断 B 的提示词
-  comparison.value = null
-  evalResult.value = null
-  void loadEvalCases()
-  detail.value = await api.adminAgent(key)
-  const base = detail.value.draft ?? detail.value.running
-  draft.value = {
-    model_tier: base.model_tier,
-    role_prompt: base.role_prompt,
-    note: detail.value.draft?.note ?? '',
-  }
-  runs.value = (await api.adminRuns(key)).runs
-}
-
-async function saveDraft() {
-  if (!detail.value) return
-  saving.value = true
-  try {
-    await api.adminSaveDraft(activeKey.value, draft.value)
-    ElMessage.success('草稿已保存，未发布不影响线上')
-    await select(activeKey.value)
-    await loadOverview()
-  } catch (error) {
-    ElMessage.error(`保存失败：${(error as Error).message}`)
-  } finally {
-    saving.value = false
-  }
-}
-
-async function publish() {
-  await ElMessageBox.confirm(
-    '发布后所有新的调用立即使用这一版配置。旧版本保留为历史，可随时回滚。',
-    '确认发布',
-    { type: 'warning' },
-  )
-  const result = await api.adminPublish(activeKey.value)
-  ElMessage.success(`已发布 ${result.version}`)
-  await select(activeKey.value)
-  await loadOverview()
-}
-
-async function rollback(versionId: number, version: string) {
-  await ElMessageBox.confirm(`回滚到 ${version}？当前生产版本会降为历史版本。`, '确认回滚', { type: 'warning' })
-  await api.adminRollback(activeKey.value, versionId)
-  ElMessage.success(`已回滚到 ${version}`)
-  await select(activeKey.value)
-  await loadOverview()
-}
-
-async function discard() {
-  await ElMessageBox.confirm('丢弃草稿？未保存的改动会丢失。', '确认丢弃', { type: 'warning' })
-  await api.adminDiscardDraft(activeKey.value)
-  ElMessage.success('草稿已丢弃')
-  await select(activeKey.value)
-  await loadOverview()
-}
-
-function resetToCodeDefault() {
-  if (!detail.value) return
-  draft.value.role_prompt = detail.value.code_default_prompt
-  ElMessage.info('已填入代码默认 Prompt，保存并发布后生效')
-}
-
-function statusType(status: string) {
-  if (status === 'published') return 'success'
-  if (status === 'draft') return 'warning'
-  return 'info'
-}
+const {
+  loading, agents, tiers, bundleVersion, activeKey, detail, runs, tab,
+  draft, params, saving, dirty,
+  dryPatient, comparing, comparison, changedFields, fieldText, runCompare,
+  evaluating, evalResult, evalCases, datasets, togglingDataset, activeCaseCount,
+  runEval, loadDatasets, toggleDataset,
+  loadOverview, select, saveDraft, publish, rollback, discard, resetToCodeDefault, statusType,
+} = useAdminConsole()
 
 onMounted(async () => {
   await loadOverview()
@@ -235,7 +32,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="admin-page">
+  <!--
+    控制台移动端是另一套 IA：左右分栏改「顶部岗位切换 + 底部四档」。
+    与医生端不同，这里**保留写入动作** —— 改的是 Agent 配置，不是病历。
+  -->
+  <MobileAdminConsole v-if="isMobile" />
+
+  <div v-else class="admin-page">
     <header class="admin-header">
       <div class="admin-brand">
         <span class="admin-logo">⚙</span>

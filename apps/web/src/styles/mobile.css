@@ -904,7 +904,175 @@
 }
 
 /*
- * 登录页与 Agent 控制台没有做「对话优先」的改造 —— 它们不是医生的诊间动线。
- * 这两页的移动端适配写在各自的 scoped 样式表里（Login.scoped.css / admin.css），
- * 不放这里：全局规则的优先级低于 scoped 的 [data-v-*] 选择器，写在这里不生效。
+ * Agent 控制台的**可达性兜底**（分栏改上下、岗位侧栏横向滚动）写在 admin.css，
+ * 不放这里：全局规则优先级低于 scoped 的 [data-v-*] 选择器，写在这里不生效。
+ * 控制台的移动端专属 IA 在 mobile/MobileAdminConsole.vue，用的是本文件的 m- 类。
+ *
+ * 登录页已于 2026-09-01 移除（一期无 SSO，那道门形同虚设），相关样式一并删除。
  */
+
+/* ------------------------------------------------------------------ 控制台移动端 */
+
+.m-agent-pick {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* 只读区压暗但完整可读 —— 「改不了什么」本身是要看到的信息 */
+.m-locked {
+  background: var(--bg);
+  border-color: #fadadd;
+}
+
+.m-pre {
+  margin: 4px 0 0;
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.m-textarea,
+.m-select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 9px 10px;
+  /* 16px 是 iOS 不自动放大的下限，见文件头 */
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  outline: none;
+  resize: vertical;
+}
+
+.m-select {
+  width: auto;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.m-ds-panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.m-ds-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.m-ds-row {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line-2);
+}
+
+.m-ds-row:first-of-type {
+  border-top: 0;
+}
+
+/* 停用的压暗但完整可读：要看得清自己关掉的是什么 */
+.m-ds-row.off {
+  opacity: 0.55;
+}
+
+.m-ds-row.broken {
+  background: #fff7f7;
+}
+
+.m-ds-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.m-ds-error {
+  font-size: 11px;
+  line-height: 1.55;
+  color: #e6191a;
+  word-break: break-word;
+}
+
+.m-agent-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+}
+
+.m-agent-row.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+/* 成功率低于 90% 标红：切岗位时最该先看到的就是「哪个在掉」 */
+.m-rate-ok {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--green);
+}
+
+.m-rate-bad {
+  font-size: 11px;
+  font-weight: 600;
+  color: #e6191a;
+}
+
+.m-case-failed {
+  background: #fffafa;
+  border-color: #fadadd;
+}
+
+.m-version-hint {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+  padding: 7px 11px;
+  border-radius: 8px;
+  background: rgba(31, 41, 55, 0.86);
+  color: #fff;
+  font-size: 11px;
+}
+
+.m-version-hint .m-btn.link {
+  color: #9dc0ff;
+}
+
+/* 面板内的操作行。不能复用 .m-toolbar —— 那个带白底和下边框，
+   放进 .m-records 的卡片流里会多出一条突兀的白条，而且没有左右内距会贴边。 */
+.m-actionrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

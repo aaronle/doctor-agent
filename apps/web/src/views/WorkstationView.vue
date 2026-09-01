@@ -364,10 +364,6 @@ function switchPatient(id: string) {
   router.push(`/outpatient/${id}`)
 }
 
-function logout() {
-  session.logout()
-  router.push('/login')
-}
 
 watch(
   () => route.params.patientId,
@@ -421,7 +417,6 @@ onMounted(async () => {
         <el-button text size="small" @click="admissionDialog = true">住院</el-button>
         <el-button text size="small" @click="router.push('/admin')">Agent 控制台</el-button>
         <el-button text size="small" @click="router.push('/outpatient/manage')">患者管理</el-button>
-        <el-button text type="danger" size="small" @click="logout">退出</el-button>
       </div>
     </div>
 

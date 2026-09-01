@@ -18,6 +18,7 @@ from ..agent_config import resolve
 from ..llm import ChatMessage, LlmError, get_llm_client
 from ..models import AgentRun
 from .context import project
+from ..obs import event
 
 PROMPT_BUNDLE_VERSION = "pb-1.0.0"
 
@@ -147,6 +148,8 @@ class Agent:
                 degraded=True,
                 note="模型通道未配置，已降级为本地规则",
             )
+            event("agent_degraded", agent=self.key, patient=ctx.get("id"), reason="unconfigured",
+                  tier=config.model_tier, recorded=record)
             if record:
                 self._record(session, ctx, outcome, status="degraded", error="unconfigured", config=config)
             return outcome
@@ -165,9 +168,18 @@ class Agent:
                 degraded=True,
                 note=f"模型不可用，已降级为本地规则：{exc}",
             )
+            # 记异常类型而不是整段消息：类型能聚合计数（今天 12 次 LlmError），
+            # 消息各不相同，聚合不了
+            event("agent_degraded", agent=self.key, patient=ctx.get("id"),
+                  reason=type(exc).__name__, detail=str(exc)[:160],
+                  tier=config.model_tier, recorded=record)
             if record:
                 self._record(session, ctx, outcome, status="degraded", error=str(exc), config=config, raw=getattr(exc, "raw_excerpt", ""))
             return outcome
+
+        event("agent_run", agent=self.key, patient=ctx.get("id"), tier=config.model_tier,
+              model=result.model, ms=result.elapsed_ms, tokens=result.total_tokens,
+              version=config.version, source=config.source, recorded=record)
 
         outcome = AgentOutcome(
             data=data,

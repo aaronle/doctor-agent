@@ -1,7 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
-import { useSession } from './stores/session'
-
 /**
  * 路由与 V4.3 一一对应，不得新增第二套工作台或独立问诊页。
  *
@@ -9,8 +7,11 @@ import { useSession } from './stores/session'
  * 由 FastAPI 对未匹配路径回落 index.html。URL 更干净，路径本身不变。
  */
 const routes: RouteRecordRaw[] = [
-  { path: '/', redirect: '/login' },
-  { path: '/login', name: 'Login', component: () => import('./views/LoginView.vue'), meta: { noAuth: true, title: '登录' } },
+  // 一期没有医院 SSO，登录页只是一道摆设 —— 任意账号密码都能进。
+  // 摆一道形同虚设的门，既拖慢演示，又让人误以为这里有身份边界。直接进候诊列表。
+  { path: '/', redirect: '/outpatient/list' },
+  // 老书签与外部链接还可能指向 /login，重定向掉而不是 404
+  { path: '/login', redirect: '/outpatient/list' },
   { path: '/outpatient', name: 'OutpatientHome', component: () => import('./views/WorkstationView.vue'), meta: { title: '门诊工作站' } },
   { path: '/outpatient/list', name: 'OutpatientList', component: () => import('./views/OutpatientListView.vue'), meta: { title: '候诊列表' } },
   { path: '/outpatient/manage', name: 'PatientManage', component: () => import('./views/PatientManageView.vue'), meta: { title: '患者管理' } },
@@ -22,10 +23,6 @@ const routes: RouteRecordRaw[] = [
 export const router = createRouter({ history: createWebHistory(), routes })
 
 router.beforeEach((to) => {
-  const session = useSession()
   document.title = `${to.meta.title ?? '门诊'} · AI 门诊工作站`
-  if (!to.meta.noAuth && !session.loggedIn) {
-    return { path: '/login' }
-  }
   return true
 })

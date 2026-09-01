@@ -43,6 +43,7 @@ from ..database import SessionLocal, get_session
 from ..llm import ChatMessage, LlmError, get_llm_client
 from ..models import AuditLog, Patient, RecordDraft, Referral, VoiceSession
 from ..record_quality import evaluate
+from ..obs import event
 
 router = APIRouter(prefix="/api/emr", tags=["emr"])
 
@@ -802,7 +803,13 @@ def _assert_red_alerts_closed(session: Session, patient, handled: list[str], *, 
     all_red = {a["id"] for a in hard} | {a["id"] for a in model_alerts if a.get("level") == "高风险"}
     open_red = sorted(all_red - set(handled or []))
     if open_red:
+        # 红线拦截必须留日志：这是零容忍门禁真正生效的证据。
+        # 只有审计没有日志的话，「那次到底拦没拦住」得翻库才知道。
+        event("redline_blocked", patient=patient.id, action=action,
+              open_count=len(open_red), open_ids="|".join(open_red),
+              hard_rules=len(hard), model_alerts=len(model_alerts))
         raise HTTPException(status_code=409, detail=f"尚有 {len(open_red)} 条红色风险未处置，已阻断{action}")
+    event("redline_passed", patient=patient.id, action=action, handled=len(handled or []))
 
 
 class AlertHandleIn(StrictIn):

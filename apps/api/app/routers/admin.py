@@ -27,6 +27,7 @@ from ..agents import base as agent_base
 from ..audit import DEMO_ACTOR, record_audit
 from ..agents.context import build_context
 from ..eval_datasets import active_cases, describe as describe_datasets, set_enabled, universal_checks
+from ..obs import event
 from ..schemas import StrictIn
 from ..database import SessionLocal, get_session
 from ..models import AgentRun, AgentVersion, Patient
@@ -529,6 +530,7 @@ def toggle_eval_dataset(
     if dataset_id not in known:
         raise HTTPException(status_code=404, detail=f"未知数据集：{dataset_id}")
     set_enabled(session, dataset_id, body.enabled)
+    event("eval_dataset_toggle", dataset=dataset_id, enabled=body.enabled)
     record_audit(
         session,
         action="eval_dataset_toggle",
@@ -627,6 +629,14 @@ async def run_eval(agent_key: str, body: EvalIn, session: Session = Depends(get_
 
     rows = await asyncio.gather(*(one(c) for c in cases))
     passed = sum(1 for r in rows if r["passed"])
+    # 通过率必须连着分母与失败清单一起记 —— 只记百分比的话，
+    # 日后回看分不清是「改好了」还是「关掉了半个数据集」
+    event("eval_run", agent=agent_key, use=body.use, total=len(rows), passed=passed,
+          failed=len(rows) - passed,
+          datasets="|".join(d["id"] for d in ran_datasets),
+          failed_cases="|".join(r["case_id"] for r in rows if not r["passed"]),
+          degraded_cases=sum(1 for r in rows if r.get("degraded")),
+          version=config.version, source=config.source)
     return {
         "total": len(rows),
         "passed": passed,

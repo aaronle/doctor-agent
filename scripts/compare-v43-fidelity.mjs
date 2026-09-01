@@ -307,9 +307,10 @@ await refPage.goto(`http://127.0.0.1:${REF_PORT}/#/login`, { waitUntil: 'network
 await refPage.getByRole('button', { name: '进入门诊工作站' }).click();
 await refPage.waitForTimeout(1500);
 
+// 重建版已于 2026-09-01 移除登录页（一期无 SSO，那道门形同虚设），直接进候诊列表。
+// 原件那边还得走登录 —— 两边入口不同，但落点都是候诊列表，比对的起点是一致的。
 const appPage = await browser.newPage({ viewport: VIEWPORT });
-await appPage.goto(`${APP_URL}/login`, { waitUntil: 'networkidle' });
-await appPage.getByRole('button', { name: '进入门诊工作站' }).click();
+await appPage.goto(`${APP_URL}/outpatient/list`, { waitUntil: 'networkidle' });
 await appPage.waitForTimeout(1500);
 
 let total = 0;

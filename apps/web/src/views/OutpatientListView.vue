@@ -57,10 +57,6 @@ function enter(patient: PatientListItem) {
   router.push(`/outpatient/${patient.id}`)
 }
 
-function logout() {
-  session.logout()
-  router.push('/login')
-}
 
 onMounted(load)
 </script>
@@ -78,7 +74,6 @@ onMounted(load)
     :doctor-name="session.doctorName"
     :today="today"
     @refresh="load"
-    @logout="logout"
   />
 
   <div v-else class="his-list-page">
@@ -91,7 +86,6 @@ onMounted(load)
       <div class="his-header-right">
         <div class="ai-badge"><span class="ai-dot" />AI 已就绪</div>
         <span class="his-date">{{ session.doctorName }} · {{ today }}</span>
-        <el-button text type="danger" size="small" @click="logout">退出</el-button>
       </div>
     </div>
 

@@ -13,5 +13,10 @@ import './styles/mobile.css'
 
 import App from './App.vue'
 import { router } from './router'
+import { installDebugHandle } from './logging'
+
+// 调试句柄挂到 window.__da。默认不输出，URL 加 ?debug=1 或执行 __da.on() 打开；
+// 环形缓冲始终在记 —— 出问题往往是事后才想起要看日志，那时再重现现场就没了。
+installDebugHandle()
 
 createApp(App).use(createPinia()).use(router).use(ElementPlus, { locale: zhCn }).mount('#app')
