@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..agent_config import MODEL_TIERS, TIER_LABELS, ResolvedConfig, prompt_hash, published_version, resolve, resolve_model
+from ..agent_config import DEFAULT_TIER_MODELS, TIER_LABELS, ResolvedConfig, prompt_hash, published_version, resolve, resolve_model
 from ..agents import AGENT_REGISTRY, PROMPT_BUNDLE_VERSION
 from ..agents import base as agent_base
 from ..audit import DEMO_ACTOR, record_audit
@@ -80,7 +80,10 @@ PARAM_BOUNDS = {
 
 
 class DraftIn(StrictIn):
-    model_tier: str = "clinical_fast"
+    #: 不传就沿用该岗位当前生效的档位，**不默认成快速档**。
+    #: 原先默认 clinical_fast：在控制台只改了 Prompt、没碰档位，
+    #: 存一次草稿就把岗位悄悄降级到快档 —— 而界面上看不出任何异样。
+    model_tier: str | None = None
     role_prompt: str = ""
     params: dict = Field(default_factory=dict)
     note: str = ""
@@ -163,7 +166,7 @@ def list_agents(session: Session = Depends(get_session)) -> dict:
     return {
         "agents": items,
         "model_tiers": [
-            {"tier": t, "label": TIER_LABELS[t], "model": resolve_model(t)} for t in MODEL_TIERS
+            {"tier": t, "label": TIER_LABELS[t], "model": resolve_model(t)} for t in DEFAULT_TIER_MODELS
         ],
         "prompt_bundle_version": PROMPT_BUNDLE_VERSION,
     }
@@ -228,9 +231,10 @@ def get_agent(agent_key: str, session: Session = Depends(get_session)) -> dict:
 
 @router.put("/agents/{agent_key}/draft")
 def save_draft(agent_key: str, body: DraftIn, session: Session = Depends(get_session)) -> dict:
-    _agent_or_404(agent_key)
-    if body.model_tier not in MODEL_TIERS:
-        raise HTTPException(status_code=400, detail=f"未知模型档位：{body.model_tier}")
+    agent = _agent_or_404(agent_key)
+    tier = body.model_tier or resolve(session, agent).model_tier
+    if tier not in DEFAULT_TIER_MODELS:
+        raise HTTPException(status_code=400, detail=f"未知模型档位：{tier}")
     if not body.role_prompt.strip():
         raise HTTPException(status_code=400, detail="岗位 Prompt 不能为空")
     _validate_params(body.params)
@@ -242,8 +246,8 @@ def save_draft(agent_key: str, body: DraftIn, session: Session = Depends(get_ses
         draft = AgentVersion(agent_key=agent_key, version="draft", status="draft")
         session.add(draft)
 
-    draft.model_tier = body.model_tier
-    draft.model = resolve_model(body.model_tier)
+    draft.model_tier = tier
+    draft.model = resolve_model(tier)
     draft.role_prompt = body.role_prompt
     draft.params = body.params
     draft.note = body.note

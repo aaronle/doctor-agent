@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from .agents import agent_inventory
+from .agent_config import tier_models
 from .config import get_ai_settings, get_settings
 from .database import SessionLocal, engine, init_database
 from .models import OperationLog
@@ -129,7 +130,10 @@ def health() -> dict:
         "release": settings.release,
         "database": database,
         "ai": "configured" if ai.configured else "unconfigured",
+        # fast/smart 是**不走档位**的那些调用（Copilot 对话等）用的。
+        # 六个岗位的模型只看 modelTiers —— 两者可以不同，2026-09-02 起就是不同的。
         "aiModels": {"fast": ai.fast_model, "smart": ai.smart_model},
+        "modelTiers": tier_models(),
         "agents": agent_inventory(),
         "runtime_mode": settings.runtime_mode,
         "write_back_mode": settings.write_back_mode,

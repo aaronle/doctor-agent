@@ -163,6 +163,9 @@ def hard_rule_alerts(ctx: dict) -> list[dict]:
 
 class RiskAgent(Agent):
     key = "risk"
+    # 配合平台硬规则，漏报有临床后果。回归集只有 1 条用例，
+    # 在补足之前不动它 —— 它同时也是 report-summary 的长杆（52.2s）。
+    model_tier = "clinical_safety"
     version = "mvp-1.0.0"
     # 风险判断看当前值与阈值，不需要历史趋势数组
     context_fields = (

@@ -50,6 +50,10 @@ def _archived_history(ctx: dict) -> str:
 class RecordAgent(Agent):
     key = "record"
     version = "mvp-1.0.0"
+    # 2026-09-02 由 Sonnet 换回 Haiku。**六个岗位里唯一有 A/B 数据的一个**：
+    # 同一套 10 条回归集两个模型都是 10/10，而耗时 45.8s → 5.0s。
+    # 这一段是「读证据 → 按七段转写」，不是推理，快档名副其实。
+    model_tier = "clinical_fast"
     # 病历要引用对话原文与检查结论，但不需要检验历史值
     context_fields = (
         "primary_diagnosis", "diagnoses", "past_history", "allergies",

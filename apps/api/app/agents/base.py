@@ -64,6 +64,13 @@ class Agent:
     role_prompt: str = ""
     output_schema: dict = {}
 
+    #: 模型档位。**缺省是推理档，不是快速档。**
+    #:
+    #: 之前所有岗位都硬编码成 clinical_fast，档位形同虚设。改成由子类声明后，
+    #: 缺省必须落在能力更强的一侧：漏声明的后果应该是「慢一点」，
+    #: 而不是「某个临床岗位被悄悄降级」——后者没有任何人会立刻发现。
+    model_tier: str = "clinical_reasoning"
+
     # 该岗位实际需要的上下文字段。None 表示全量。
     # 只影响送进提示词的内容，不影响 fallback 能看到的数据。
     context_fields: tuple[str, ...] | None = None
@@ -229,7 +236,7 @@ class Agent:
             # 记下这次跑的是哪一版配置，出问题能定位到具体版本而不是「某次改动」
             "config_version": getattr(config, "version", self.version),
             "config_source": getattr(config, "source", "code-default"),
-            "model_tier": getattr(config, "model_tier", "clinical_fast"),
+            "model_tier": getattr(config, "model_tier", self.model_tier),
         }
         # 失败样本：只在失败时留模型原文的前 500 字符。
         # 成功的输出不留 —— 那会让日志变成病历副本；500 字够定位格式问题，

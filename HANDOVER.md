@@ -54,10 +54,21 @@ npm run dev
 ```env
 AI_API_KEY=            # 从 ts-it-service 同步，不要写进任何文档
 AI_BASE_URL=https://www.meatdc.com/v1
-AI_FAST_MODEL=claude-sonnet-5    # 2026-09-02 由 Haiku 4.5 换过来
+AI_FAST_MODEL=claude-sonnet-5    # 只管不走档位的调用（Copilot 对话等）
 AI_TIMEOUT_MS=90000              # Sonnet 更慢，45s 会让岗位擦边超时后降级
 AI_TEST_MODE=          # 置为 rules 时全部岗位走本地规则，不调模型
 ```
+
+**六个岗位用什么模型看「档位」，不看 `AI_FAST_MODEL`**（2026-09-02 起）：
+
+| 档位 | 模型 | 岗位 | 依据 |
+| --- | --- | --- | --- |
+| `clinical_fast` | Haiku 4.5 | record | 实测两模型回归集都 10/10，45.8s → 5.0s |
+| `clinical_reasoning` | Sonnet 5 | summary / diagnosis / comorbidity / voice | 无 A/B 数据，留强的一侧 |
+| `clinical_safety` | Sonnet 5 | risk | 只有 1 条用例，且漏报有临床后果 |
+
+`report-summary` 里那四个是**并发**的，耗时等于最慢的那个（risk 52.2s）——
+动另外三个一秒都省不下来。详见 `15-Agent架构重构…md` §15。
 
 > **换模型要同时改代码缺省与部署 env，以 `/api/health` 的实际回值为准。**
 > 上一次只改了 `app/config.py`，服务器的 `.env.runtime` 还压着 Haiku ——
