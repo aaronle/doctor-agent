@@ -30,7 +30,9 @@ AGENT_REGISTRY: tuple[tuple[str, str, str], ...] = (
     ("diagnosis", "诊断智能体", diagnosis_agent.version),
     ("risk", "风险管理智能体", risk_agent.version),
     ("comorbidity", "共病管理智能体", comorbidity_agent.version),
-    ("voice", "语音问诊智能体", voice_plan_agent.version),
+    # 指向 voice_summary_agent —— 它才是产品路径上真正在跑的那个（问诊小结）。
+    # voice_plan_agent（追问清单与补充观察）一期已撤，见 emr.py 的 voice_init。
+    ("voice", "语音问诊智能体", voice_summary_agent.version),
 )
 
 

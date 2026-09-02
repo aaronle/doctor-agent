@@ -153,21 +153,6 @@ const patient = computed(() => ws.patient)
  * 这里沿用它的取值；医生智能体面板关闭时右移，避免悬空。
  */
 const floatRight = computed(() => (panelOpen.value ? 308 : 20))
-const pendingStyle = computed(() => ({
-  position: 'fixed' as const,
-  right: `${floatRight.value}px`,
-  top: '105px',
-  width: '220px',
-  zIndex: 2100,
-}))
-const obsStyle = computed(() => ({
-  position: 'fixed' as const,
-  right: `${floatRight.value}px`,
-  top: '320px',
-  width: '220px',
-  maxHeight: 'calc(100vh - 340px)',
-  zIndex: 2090,
-}))
 
 
 // ---------------------------------------------------------------- 诊断管理
@@ -1061,7 +1046,7 @@ function submitInput() {
   const text = chatInput.value.trim()
   if (!text) return
   chatInput.value = ''
-  if (inVoice.value) voice.askManual(text)
+  if (inVoice.value) voice.recordPatientUtterance(text)
   else sendChat(text)
 }
 
@@ -1184,16 +1169,15 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               <p class="gate-foot">
                 跳过入口不能少：复诊、患者不配合、医生已自行问完 —— 这些情况下分析不能因此永远出不来。
               </p>
+              <!--
+                进度改成「已录几轮」。原来是「追问提示 N/M 已问到」——
+                那个分母来自已撤掉的追问清单，而且它表达的是「模型觉得你还该问几条」，
+                本身就是这次要去掉的那种未经知识库支撑的判断。
+                已录轮数是纯事实，不需要任何模型判断。
+              -->
               <div v-if="voice.active.value" class="gate-progress">
-                <div class="gate-progress-bar">
-                  <div
-                    class="gate-progress-done"
-                    :style="{ width: `${Math.round((voice.doneQuestions.value.length / Math.max(1, voice.questions.value.length)) * 100)}%` }"
-                  />
-                </div>
                 <span class="gate-progress-text">
-                  问诊进行中 · AI 追问提示 {{ voice.doneQuestions.value.length }}/{{ voice.questions.value.length }} 已问到
-                  · 已播 {{ voice.messages.value.length }} 轮
+                  问诊进行中 · 已录 {{ voice.messages.value.length }} 轮
                 </span>
               </div>
             </div>
@@ -1383,7 +1367,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                         <div
                           v-for="(hit, i) in noteHits"
                           :key="i"
-                          class="obs-float-item"
+                          class="note-hit-item"
                           :title="'点击并入智能笔记'"
                           @click="smartNote = `${smartNote}｜${hit.text}`"
                         >
@@ -2060,7 +2044,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                 <button class="float-voice-btn" title="语音问诊" @click="voice.resumeCapture()">
                   🎤
                 </button>
-                <button class="float-send-btn" :disabled="chatting || voice.manualThinking.value" @click="submitInput">↑</button>
+                <button class="float-send-btn" :disabled="chatting" @click="submitInput">↑</button>
               </div>
             </div>
             <div class="chat-toolbar">
@@ -2109,59 +2093,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         </div>
       </div>
 
-      <!-- AI 追问提示：问诊播放中浮在右侧，已问到的逐条划掉 -->
-      <div v-if="voice.active.value && voice.questions.value.length" class="pending-float" :style="pendingStyle">
-        <div class="pending-title"><span class="pending-dot" /> AI 追问提示 </div>
-        <div class="pending-list">
-          <!-- 当前该问的一条。点一下可手动标记已问，模型判错时医生能一键纠正。 -->
-          <div
-            v-if="voice.currentQuestion.value"
-            class="pq-item"
-            title="点击标记为已问"
-            @click="voice.toggleQuestionDone(voice.currentQuestion.value.index)"
-          >
-            <span class="pq-num">{{ voice.currentQuestion.value.index + 1 }}</span>
-            <span class="pq-text">{{ voice.currentQuestion.value.text }}</span>
-          </div>
-          <div class="pq-done-list">
-            <div
-              v-for="item in voice.pendingQuestions.value.filter((q) => q.done)"
-              :key="item.index"
-              class="pq-item done"
-              :title="item.evidence ? `依据：${item.evidence}` : '点击撤销'"
-              @click="voice.toggleQuestionDone(item.index)"
-            >
-              <span class="pq-check">✓</span>
-              <span class="pq-text">{{ item.text }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!--
-        补充观察：随对话动态过滤后的「待观察」清单。
-        已经在对话里问到的条目会自动移出，剩下的才需要医生补问；勾选后并入问诊小结。
-      -->
-      <div v-if="voice.observationsVisible.value" class="obs-float" :style="obsStyle">
-        <div class="obs-float-header">
-          <span class="obs-float-title">补充观察</span>
-          <el-button link size="small" class="obs-float-close" @click="voice.showObservations.value = false">✕</el-button>
-        </div>
-        <div class="obs-float-list">
-          <div
-            v-for="item in voice.observations.value"
-            :key="item"
-            class="obs-float-item"
-            :class="{ picked: voice.pickedObservations.value.has(item) }"
-            @click="voice.toggleObservation(item)"
-          >
-            {{ item }}
-          </div>
-          <div v-if="!voice.observations.value.length" class="obs-float-item mute">
-            {{ voice.messages.value.length ? '本次对话已覆盖全部候选观察项' : '待患者描述主诉后动态更新' }}
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- 技能管理 -->

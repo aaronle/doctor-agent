@@ -472,13 +472,31 @@ for (const target of PAGES) {
     .first().waitFor({ state: 'visible', timeout: 30000 });
   // 工作站首屏要等四个岗位跑完。
   //
-  // **不要在这里写死秒数。** 原来是 `waitForTimeout(25000)`，那个数字是
-  // Haiku 时代量出来的；换 Sonnet 后 report-summary 要 61 秒，于是
-  // 「门诊工作站」这一屏的鉴别诊断与风险提示共十四个元素被判成缺失 ——
-  // 而它们只是还没渲染。这个场景没有 prepare，所以 settle() 也没跑到。
+  // **等的是「数据到位了」这个肯定条件，不是「什么都没在转」。**
   //
-  // 判据放主循环里而不是各场景的 prepare 里：靠每个场景自己记得调，
-  // 迟早漏一个 —— 上一轮漏的就是这一个。
+  // 这一处前后错了三次，每次都更接近但都没到位：
+  //   ① `waitForTimeout(25000)` —— 写死秒数。Haiku 时代量的，Sonnet 要 61 秒
+  //   ② `settle()` 只放在各场景的 prepare 里 —— 这个场景没有 prepare，没跑到
+  //   ③ `settle()` 放进主循环 —— 仍然会漏，因为它有竞态：页面刚加载、
+  //      请求还没发出去时，既没有遮罩也没有「智能体分析中」，settle 立刻通过。
+  //      「什么都没在转」分不清「已经好了」和「还没开始」。
+  //
+  // 现在先把 report-summary 自己请求一遍。它服务端有缓存，所以这一步既是
+  // 「等数据」也是「预热」；它返回了，就一定有数据可渲染。之后 settle()
+  // 只负责等渲染完成。
+  if (target.path.includes('/outpatient/P')) {
+    const pid = target.path.split('/').pop();
+    await appPage.evaluate(
+      async ({ base, id }) => {
+        try {
+          await fetch(`${base}/api/emr/report-summary/${id}`);
+        } catch {
+          // 拿不到就让后面的比对如实记成缺失，这里不代它下结论
+        }
+      },
+      { base: APP_URL, id: pid },
+    );
+  }
   await settle(appPage);
   await appPage.waitForTimeout(target.path.includes('/outpatient/P') ? 1200 : 800);
 

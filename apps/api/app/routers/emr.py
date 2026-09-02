@@ -32,8 +32,6 @@ from ..agents import (
     record_field_agent,
     risk_agent,
     summary_agent,
-    voice_coverage_agent,
-    voice_plan_agent,
     voice_summary_agent,
 )
 from .. import cache
@@ -742,13 +740,6 @@ def record_quality(body: RecordQualityIn, session: Session = Depends(get_session
 # ------------------------------------------------------------------ 语音问诊
 
 
-class VoiceTurnIn(StrictIn):
-    patient_id: str
-    patient_text: str = ""
-    turn_index: int = 0
-    conversation_history: list = Field(default_factory=list)
-
-
 class VoiceCompleteIn(StrictIn):
     patient_id: str
     conversation_summary: str = ""
@@ -760,13 +751,18 @@ async def voice_init(patient_id: str, session: Session = Depends(get_session)) -
     """
     问诊开场包。一次返回播放一整场问诊所需的全部内容。
 
-    对齐 V4.3：点「语音问诊」后由前端按脚本自动播放对话，
-    播放过程中对照 questions 逐条划掉、按需展开 observations。
-    脚本是演示数据；questions 与 observations 是真实模型输出。
+    **不再调模型**（2026-09-02）。原先这里会跑 `voice_plan_agent` 生成
+    「AI 追问提示」与「补充观察」两份清单 —— 那两块一期已撤（没有临床知识库
+    支撑时，建议错一条的代价大于不给建议），产出没有任何消费方。
+
+    留着那次调用等于每点一次「开始问诊」就白花 7.3 秒和一次真实模型费用，
+    换来一份直接丢掉的输出。所以整个拿掉，这个接口现在是纯数据组装。
+
+    `questions` / `observations` 两个字段仍在返回体里，恒为空数组：
+    前端已经不消费它们，保留字段只是为了老前端拿到的形状不变。
+    等临床知识库就位、这个功能重新开启时，把 agent 调用加回来即可。
     """
     patient = _patient_or_404(session, patient_id)
-    ctx = build_context(session, patient)
-    outcome = await _run_isolated(voice_plan_agent, ctx)
 
     payload = patient.payload or {}
     return {
@@ -776,84 +772,11 @@ async def voice_init(patient_id: str, session: Session = Depends(get_session)) -
         "diagnoses": payload.get("diagnoses") or [],
         # 演示对话脚本，供前端逐条播放
         "dialog": seed_items(session, "dialog_script", patient_id),
-        "questions": outcome.data.get("questions", []),
-        "observations": outcome.data.get("observations", []),
-        "provider": outcome.provider,
-        "degraded": outcome.degraded,
+        "questions": [],
+        "observations": [],
+        "provider": "none",
+        "degraded": False,
     }
-
-
-@router.post("/voice/turn")
-async def voice_turn(body: VoiceTurnIn, session: Session = Depends(get_session)) -> StreamingResponse:
-    patient = _patient_or_404(session, body.patient_id)
-    ctx = build_context(session, patient)
-    return StreamingResponse(
-        _stream_voice_turn(
-            ctx,
-            patient_text=body.patient_text,
-            turn_index=body.turn_index,
-            conversation_history=body.conversation_history,
-        ),
-        headers=SSE_HEADERS,
-    )
-
-
-async def _stream_voice_turn(ctx: dict, **kwargs) -> AsyncIterator[str]:
-    """
-    手动补问路径：医生自己输入患者所述时，给出下一句追问建议。
-
-    主流程（脚本播放）不经过这里 —— 那条路的追问清单在 voice/init 一次拿全。
-    这个端点保留给「播放结束后医生继续追问」和无脚本患者的情形。
-    """
-    outcome = await _run_isolated(voice_plan_agent, ctx)
-    questions = outcome.data.get("questions") or []
-    asked = {str(m.get("text") or "") for m in (kwargs.get("conversation_history") or []) if isinstance(m, dict)}
-    remaining = [q for q in questions if q not in asked]
-    prompt = remaining[0] if remaining else "还有其他不舒服的地方吗？"
-
-    for index in range(0, len(prompt), 3):
-        yield _sse({"type": "prompt_token", "token": prompt[index : index + 3]})
-        await asyncio.sleep(0.02)
-
-    yield _sse(
-        {
-            "type": "prompt_done",
-            "observations": outcome.data.get("observations", []),
-            "turn_index": int(kwargs.get("turn_index") or 0) + 1,
-            "provider": outcome.provider,
-            "degraded": outcome.degraded,
-        }
-    )
-
-
-class VoiceCoverageIn(StrictIn):
-    patient_id: str
-    # 只发还开着的问题：已覆盖的判定是单调的，不会回退，重复发只是浪费 token
-    open_questions: list[str] = Field(default_factory=list)
-    transcript: list[dict] = Field(default_factory=list)
-
-
-@router.post("/voice/coverage")
-async def voice_coverage(body: VoiceCoverageIn, session: Session = Depends(get_session)) -> dict:
-    """
-    判定追问清单里哪些问题已在对话中得到回答。
-
-    单独开一个端点而不并进 voice/turn：两者节奏不同 —— 「建议下一句问什么」
-    是每轮一次，「判定覆盖」是在对话停顿处批量做。混在一起会互相拖累。
-
-    调用方按需异步调用，界面不阻塞在它上面。
-    """
-    patient = _patient_or_404(session, body.patient_id)
-    if not body.open_questions:
-        return {"covered": [], "provider": "none", "degraded": False}
-
-    ctx = build_context(session, patient)
-    outcome = await _run_isolated(
-        voice_coverage_agent, ctx, questions=body.open_questions, transcript=body.transcript
-    )
-    # 序号越界的一律丢弃，避免模型幻觉出不存在的条目
-    covered = [c for c in outcome.data.get("covered", []) if 1 <= c["index"] <= len(body.open_questions)]
-    return {"covered": covered, "provider": outcome.provider, "degraded": outcome.degraded}
 
 
 @router.post("/voice/complete")

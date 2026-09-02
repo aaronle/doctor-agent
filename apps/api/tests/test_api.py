@@ -187,24 +187,6 @@ def test_record_field_fallback_preserves_doctor_input(client):
     assert "神清" in body["generated_text"], "降级时也不得丢弃医生已输入的内容"
 
 
-def test_voice_turn_streams_prompt_and_advances_index(client):
-    response = client.post(
-        "/api/emr/voice/turn",
-        json={"patient_id": "P001", "patient_text": "最近口渴", "turn_index": 2, "conversation_history": []},
-    )
-    prompt, done = "", None
-    for line in response.text.splitlines():
-        if not line.startswith("data: "):
-            continue
-        event = json.loads(line[6:])
-        if event["type"] == "prompt_token":
-            prompt += event["token"]
-        elif event["type"] == "prompt_done":
-            done = event
-    assert prompt
-    assert done["turn_index"] == 3
-
-
 def test_voice_session_is_persisted_and_listed(client):
     client.post(
         "/api/emr/voice/complete",
@@ -279,18 +261,26 @@ def test_model_cannot_override_hard_rule_red_alert():
 # ------------------------------------------------------------------ V4.3 对齐
 
 
-def test_voice_init_returns_full_interview_package(client):
+def test_voice_init_gives_the_script_without_calling_a_model(client):
     """
-    V4.3 的问诊是「点一下自动播放脚本」，所以 init 必须一次给全：
-    对话脚本 + 追问清单 + 候选补充观察。少任何一样前端都播不起来。
+    问诊开场包只做数据组装，**不调模型**（2026-09-02）。
+
+    原先这里会跑 voice_plan_agent 生成追问清单与补充观察，那两块已撤，
+    产出没有消费方 —— 留着等于每点一次「开始问诊」白花 7.3 秒和一次
+    真实模型费用，换一份直接丢掉的输出。
+
+    questions / observations 仍在返回体里但恒为空：保留字段是为了老前端
+    拿到的形状不变，恒空是为了没人能顺手把它接回去而不被发现。
     """
     body = client.get("/api/emr/voice/init/P006").json()
-    for field in ("greeting", "patient_name", "chief_complaint", "dialog", "questions", "observations"):
+    for field in ("greeting", "patient_name", "chief_complaint", "dialog"):
         assert field in body, f"问诊开场包缺少 {field}"
     assert len(body["dialog"]) > 0, "P006 应有演示对话脚本"
     assert all({"role", "text"} <= set(turn) for turn in body["dialog"])
-    # 本地规则兜底也必须给出可用的追问清单
-    assert len(body["questions"]) >= 5
+
+    assert body["questions"] == [] and body["observations"] == []
+    # 没调模型就不该报 provider/降级 —— 报了说明模型调用又被加回来了
+    assert body["provider"] == "none" and body["degraded"] is False
 
 
 def test_diagnosis_ranks_are_derived_not_reported():
@@ -343,32 +333,24 @@ def test_report_summary_carries_rank_fields_for_the_ui(client):
 # ------------------------------------------------------------------ 覆盖判定与回写
 
 
-def test_coverage_returns_empty_without_open_questions(client):
-    """没有待判问题时不该白调一次模型。"""
-    body = client.post(
-        "/api/emr/voice/coverage", json={"patient_id": "P006", "open_questions": [], "transcript": []}
-    ).json()
-    assert body["covered"] == []
-    assert body["provider"] == "none"
-
-
-def test_coverage_degrades_to_marking_nothing(client):
+def test_removed_interview_suggestion_endpoints_stay_removed(client):
     """
-    模型不可用时**不做任何标记**。
+    「AI 追问提示」与「补充观察」一期已撤（2026-09-02）：没有临床知识库支撑时，
+    建议错一条的代价大于不给建议，而它出现在医生正在问诊的那一刻，干扰最直接。
 
-    退回关键词或按轮次猜都会往「错标已问」偏 —— 那条问题就再也不会提醒了。
-    宁可让医生看一份冗余的完整清单。
+    两个只为它们服务的端点一并删掉。**留一条测试盯着别悄悄回来** ——
+    这类端点很容易因为「先接上看看」而复活，而复活时不会有人重新问一遍
+    「现在有知识库了吗」。
     """
-    body = client.post(
-        "/api/emr/voice/coverage",
-        json={
-            "patient_id": "P006",
-            "open_questions": ["哪一侧肢体无力？", "有无进行性加重？"],
-            "transcript": [{"role": "patient", "text": "右手拿筷子拿不稳"}],
-        },
-    ).json()
-    assert body["degraded"] is True
-    assert body["covered"] == []
+    for path, payload in (
+        ("/api/emr/voice/coverage", {"patient_id": "P006", "open_questions": [], "transcript": []}),
+        ("/api/emr/voice/turn", {"patient_id": "P001", "patient_text": "最近口渴", "turn_index": 2}),
+    ):
+        code = client.post(path, json=payload).status_code
+        # 405 而不是 404：SPA 兜底路由只接 GET/HEAD，POST 到未知路径落在它上面。
+        # 断言「不是 2xx」而不是某个具体码 —— 要守住的是「这个端点不工作」，
+        # 而不是它以哪种方式不工作；后者会随兜底路由的实现变。
+        assert not (200 <= code < 300), f"{path} 又回来了（{code}）"
 
 
 def test_diagnosis_write_back_requires_primary(client):

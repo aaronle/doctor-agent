@@ -79,7 +79,7 @@ describe('语音问诊', () => {
     expect(voice.messages.value).toHaveLength(DIALOG.length)
   })
 
-  it('awaiting 时问诊仍算进行中，追问清单浮层继续留着', async () => {
+  it('awaiting 时问诊仍算进行中 —— 内容播完不等于问诊结束', async () => {
     stubInit()
     const voice = useVoiceInterview(() => 'P006')
     await play(voice, DIALOG.length)
@@ -102,7 +102,7 @@ describe('语音问诊', () => {
     expect(voice.active.value).toBe(false)
   })
 
-  it('结束后手动补问会回到 awaiting，不是重开一场', async () => {
+  it('结束后手动补录会回到 awaiting，不是重开一场', async () => {
     stubInit()
     const voice = useVoiceInterview(() => 'P006')
     await play(voice, DIALOG.length)
@@ -111,70 +111,16 @@ describe('语音问诊', () => {
     expect(voice.state.value).toBe('ended')
 
     const before = voice.messages.value.length
-    await voice.askManual('还有点头晕')
+    voice.recordPatientUtterance('还有点头晕')
     expect(voice.state.value).toBe('awaiting')
-    // 补问是接着说，不是清空重来
+    // 补录是接着说，不是清空重来
     expect(voice.messages.value.length).toBeGreaterThan(before)
+    // **只记患者原话，不生成任何医生侧建议** —— 那是已撤掉的追问提示
+    expect(voice.messages.value.at(-1)).toEqual({ role: 'patient', text: '还有点头晕' })
   })
 
-  it('追问清单按语义判定划掉，不是按轮次顺序', async () => {
-    // 后端判定「第 2 条（有无进行性加重）已覆盖」——若按轮次顺序，划掉的会是第 1 条
-    stubInit({}, [{ index: 2, evidence: '这三天差不多。' }])
-    const voice = useVoiceInterview(() => 'P006')
 
-    await voice.start()
-    expect(voice.doneQuestions.value).toHaveLength(0)
 
-    await vi.advanceTimersByTimeAsync(1400)
-    await vi.advanceTimersByTimeAsync(0)
-
-    expect(voice.doneQuestions.value).toEqual(['有无进行性加重？'])
-    expect(voice.currentQuestion.value?.index).toBe(0)
-  })
-
-  it('覆盖判定是单调的，已标记的不会回退', async () => {
-    stubInit({}, [{ index: 1, evidence: 'x' }])
-    const voice = useVoiceInterview(() => 'P006')
-    await voice.start()
-    await vi.advanceTimersByTimeAsync(1400)
-    await vi.advanceTimersByTimeAsync(0)
-    const first = voice.doneQuestions.value.length
-    expect(first).toBeGreaterThan(0)
-
-    // 后续判定不再返回该条，它也不能掉回未问
-    await vi.advanceTimersByTimeAsync(1400)
-    await vi.advanceTimersByTimeAsync(0)
-    expect(voice.doneQuestions.value.length).toBeGreaterThanOrEqual(first)
-  })
-
-  it('判定降级时不做任何标记，宁可让清单冗余也不错标已问', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        if (url.includes('/voice/coverage')) {
-          return new Response(JSON.stringify({ covered: [], provider: 'local-rules', degraded: true }), { status: 200 })
-        }
-        if (url.includes('/voice/init/')) {
-          return new Response(
-            JSON.stringify({
-              greeting: '您好', patient_name: '赵某某', chief_complaint: '右侧肢体无力', diagnoses: [],
-              dialog: DIALOG, questions: ['哪一侧肢体无力？', '有无进行性加重？'], observations: [],
-              provider: 'haiku', degraded: false,
-            }),
-            { status: 200 },
-          )
-        }
-        return new Response(JSON.stringify({ ok: true }), { status: 200 })
-      }),
-    )
-    const voice = useVoiceInterview(() => 'P006')
-    await voice.start()
-    await vi.advanceTimersByTimeAsync(1400)
-    await vi.advanceTimersByTimeAsync(0)
-
-    expect(voice.coverageDegraded.value).toBe(true)
-    expect(voice.doneQuestions.value).toHaveLength(0)
-  })
 
   it('落库不改变状态 —— 生成/更新不该顺手把问诊结束掉', async () => {
     stubInit()
@@ -190,34 +136,7 @@ describe('语音问诊', () => {
     expect(voice.active.value).toBe(true)
   })
 
-  it('医生可手动勾销，模型判错时能一键纠正', async () => {
-    stubInit()
-    const voice = useVoiceInterview(() => 'P006')
-    await voice.start()
 
-    voice.toggleQuestionDone(1)
-    expect(voice.doneQuestions.value).toContain('有无进行性加重？')
-
-    voice.toggleQuestionDone(1)
-    expect(voice.doneQuestions.value).not.toContain('有无进行性加重？')
-  })
-
-  it('待观察清单会剔掉对话中已经问到的条目', async () => {
-    // 「右上肢肌力」的判定键是「右上肢」，患者说「右边手脚不利索」不含它 —— 保留
-    // 「吞咽功能」的判定键是「吞咽功」，对话未涉及 —— 保留
-    stubInit({ observations: ['右上肢肌力', '有无进行性加重', '睡眠质量'] })
-    const voice = useVoiceInterview(() => 'P006')
-
-    await voice.start()
-    expect(voice.observations.value).toContain('有无进行性加重')
-
-    // 播到医生问出「有没有进行性加重？」后，该项应从待观察里移出
-    await play(voice, 3)
-    expect(voice.observations.value).not.toContain('有无进行性加重')
-    expect(voice.coveredObservations.value).toContain('有无进行性加重')
-    // 未被提及的仍在清单里
-    expect(voice.observations.value).toContain('睡眠质量')
-  })
 
   it('继续问诊：脚本没播完就接着播', async () => {
     stubInit()
@@ -270,47 +189,8 @@ describe('语音问诊', () => {
     expect(voice.error.value).toContain('模型通道不可用')
   })
 
-  it('结束问诊后收起补充观察浮层', async () => {
-    stubInit()
-    const voice = useVoiceInterview(() => 'P006')
-    await voice.start()
-    // 问诊中自动浮出，不藏在按钮后面
-    expect(voice.observationsVisible.value).toBe(true)
 
-    await voice.finish()
 
-    // 点完「结束问诊」它还挂在那里，会盖着病历区，看着像问诊没结束。
-    // 「追问提示」一直是对的（它挂在 active 上），两个浮层各判各的才会只坏一个。
-    expect(voice.state.value).toBe('ended')
-    expect(voice.observationsVisible.value).toBe(false)
-  })
-
-  it('医生自己收起过的浮层，继续问诊时不擅自弹回来', async () => {
-    stubInit()
-    const voice = useVoiceInterview(() => 'P006')
-    await voice.start()
-
-    voice.showObservations.value = false
-    expect(voice.observationsVisible.value).toBe(false)
-
-    await voice.finish()
-    voice.resumeCapture()
-
-    // active 恢复了，但医生的「收起」是个明确意图，不该被状态变化覆盖
-    expect(voice.active.value).toBe(true)
-    expect(voice.observationsVisible.value).toBe(false)
-  })
-
-  it('结束后点继续问诊，浮层跟着回来', async () => {
-    stubInit()
-    const voice = useVoiceInterview(() => 'P006')
-    await voice.start()
-    await voice.finish()
-    expect(voice.observationsVisible.value).toBe(false)
-
-    voice.resumeCapture()
-    expect(voice.observationsVisible.value).toBe(true)
-  })
 
   it('一条都没录到就点结束，状态机照样收尾', async () => {
     stubInit({ dialog: [] })
@@ -323,6 +203,28 @@ describe('语音问诊', () => {
     // 早先「有没有消息」的判断写在调用方，没消息就整个跳过 finish()，
     // 于是分析已经解锁、界面却还停在 awaiting，一副问诊没结束的样子。
     expect(voice.state.value).toBe('ended')
-    expect(voice.observationsVisible.value).toBe(false)
+    expect(voice.active.value).toBe(false)
+  })
+
+  it('一期不提供追问提示与补充观察 —— 撤掉的东西不该从后门回来', async () => {
+    // 这两块给的是「接下来该问什么」的临床建议，而一期没有临床知识库支撑：
+    // 建议错一条的代价大于不给建议，何况它出现在医生正在问诊的那一刻。
+    //
+    // 服务端 voice/init 仍会返回 questions / observations（接口形状留着，
+    // 等知识库就位再接），所以**必须有一条测试盯住前端不消费它们** ——
+    // 否则哪天有人「顺手接上」，一个不准的清单就又回到医生眼前了。
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006') as unknown as Record<string, unknown>
+    await (voice.start as () => Promise<void>)()
+
+    for (const gone of [
+      'questions', 'pendingQuestions', 'doneQuestions', 'currentQuestion',
+      'observations', 'coveredObservations', 'pickedObservations',
+      'showObservations', 'observationsVisible',
+      'toggleQuestionDone', 'toggleObservation', 'judgeCoverage', 'coverageDegraded',
+      'askManual', 'manualThinking',
+    ]) {
+      expect(voice[gone], `useVoiceInterview 不该再暴露 ${gone}`).toBeUndefined()
+    }
   })
 })

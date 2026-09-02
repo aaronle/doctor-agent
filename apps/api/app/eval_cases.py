@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Callable
 
@@ -38,8 +39,6 @@ EXAM_CLAIMS = ("听诊", "触诊", "叩诊", "压痛", "反跳痛", "杂音", "�
 
 def _text_of(data: dict) -> str:
     """把输出摊平成一段文本，供关键词类检查使用。"""
-    import json
-
     return json.dumps(data, ensure_ascii=False)
 
 
@@ -406,3 +405,114 @@ def build_check(spec: dict) -> tuple[str, Callable]:
         raise ValueError(f"未知检查项 kind「{kind}」，可用：{'、'.join(sorted(CHECK_REGISTRY))}")
     name = str(spec.get("name") or kind)
     return name, builder(spec.get("args") or {})
+
+
+# ---------------------------------------------------------------- 风险管理
+
+
+#: 只把「有区分度」的数字算数。单个数字（2、5）在任何上下文里都能撞上，
+#: 拿它判「有没有引用依据」等于没判。两位以上或带小数点的才算。
+_MEANINGFUL_NUMBER = re.compile(r"\d+\.\d+|\d{2,}")
+
+
+def _context_numbers(ctx: dict) -> set[str]:
+    """上下文里出现过的所有有区分度的数字，按去掉末尾零后的形式归一。"""
+    blob = json.dumps(ctx, ensure_ascii=False)
+    return {_norm_number(n) for n in _MEANINGFUL_NUMBER.findall(blob)}
+
+
+def _norm_number(text: str) -> str:
+    """8.50 与 8.5 是同一个数。不归一的话「引用了原文」会被判成「编造」。"""
+    if "." in text:
+        return text.rstrip("0").rstrip(".")
+    return text
+
+
+def _risk_items(data: dict) -> list[dict]:
+    items = data.get("risk_assessments")
+    return [i for i in items if isinstance(i, dict)] if isinstance(items, list) else []
+
+
+def check_risk_evidence_grounded(data: dict, ctx: dict) -> tuple[bool, str]:
+    """
+    依据里出现的数字，**必须在上下文里找得到**。
+
+    这是编造检测，不是质量检测：模型写「HbA1c 9.2%」而档案里是 8.6%，
+    医生照着这条判断就是错的。比「没写数值」严重得多，所以单列一条。
+    """
+    known = _context_numbers(ctx)
+    bad: list[str] = []
+    for item in _risk_items(data):
+        text = f"{item.get('evidence', '')} {item.get('assessment', '')}"
+        for raw in _MEANINGFUL_NUMBER.findall(text):
+            if _norm_number(raw) not in known:
+                bad.append(f"{item.get('name', '?')}：{raw}")
+    if bad:
+        return False, f"依据里的数字在上下文中不存在（疑似编造）：{'；'.join(bad[:4])}"
+    return True, ""
+
+
+def check_risk_evidence_quantified(data: dict, ctx: dict) -> tuple[bool, str]:
+    """
+    **至少半数风险项要引用具体数值。**
+
+    这一条是冲着「四条空话」去的 —— 「血糖控制不佳」「注意血压」这种
+    没有数值的判断，医生无法复核，也无从据此决定下一步。
+    换模型时这正是最先退化、也最不容易被别的校验抓到的东西。
+
+    不要求每一条都带数字：确实存在合理的定性风险项（如依从性），
+    一刀切会逼出编造。
+    """
+    items = _risk_items(data)
+    if not items:
+        return False, "没有产出任何风险项"
+
+    known = _context_numbers(ctx)
+    with_number = [
+        i for i in items
+        if any(_norm_number(n) in known for n in _MEANINGFUL_NUMBER.findall(str(i.get("evidence", ""))))
+    ]
+    need = (len(items) + 1) // 2
+    if len(with_number) < need:
+        empty = "、".join(str(i.get("name", "?")) for i in items if i not in with_number)
+        return False, f"{len(items)} 条里只有 {len(with_number)} 条引用了具体数值（至少要 {need} 条）；空泛的：{empty}"
+    return True, ""
+
+
+def check_risk_item_count(low: int, high: int) -> Callable:
+    """条数落在区间内。太少是漏评，太多是把噪音也塞进来，医生一条都不会看。"""
+
+    def _check(data: dict, ctx: dict) -> tuple[bool, str]:
+        n = len(_risk_items(data))
+        if low <= n <= high:
+            return True, ""
+        return False, f"产出 {n} 条风险项，要求 {low}–{high} 条"
+
+    return _check
+
+
+def check_risk_fields_filled(data: dict, ctx: dict) -> tuple[bool, str]:
+    """
+    五个字段都不能是空壳。
+
+    Schema 只保证键在，不保证有内容 —— `"suggestion": ""` 是合法 JSON，
+    但界面上就是一条没有建议的风险，医生看了不知道要做什么。
+    """
+    missing: list[str] = []
+    for item in _risk_items(data):
+        for field in ("name", "level", "evidence", "assessment", "suggestion"):
+            if not str(item.get(field, "")).strip():
+                missing.append(f"{item.get('name', '?')}.{field}")
+    if missing:
+        return False, f"这些字段是空的：{'、'.join(missing[:6])}"
+    return True, ""
+
+
+CHECK_REGISTRY.update(
+    {
+        "risk_evidence_grounded": lambda args: check_risk_evidence_grounded,
+        "risk_evidence_quantified": lambda args: check_risk_evidence_quantified,
+        "risk_item_count": lambda args: check_risk_item_count(int(args["low"]), int(args["high"])),
+        "risk_fields_filled": lambda args: check_risk_fields_filled,
+    }
+)

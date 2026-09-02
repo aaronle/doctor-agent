@@ -2902,9 +2902,15 @@
       "DraftIn": {
         "properties": {
           "model_tier": {
-            "type": "string",
-            "title": "Model Tier",
-            "default": "clinical_fast"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Tier"
           },
           "role_prompt": {
             "type": "string",
