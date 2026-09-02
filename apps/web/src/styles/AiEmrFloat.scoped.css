@@ -876,6 +876,16 @@
 .assistant-toggle.expanded .at-name{color:#1677ff}
 .at-badge{font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:#eef0f2;color:#8a9099}
 .at-badge.auto{background:#edfaed;color:#16a34a}
-.at-desc{font-size:10px;color:#8a9099;line-height:1.6}
-.at-arrow{font-size:12px;font-weight:700;color:#8a9099;flex-shrink:0}
+.at-desc{font-size:10px;color:#8a9099;line-height:1.55}
+.at-arrow{font-size:11px;font-weight:700;color:#8a9099;flex-shrink:0;align-self:center;white-space:nowrap}
 .assistant-toggle.expanded .at-arrow{color:#1677ff}
+
+/* AI 助手收起时占位。HIS 门面撤掉后那是页面最大的一块，
+   空着会让人以为「没加载完」。这张卡讲清「为什么现在没有结论」与两条出路。 */
+.assistant-placeholder{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;padding:24px}
+.ap-card{max-width:520px;background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:26px 28px;text-align:center;box-shadow:0 4px 20px #0000000f}
+.ap-icon{font-size:26px;font-weight:700;color:#b0b5bd;line-height:1}
+.ap-title{margin-top:10px;font-size:15px;font-weight:700;color:#1f2329}
+.ap-desc{margin:10px 0 0;font-size:12px;line-height:1.75;color:#8a9099}
+.ap-actions{margin-top:18px;display:flex;gap:8px;justify-content:center}
+.ap-hint{margin:16px 0 0;font-size:11px;color:#b0b5bd;line-height:1.6}

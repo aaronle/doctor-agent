@@ -93,6 +93,16 @@ const panelOpen = ref(true)
 const justAutoExpanded = ref(false)
 
 /**
+ * 空状态里的「开始问诊」。
+ *
+ * 与右栏那个按钮走同一条路径 —— 两个入口做两件事，迟早会出现「从这里开始
+ * 和从那里开始不一样」这种查起来极费劲的问题。
+ */
+function startInterviewFromPlaceholder() {
+  void voice.start()
+}
+
+/**
  * 浮层全关后的重新唤出入口。
  *
  * 只在「抽屉与面板都关」时出现 —— 面板还开着时，抽屉由面板里的
@@ -1130,6 +1140,27 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
     </div>
     <div class="ai-float-wrapper">
       <!-- ======================= AI 助手 ======================= -->
+      <!--
+        AI 助手收起时，它原来占的位置不能就这么空着 —— HIS 门面撤掉之后，
+        那是整个页面最大的一块，空着会让人以为「页面没加载完」。
+        放一张说明卡：讲清为什么现在没有结论，以及两条出路。
+      -->
+      <div v-if="!tipsOpen" class="assistant-placeholder">
+        <div class="ap-card">
+          <div class="ap-icon">⌘</div>
+          <div class="ap-title">AI 助手待问诊后展开</div>
+          <p class="ap-desc">
+            病历、鉴别诊断、风险与共病都由这一场问诊推导。问诊前先给结论，
+            会让医生把「模型基于旧资料的猜测」当成本次判断 —— 那是这道门禁存在的理由。
+          </p>
+          <div class="ap-actions">
+            <el-button type="primary" size="small" @click="startInterviewFromPlaceholder">● 开始问诊</el-button>
+            <el-button size="small" @click="tipsOpen = true">仅查看已有资料</el-button>
+          </div>
+          <p class="ap-hint">硬规则红色风险不受此门禁 —— 它是纯代码判定，任何时候都在场。</p>
+        </div>
+      </div>
+
       <div v-if="tipsOpen" class="tips-drawer connected-right">
         <div class="tips-header">
           <span class="tips-title"><span class="panel-ai-dot" />AI 助手</span>

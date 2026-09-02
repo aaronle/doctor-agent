@@ -875,3 +875,34 @@ describe('风险名按等级着色', () => {
     expect(cards[1].classes()).toContain('ra-card-warning')
   })
 })
+
+describe('AI 助手收起时的空状态', () => {
+  /**
+   * HIS 门面撤掉之后，AI 助手收起时它原来占的位置是整个页面最大的一块。
+   * 空着会让人以为「页面没加载完」—— 而那正是这次改动最容易造成的观感事故。
+   */
+  it('收起时给一张说明卡，不是一片空白', async () => {
+    stubFetch()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [createPinia(), router, ElementPlus] },
+      attachTo: document.body,
+    })
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+
+    const holder = wrapper.find('.assistant-placeholder')
+    expect(holder.exists()).toBe(true)
+    // 讲清「为什么现在没有结论」，而不只是一句「暂无数据」
+    expect(holder.text()).toContain('由这一场问诊推导')
+    // 两条出路都在
+    const actions = holder.findAll('button').map((b) => b.text()).join('|')
+    expect(actions).toContain('开始问诊')
+    // 红线不受门禁这件事要说出来，否则医生会以为什么都没有
+    expect(holder.text()).toContain('硬规则红色风险不受此门禁')
+  })
+
+  it('展开后空状态让位给抽屉 —— 两者互斥，不叠在一起', async () => {
+    const wrapper = await renderFloat()
+    expect(wrapper.find('.tips-drawer').exists()).toBe(true)
+    expect(wrapper.find('.assistant-placeholder').exists()).toBe(false)
+  })
+})

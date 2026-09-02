@@ -1137,7 +1137,7 @@
           "emr"
         ],
         "summary": "Voice Init",
-        "description": "问诊开场包。一次返回播放一整场问诊所需的全部内容。\n\n对齐 V4.3：点「语音问诊」后由前端按脚本自动播放对话，\n播放过程中对照 questions 逐条划掉、按需展开 observations。\n脚本是演示数据；questions 与 observations 是真实模型输出。",
+        "description": "问诊开场包。一次返回播放一整场问诊所需的全部内容。\n\n**不再调模型**（2026-09-02）。原先这里会跑 `voice_plan_agent` 生成\n「AI 追问提示」与「补充观察」两份清单 —— 那两块一期已撤（没有临床知识库\n支撑时，建议错一条的代价大于不给建议），产出没有任何消费方。\n\n留着那次调用等于每点一次「开始问诊」就白花 7.3 秒和一次真实模型费用，\n换来一份直接丢掉的输出。所以整个拿掉，这个接口现在是纯数据组装。\n\n`questions` / `observations` 两个字段仍在返回体里，恒为空数组：\n前端已经不消费它们，保留字段只是为了老前端拿到的形状不变。\n等临床知识库就位、这个功能重新开启时，把 agent 调用加回来即可。",
         "operationId": "voice_init_api_emr_voice_init__patient_id__get",
         "parameters": [
           {
@@ -1159,89 +1159,6 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Voice Init Api Emr Voice Init  Patient Id  Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/emr/voice/turn": {
-      "post": {
-        "tags": [
-          "emr"
-        ],
-        "summary": "Voice Turn",
-        "operationId": "voice_turn_api_emr_voice_turn_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VoiceTurnIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/emr/voice/coverage": {
-      "post": {
-        "tags": [
-          "emr"
-        ],
-        "summary": "Voice Coverage",
-        "description": "判定追问清单里哪些问题已在对话中得到回答。\n\n单独开一个端点而不并进 voice/turn：两者节奏不同 —— 「建议下一句问什么」\n是每轮一次，「判定覆盖」是在对话停顿处批量做。混在一起会互相拖累。\n\n调用方按需异步调用，界面不阻塞在它上面。",
-        "operationId": "voice_coverage_api_emr_voice_coverage_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VoiceCoverageIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Voice Coverage Api Emr Voice Coverage Post"
                 }
               }
             }
@@ -3440,64 +3357,6 @@
           "patient_id"
         ],
         "title": "VoiceCompleteIn"
-      },
-      "VoiceCoverageIn": {
-        "properties": {
-          "patient_id": {
-            "type": "string",
-            "title": "Patient Id"
-          },
-          "open_questions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Open Questions"
-          },
-          "transcript": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Transcript"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "patient_id"
-        ],
-        "title": "VoiceCoverageIn"
-      },
-      "VoiceTurnIn": {
-        "properties": {
-          "patient_id": {
-            "type": "string",
-            "title": "Patient Id"
-          },
-          "patient_text": {
-            "type": "string",
-            "title": "Patient Text",
-            "default": ""
-          },
-          "turn_index": {
-            "type": "integer",
-            "title": "Turn Index",
-            "default": 0
-          },
-          "conversation_history": {
-            "items": {},
-            "type": "array",
-            "title": "Conversation History"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "patient_id"
-        ],
-        "title": "VoiceTurnIn"
       },
       "WorkerRunIn": {
         "properties": {
