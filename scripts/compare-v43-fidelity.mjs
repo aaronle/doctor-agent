@@ -98,7 +98,33 @@ async function ensureAnalysisUnlocked(page, apiBase, patientId) {
   }, { base: apiBase, pid: patientId });
 }
 
+/**
+ * 等页面上的加载遮罩散掉再动手。
+ *
+ * `el-loading-mask` 会拦截指针事件。遮罩还在时点击**不会**报「找不到元素」，
+ * 而是一路重试到超时，抛出来的是 TimeoutError —— 看着像元素不存在，
+ * 实际是它被盖住了。查这个错会先去怀疑选择器，方向就偏了。
+ *
+ * 判据是「遮罩没了」，不是「等够了 N 秒」。这和把 `networkidle` 换成
+ * 「要比的元素在场了」是同一件事：等的应该是那个条件本身。
+ *
+ * 150 秒是因为智慧诊疗聚合在 Sonnet 5 下要跑一分钟以上（Haiku 时代约 20 秒）。
+ * **换模型第二次把藏在余量里的等待顶出来** —— 第一次是 Nginx 那 60 秒读超时。
+ */
+async function settle(page, timeout = 150000) {
+  await page.waitForFunction(
+    () =>
+      ![...document.querySelectorAll('.el-loading-mask')].some(
+        (m) => m.offsetParent !== null && getComputedStyle(m).display !== 'none',
+      ),
+    null,
+    { timeout },
+  );
+}
+
 async function ensureAiFloat(page) {
+  // 每个 prepare 都从这里进来，遮罩的等待放在最前面，各处不必各写一遍
+  await settle(page);
   const round = page.locator('.ai-float-btn').first();
   if (await round.isVisible().catch(() => false)) {
     await round.click();
@@ -168,6 +194,8 @@ const PAGES = [
       await ensureAiFloat(page);
       await page.locator('.ttab').filter({ hasText: tab }).first().click();
       await page.waitForTimeout(700);
+      // 切标签页会触发该页自己的加载，再等一次
+      await settle(page);
       // 就诊卡默认折叠，点开第一张才能取到内部元素
       const visit = page.locator('.visit-card').first();
       if (await visit.isVisible().catch(() => false)) {
@@ -340,7 +368,29 @@ await new Promise((resolve) => server.listen(REF_PORT, '127.0.0.1', resolve));
 
 const browser = await chromium.launch();
 
+/**
+ * 取样前先等这些选择器出现。
+ *
+ * 不等的话，判据就成了「我按下快门那一瞬间它在不在」—— 而这一瞬间取决于模型多快返回。
+ * 换到 Sonnet 5 之后真的抖出来过一次：同一份代码，一轮报「缺失 14」，
+ * 单独重跑又是「缺失 0」。那不是缺失，是**还没渲染出来**。
+ *
+ * 等过之后，「缺失」才恢复它本来的含义：**给了时间也没出现**，
+ * 那才是真的整块没做或者根本没渲染。
+ *
+ * 全部并行等，所以墙钟是单个超时而不是累加。等不到的不报错 ——
+ * 由后面的比对如实记成缺失，这里只负责给足时间。
+ */
+async function waitForSampleTargets(page, selectors, timeout = 20000) {
+  await Promise.all(
+    selectors.map((s) =>
+      page.locator(s).first().waitFor({ state: 'attached', timeout }).catch(() => {}),
+    ),
+  );
+}
+
 async function collect(page, selectors) {
+  await waitForSampleTargets(page, selectors);
   return page.evaluate(([s, p]) => {
     const out = {};
     for (const selector of s) {
@@ -427,3 +477,17 @@ console.log(`\n合计比对 ${total} 个元素：一致 ${total - diffs}，有�
 
 await browser.close();
 server.close();
+
+// 2026-09-02 补：这个脚本原本**只打印、从不设退出码**，一直是 exit 0。
+//
+// 也就是说它压根没在「门禁」，全靠人盯着最后那行数字。链式的
+// `a && b && c` 里它永远放行；直到 verify.mjs 按退出码判定，才露出来 ——
+// 那一次它印着「缺失 14」，却被记成通过。
+//
+// **缺失比差异更该拦。** 差异是「长得不一样」，缺失是「这个元素根本没渲染出来」，
+// 后者往往意味着整块功能没上，或者取样时页面还没到位。
+if (diffs || missing) {
+  console.log(`\n✗ 还原度门禁未过：差异 ${diffs}、缺失 ${missing}`);
+  process.exit(1);
+}
+process.exit(0);

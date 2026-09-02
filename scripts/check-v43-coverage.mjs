@@ -110,8 +110,29 @@ async function ensureAnalysisUnlocked(page, apiBase, patientId) {
   }, { base: apiBase, pid: patientId });
 }
 
+/**
+ * 等加载遮罩散掉再动手。
+ *
+ * 这里比还原度脚本更要紧：下面几处 click 都带着 `.catch(() => {})`，
+ * 遮罩挡住时点击会**静悄悄地没发生** —— 卡片没展开，于是报「重建版缺 3 个类」。
+ * 那是个假失败，而且长得和真失败一模一样，上一轮已经因为它误判过一次。
+ *
+ * 150 秒：智慧诊疗聚合在 Sonnet 5 下要跑一分钟以上（Haiku 时代约 20 秒）。
+ */
+async function settle(page, timeout = 150000) {
+  await page.waitForFunction(
+    () =>
+      ![...document.querySelectorAll('.el-loading-mask')].some(
+        (m) => m.offsetParent !== null && getComputedStyle(m).display !== 'none',
+      ),
+    null,
+    { timeout },
+  );
+}
+
 /** 确保 AI 浮层开着 —— 关掉的话一个标签页都点不到 */
 async function ensureFloat(page) {
+  await settle(page);
   const round = page.locator('.ai-float-btn').first();
   if (await round.isVisible().catch(() => false)) {
     await round.click();
@@ -146,6 +167,7 @@ async function classesPerTab(page, gotoPatient) {
   for (const tab of TABS) {
     await page.locator('.ttab').filter({ hasText: tab }).first().click().catch(() => {});
     await page.waitForTimeout(700);
+    await settle(page);
     if (tab === '智慧诊疗') await ensureFirstAssessmentCardOpen(page);
     result[tab] = await page.evaluate(collectClasses, '.tips-tab-pane:not([style*="display: none"])');
   }
