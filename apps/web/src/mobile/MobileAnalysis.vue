@@ -274,10 +274,14 @@ function riskTone(level = '') {
       </div>
     </section>
 
-    <!-- 专项评估 -->
+    <!--
+      专项评估小助手。**只改显示文案，段落键仍是「专项评估」** ——
+      那个键同时是 open/GATED 的成员、data-sec 的值，以及 ＋ 菜单
+      focus 过来的目标。跟着文案一起改，菜单就跳不过来了。
+    -->
     <section class="m-sec" data-sec="专项评估">
       <button class="m-sec-head" type="button" @click="toggle('专项评估')">
-        <span class="m-sec-title">专项评估</span>
+        <span class="m-sec-title">专项评估小助手</span>
         <span class="m-sec-badge">{{ catalog.length }}</span>
         <span class="m-spacer" />
         <span class="m-chev">{{ open.has('专项评估') ? '▾' : '▸' }}</span>

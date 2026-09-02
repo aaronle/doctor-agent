@@ -635,14 +635,26 @@ describe('专项评估默认态', () => {
     return wrapper
   }
 
-  it('分类默认全展开 —— 全折叠的话 33 项评估一项都看不到', async () => {
+  it('叫「专项评估小助手」', async () => {
     const wrapper = await open()
-    expect(wrapper.findAll('.ka-list')).toHaveLength(2)
-    expect(wrapper.findAll('.ka-card')).toHaveLength(3)
+    expect(wrapper.find('.ka-title').text()).toBe('专项评估小助手')
   })
 
-  it('标了 default_expanded 的条目连说明一起展开，其余折叠', async () => {
+  it('分类默认全折叠 —— 一期只做目录展示，铺开会把下面的内容挤没', async () => {
+    // 有意偏离 V4.3（原件默认全展开）。33 项都还没 Agent 化，先当索引用。
     const wrapper = await open()
+    expect(wrapper.findAll('.ka-cat-header')).toHaveLength(2)
+    expect(wrapper.findAll('.ka-list')).toHaveLength(0)
+    expect(wrapper.findAll('.ka-card')).toHaveLength(0)
+  })
+
+  it('点开分类才出条目，展开态本身仍与原件一致', async () => {
+    const wrapper = await open()
+    await wrapper.findAll('.ka-cat-header')[0].trigger('click')
+    expect(wrapper.findAll('.ka-list')).toHaveLength(1)
+
+    // 标了 default_expanded 的条目连说明一起展开，其余折叠 ——
+    // 分类折叠只是把这一层盖住了，不该顺手改掉里面的层次。
     const cards = wrapper.findAll('.ka-card')
     expect(cards[0].classes()).not.toContain('collapsed')
     expect(cards[0].text()).toContain('说明一')

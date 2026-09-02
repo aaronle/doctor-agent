@@ -202,15 +202,31 @@ const PAGES = [
         await visit.click();
         await page.waitForTimeout(400);
       }
-      // 专项评估**默认就是展开的**（与原件一致）。这里要「确保展开」而不是
-      // 「点一下」—— 盲点会把已展开的第一个分类收起来，于是第一张可见卡片
-      // 变成另一个分类的，比出来是背景色不一致，其实是取样取错了对象。
-      // 注意先判断分类头存在：它只在智慧诊疗页有，别的标签页上点它会一直等到超时
-      const cat = page.locator('.ka-cat-header').first();
-      const listVisible = await page.locator('.ka-list').first().isVisible().catch(() => false);
-      if (!listVisible && (await cat.isVisible().catch(() => false))) {
-        await cat.click();
-        await page.waitForTimeout(400);
+      // 专项评估小助手：**重建版五个分类默认全折叠，原件全展开**
+      // （2026-09-02 产品决策，见 10-V4.3反向需求规格说明书.md）。要比就得
+      // 先摊到同一个状态，否则比的是默认态差异而不是还原度。
+      //
+      // 每一个分类都要开，不能只开第一个 —— 卡片配色按分类分布，
+      // 只开第一个就采不到后面几类的样式。
+      //
+      // 一律「确保展开」而不是「点一下」：盲点会把原件那份已展开的收起来，
+      // 于是第一张可见卡片变成另一个分类的，比出来是背景色不一致，
+      // 其实是取样取错了对象。
+      // **先确认这一页真的看得见专项评估。** 标签页之间用 v-show 切换，
+      // `.ka-category` 在每一页的 DOM 里都在，只是隐藏着 —— 不加这道判断，
+      // 另外七个标签页上每次点击都会等满 Playwright 的 30 秒超时再被 catch 掉：
+      // 5 个分类 × 2 个页面 × 7 个标签页 ≈ 35 分钟，跑起来像卡死。
+      // 原来的写法有这道判断（`cat.isVisible()`），是我改的时候弄丢的。
+      const categories = page.locator('.ka-category');
+      const catCount = await categories.count().catch(() => 0);
+      if (catCount && (await categories.first().locator('.ka-cat-header').isVisible().catch(() => false))) {
+        for (let i = 0; i < catCount; i += 1) {
+          const header = categories.nth(i).locator('.ka-cat-header');
+          if (await categories.nth(i).locator('.ka-list').isVisible().catch(() => false)) continue;
+          // 给短超时：真点不动时快点失败，别把一次误判摊成半分钟
+          await header.click({ timeout: 3000 }).catch(() => {});
+          await page.waitForTimeout(120);
+        }
       }
       // 评估卡的**默认态**两边不同：原件默认展开前两条说明，重建版一律折叠
       // （产品决策，见 assessment_catalog.json 的 note）。所以这里要把第一张卡

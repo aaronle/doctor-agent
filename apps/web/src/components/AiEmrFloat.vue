@@ -762,12 +762,14 @@ function toggleVisit(id: string) {
 const catalog = ref<{ name: string; count: number; items: { name: string; level: string; desc: string; default_expanded?: boolean }[] }[]>([])
 
 /**
- * 专项评估的默认展开态，与 V4.3 一致：**五个分类全部展开**，
- * 其中目录里标了 `default_expanded` 的条目连说明一起展开。
+ * 专项评估小助手的默认态：**五个分类全部折叠**（2026-09-02 产品决策）。
  *
- * 早先做成了全折叠 —— 界面上只剩五个标题，33 项评估一项都看不到。
- * 还原度比对没抓到，因为它的 prepare 会先点开分类再比，
- * 测的是「展开后长得对不对」，测不到「默认就该是展开的」。
+ * 与 V4.3 原件不同 —— 原件默认全展开。一期只做目录展示、33 项都还没 Agent 化，
+ * 铺开占掉大半屏，把下面真正在用的内容挤没了；折叠起来当索引用。
+ *
+ * 展开态本身仍与原件一致，所以两道界面闸照旧比得了 —— 但它们的
+ * prepare/collect 必须先把分类点开，否则比的是「默认态差异」而不是「漏做」。
+ * `check-v43-coverage.mjs` 的 `ensureAssessmentVisible` 就是干这个的。
  */
 const expandedCategories = ref<Set<string>>(new Set())
 
@@ -1097,8 +1099,11 @@ onMounted(async () => {
   document.addEventListener('click', closePlusMenu)
   try {
     catalog.value = (await api.assessmentCatalog()).categories
-    // 默认态跟着数据走，不在组件里写死条目名（组件禁止写死临床数据）
-    expandedCategories.value = new Set(catalog.value.map((c) => c.name))
+    // 分类默认全折叠 —— 不预置任何一个（见 expandedCategories 的说明）。
+    //
+    // 条目内部的展开态照旧跟着数据走：`default_expanded` 标了的先展开，
+    // 这样医生点开分类时看到的层次与原件一致。默认态跟数据走，
+    // 不在组件里写死条目名（组件禁止写死临床数据）。
     expandedSkills.value = new Set(
       catalog.value.flatMap((c) => c.items.filter((i) => i.default_expanded).map((i) => i.name)),
     )
@@ -1421,7 +1426,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                 </div>
 
                 <div class="key-assessment-section">
-                  <div class="ka-header"><div class="ka-title">专项评估</div></div>
+                  <div class="ka-header"><div class="ka-title">专项评估小助手</div></div>
                   <div class="ka-categories">
                     <div v-for="category in catalog" :key="category.name" class="ka-category">
                       <div class="ka-cat-header" @click="toggleCategory(category.name)">

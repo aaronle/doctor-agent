@@ -24,7 +24,8 @@ const GROUPS: { title: string; cells: Cell[] }[] = [
       { icon: '🔍', label: '鉴别诊断', action: { kind: 'analysis', focus: '鉴别诊断' } },
       { icon: '⚠️', label: '预警评估', action: { kind: 'analysis', focus: '预警评估' } },
       { icon: '🫀', label: '共病管理', action: { kind: 'analysis', focus: '共病管理' } },
-      { icon: '📐', label: '专项评估', action: { kind: 'analysis', focus: '专项评估' } },
+      // label 是给人看的，focus 是段落键 —— 两者刻意不同步，见 MobileAnalysis 的说明
+      { icon: '📐', label: '专项评估小助手', action: { kind: 'analysis', focus: '专项评估' } },
     ],
   },
   {

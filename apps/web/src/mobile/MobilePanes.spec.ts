@@ -56,7 +56,7 @@ describe('分析页', () => {
     await wrapper.vm.$nextTick()
     const titles = wrapper.findAll('.m-sec-title').map((t) => t.text())
     expect(titles).toEqual([
-      '病情概要', '鉴别诊断', '预警评估', '共病管理', '专项评估', '阳性结果', '处置建议', '病历质控',
+      '病情概要', '鉴别诊断', '预警评估', '共病管理', '专项评估小助手', '阳性结果', '处置建议', '病历质控',
     ])
   })
 
@@ -143,6 +143,15 @@ describe('分析页', () => {
       expect(urls.some((u) => u.includes('assessment-catalog'))).toBe(true)
       expect(urls.some((u) => u.includes('record/quality'))).toBe(true)
     })
+  })
+
+  it('小助手改了显示名，段落键仍是「专项评估」—— 键跟着文案改，＋ 菜单就跳不过来了', async () => {
+    const wrapper = mountPane(MobileAnalysis, { focus: '专项评估' })
+    await wrapper.vm.$nextTick()
+    const sec = wrapper.find('[data-sec="专项评估"]')
+    expect(sec.exists()).toBe(true)
+    expect(sec.find('.m-sec-title').text()).toBe('专项评估小助手')
+    expect(sec.find('.m-sec-body').exists()).toBe(true)
   })
 
   it('focus 传进来时把对应那块展开', async () => {

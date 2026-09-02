@@ -141,16 +141,44 @@ async function ensureFloat(page) {
 }
 
 /**
- * 专项评估卡的说明行（.ka-card-detail-row 等）只在**展开态**才渲染。
+ * 把「专项评估小助手」摊到与原件同一个展开层次再采类名。
  *
- * 两边的默认态是不同的：原件默认展开前两条，重建版一律折叠（产品决策，
- * 见 assessment_catalog.json 的 note）。不先统一成展开，重建版就会被报
- * 「缺 3 个类」——那是默认态差异，不是漏做。
+ * 这一块有**两层**折叠，两边的默认态都不一样：
  *
- * 「确保展开」而不是「点一下」：盲点会把原件那张已展开的收起来，
+ * | | 分类（.ka-list） | 单条说明（.ka-card-detail-row） |
+ * | --- | --- | --- |
+ * | V4.3 原件 | 默认展开 | 默认展开前两条 |
+ * | 重建版 | 默认折叠（2026-09-02 产品决策） | 默认折叠 |
+ *
+ * 不先统一，重建版会被报「缺一批类」—— 那是默认态差异，不是漏做。
+ *
+ * **必须先开分类，再开卡片。** 早先只有开卡片那一步，它一上来
+ * `.ka-card` 不可见就直接 return —— 分类一折叠，整段静悄悄地被跳过，
+ * 报出来是「重建版缺 N 个类」，和真的漏做长得一模一样。
+ *
+ * 一律「确保展开」而不是「点一下」：盲点会把原件那份已展开的收起来，
  * 于是反过来变成原件缺类。
  */
-async function ensureFirstAssessmentCardOpen(page) {
+async function ensureAssessmentVisible(page) {
+  // ① **每一个分类都要开，不能只开第一个。**
+  //
+  // 卡片配色是按分类分布的：danger/warning 在「诊疗质控助手」，
+  // success 在「患者服务助手」「临床教学助手」，info 在「临床科研助手」。
+  // 只开第一个，`ka-card-info` 与 `ka-card-success` 就永远采不到 ——
+  // 实测就是这两个被报成「重建版缺 2 个类」。原件五个分类全开着，
+  // 要比就得比同一个状态。
+  // 这里只在「智慧诊疗」页调用，所以分类一定可见；但短超时照样给上 ——
+  // 标签页之间是 v-show，元素在别处也存在，点不动时不该等满 30 秒默认超时。
+  const categories = page.locator('.ka-category');
+  const catCount = await categories.count().catch(() => 0);
+  for (let i = 0; i < catCount; i += 1) {
+    const cat = categories.nth(i);
+    if (await cat.locator('.ka-list').isVisible().catch(() => false)) continue;
+    await cat.locator('.ka-cat-header').click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(120);
+  }
+
+  // ② 分类里的第一张卡（说明行只在展开态渲染）
   const card = page.locator('.ka-card').first();
   if (!(await card.isVisible().catch(() => false))) return;
   const collapsed = await card.evaluate((el) => el.classList.contains('collapsed')).catch(() => false);
@@ -168,7 +196,7 @@ async function classesPerTab(page, gotoPatient) {
     await page.locator('.ttab').filter({ hasText: tab }).first().click().catch(() => {});
     await page.waitForTimeout(700);
     await settle(page);
-    if (tab === '智慧诊疗') await ensureFirstAssessmentCardOpen(page);
+    if (tab === '智慧诊疗') await ensureAssessmentVisible(page);
     result[tab] = await page.evaluate(collectClasses, '.tips-tab-pane:not([style*="display: none"])');
   }
   return result;
