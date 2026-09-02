@@ -113,10 +113,17 @@ async function ensureAnalysisUnlocked(page, apiBase, patientId) {
  */
 async function settle(page, timeout = 150000) {
   await page.waitForFunction(
-    () =>
-      ![...document.querySelectorAll('.el-loading-mask')].some(
+    () => {
+      const masked = [...document.querySelectorAll('.el-loading-mask')].some(
         (m) => m.offsetParent !== null && getComputedStyle(m).display !== 'none',
-      ),
+      );
+      // 「智能体分析中…」是应用自己的「我还在算」信号，且**不是被测的那些选择器**。
+      //
+      // 只等遮罩不够：遮罩散了不代表 report-summary 回来了，而诊断（.dd-*）与
+      // 风险（.ra-*）那十四个元素要等它回来才渲染。等的应该是这个条件本身。
+      const thinking = document.body.innerText.includes('智能体分析中');
+      return !masked && !thinking;
+    },
     null,
     { timeout },
   );
@@ -396,6 +403,15 @@ const browser = await chromium.launch();
  *
  * 全部并行等，所以墙钟是单个超时而不是累加。等不到的不报错 ——
  * 由后面的比对如实记成缺失，这里只负责给足时间。
+ */
+/**
+ * 这里的预算刻意保持在 20 秒，**不跟着模型变慢一起加大**。
+ *
+ * 「分析回来了没有」由 `settle()` 负责等（它盯的是应用自己的加载信号，
+ * 预算 150 秒）。到了这一步内容本该已经在了，20 秒只是给渲染留的余量。
+ *
+ * 如果这里也放到 150 秒，真出现漏做时每个场景都要空等满 —— 十六个场景
+ * 能拖到四十分钟，而那正是最需要快点看到结论的时候。
  */
 async function waitForSampleTargets(page, selectors, timeout = 20000) {
   await Promise.all(
