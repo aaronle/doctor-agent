@@ -17,8 +17,6 @@ const session = useSession()
 const ws = useWorkstation()
 const isMobile = useIsMobile()
 
-const sidebarCollapsed = ref(true)
-const orderTab = ref<'drug' | 'exam' | 'lab'>('drug')
 const orderDialog = ref(false)
 const submitting = ref(false)
 
@@ -43,8 +41,6 @@ const patient = computed(() => ws.patient)
 const summary = computed(() => ws.summary)
 
 const allOrders = computed<PatientOrder[]>(() => patient.value?.orders ?? [])
-const drugOrders = computed(() => allOrders.value.filter((o) => o.category !== 'exam'))
-
 /**
  * 「检查」子页：患者**已做的检查** + 本次**新开的检查**。
  *
@@ -56,84 +52,7 @@ const drugOrders = computed(() => allOrders.value.filter((o) => o.category !== '
  */
 type ExamRow = { id: string; name: string; type: string; date: string; conclusion: string }
 
-const examOrders = computed<ExamRow[]>(() => {
-  const done = ws.examinations.map((e, i) => {
-    const row = e as Record<string, string>
-    return {
-      id: String(row.id ?? `exam-${i}`),
-      name: row.name ?? '',
-      type: row.type ?? '检查',
-      date: row.date ?? '',
-      conclusion: row.conclusion ?? '',
-    }
-  })
-  const ordered = allOrders.value
-    .filter((o) => o.category === 'exam' && o.exam_type !== '检验')
-    .map((o) => ({
-      id: o.id,
-      name: o.name ?? '',
-      type: o.exam_type ?? '检查',
-      date: '',
-      conclusion: '待出结果',
-    }))
-  return [...done, ...ordered]
-})
 const labResults = computed<LabResult[]>(() => patient.value?.lab_results ?? [])
-
-/**
- * 阳性结果：异常检验 + 异常检查，与 V4.3 的 result-panel 一致。
- *
- * 字段名与形状对齐原件（id / type / label / detail / extra）—— detail 是展开态
- * 要显示的内容，早先的实现没有它，所以点开只能重复一遍名字。
- * 顺序也按原件：检查在前，检验在后。
- */
-type PositiveResult = { id: string; type: 'exam' | 'lab'; label: string; detail: string; extra: string }
-
-const positiveResults = computed<PositiveResult[]>(() => {
-  const labs = labResults.value
-    .filter((l) => l.abnormal)
-    .map((l) => ({
-      id: `lab-${l.name}`,
-      type: 'lab' as const,
-      label: l.name,
-      detail: `${l.value} ${l.unit ?? ''}（参考: ${l.ref ?? '—'}）`,
-      extra: l.diff_note || '偏高',
-    }))
-  const exams = ws.examinations
-    .filter((e) => {
-      const row = e as Record<string, unknown>
-      // 优先用结构化的 abnormal；没有该字段时退回结论文本判断
-      return row.abnormal === true || String(row.conclusion ?? '').includes('异常')
-    })
-    .map((e, i) => {
-      const row = e as Record<string, string>
-      return {
-        id: String(row.id ?? `exam-${i}`),
-        type: 'exam' as const,
-        label: row.name,
-        detail: row.result ?? row.conclusion ?? '',
-        extra: row.conclusion ?? '',
-      }
-    })
-  return [...exams, ...labs]
-})
-
-/** 展开查看的那一条。null 表示看列表。 */
-const openedResult = ref<PositiveResult | null>(null)
-
-/** 再点同一条即收起 —— 与原件一致 */
-function toggleResult(item: PositiveResult) {
-  openedResult.value = openedResult.value?.id === item.id ? null : item
-}
-
-/** 结论里出现「异常」「偏高」即标红 */
-const openedAbnormal = computed(() => {
-  const extra = openedResult.value?.extra ?? ''
-  return extra.includes('异常') || extra.includes('偏高')
-})
-
-// 换患者时收起展开态，否则会把上一位患者的结果留在面板里
-watch(() => ws.patientId, () => { openedResult.value = null })
 
 const allergyText = computed(() => {
   const value = patient.value?.allergies
@@ -174,13 +93,6 @@ function hydrate() {
   }
 }
 
-async function openOrderDialog() {
-  orderDialog.value = true
-  if (!drugs.value.length) {
-    drugs.value = (await api.drugs()) as { id: string; name: string; spec?: string }[]
-  }
-}
-
 async function submitOrder() {
   if (!newOrder.value.drug) {
     ElMessage.warning('请选择药品')
@@ -200,65 +112,9 @@ async function submitOrder() {
   }
 }
 
-// ---------------------------------------------------------------- 转诊 / 住院 / 检查
-
-const referralDialog = ref(false)
-const admissionDialog = ref(false)
 const examDialog = ref(false)
 
-const DEPARTMENTS = [
-  '内分泌科', '心内科', '神经内科', '肾内科', '消化内科', '呼吸内科',
-  '血液科', '风湿免疫科', '普外科', '骨科', '妇科', '眼科',
-  '营养科', '康复科', '精神心理科', '全科医学科',
-]
-
-const newReferral = ref({ target_dept: '', reason: '', urgent: false })
-const newAdmission = ref({ target_dept: '', indication: '', urgent: false })
 const newExam = ref({ name: '', type: '检查', route: '门诊', freq: '一次' })
-
-async function submitReferral() {
-  if (!newReferral.value.target_dept) {
-    ElMessage.warning('请选择转入科室')
-    return
-  }
-  submitting.value = true
-  try {
-    const result = await api.createReferral({ patient_id: ws.patientId, ...newReferral.value })
-    ElMessage.success(result.message)
-    referralDialog.value = false
-    newReferral.value = { target_dept: '', reason: '', urgent: false }
-  } catch (error) {
-    ElMessage.error(`提交失败：${(error as Error).message}`)
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function submitAdmission() {
-  if (!newAdmission.value.target_dept) {
-    ElMessage.warning('请选择入院科室')
-    return
-  }
-  if (ws.writeBackBlocked) {
-    ElMessage.warning(`${ws.openRedAlerts.length} 条红色风险未处置，已阻断住院申请`)
-    return
-  }
-  submitting.value = true
-  try {
-    const result = await api.createAdmission({
-      patient_id: ws.patientId,
-      patient_name: patient.value?.name ?? '',
-      ...newAdmission.value,
-    })
-    ElMessage.success(result.message)
-    admissionDialog.value = false
-    newAdmission.value = { target_dept: '', indication: '', urgent: false }
-  } catch (error) {
-    ElMessage.error(`提交失败：${(error as Error).message}`)
-  } finally {
-    submitting.value = false
-  }
-}
 
 async function submitExam() {
   if (!newExam.value.name) {
@@ -365,11 +221,6 @@ function goHandleAlerts() {
   window.dispatchEvent(new CustomEvent('da:open-tab', { detail: '预警评估' }))
 }
 
-function switchPatient(id: string) {
-  router.push(`/outpatient/${id}`)
-}
-
-
 watch(
   () => route.params.patientId,
   async (id) => {
@@ -407,19 +258,25 @@ onMounted(async () => {
   <MobileWorkstation v-if="isMobile" />
 
   <div v-else class="workstation-page">
+    <!--
+      极简页头。**HIS 门面已整块撤掉**（2026-09-02）：这套界面复刻的是 V4.3 演示件，
+      不是北大国际医院的真实 HIS，而链接是会被转发出去的 —— 一个长得像 HIS 的
+      页面很容易让人以为「已经和院内系统打通了」。
+
+      所以留下的只有：回列表、患者身份、以及一条**常驻的**「未接入院内 HIS」标识。
+      转诊 / 住院 / 医嘱 / 阳性结果这些模拟 HIS 的功能一并撤掉。
+    -->
     <div class="his-header">
       <div class="his-header-left">
         <el-button text class="back-btn" :icon="ArrowLeft" @click="router.push('/outpatient/list')">候诊列表</el-button>
         <span class="his-divider">|</span>
-        <span class="his-logo">🏥</span>
         <span class="his-title">AI 门诊工作站</span>
+        <span class="demo-badge">演示环境 · 未接入任何院内 HIS</span>
       </div>
       <div class="his-header-right">
         <el-tag v-if="ws.isDegraded" size="small" type="warning" effect="light">
           {{ ws.degradedAgents.length }} 个智能体已降级
         </el-tag>
-        <el-button text size="small" @click="referralDialog = true">转诊</el-button>
-        <el-button text size="small" @click="admissionDialog = true">住院</el-button>
         <el-button text size="small" @click="router.push('/admin')">Agent 控制台</el-button>
         <el-button text size="small" @click="router.push('/outpatient/manage')">患者管理</el-button>
       </div>
@@ -459,272 +316,13 @@ onMounted(async () => {
       <el-button type="danger" size="small" @click="goHandleAlerts">逐条处置</el-button>
     </div>
 
-    <div class="workstation-body">
-      <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
-        <div class="sidebar-header">
-          <button class="sidebar-toggle" type="button" @click="sidebarCollapsed = !sidebarCollapsed">
-            {{ sidebarCollapsed ? '›' : '‹' }}
-          </button>
-        </div>
-        <div class="sidebar-avatars">
-          <div
-            v-for="item in ws.queue"
-            :key="item.id"
-            class="sa-avatar"
-            :class="{ active: item.id === ws.patientId }"
-            :title="`${item.name ?? '—'} · ${item.dept ?? ''}`"
-            @click="switchPatient(item.id)"
-          >
-            <!-- 缺名字不能让 charAt 抛错：渲染函数一抛，整个工作站白屏 -->
-            {{ (item.name ?? '?').charAt(0) }}
-          </div>
-        </div>
-      </div>
-
-      <div class="main-two-col">
-        <!-- 门诊病历 -->
-        <div class="his-record-panel">
-          <div class="panel-title-bar">
-            <span class="pt-title">📋 门诊病历</span>
-            <div class="pt-actions">
-              <span class="shortcut-hint">AI 结果需确认后写入</span>
-              <el-button size="small" :loading="submitting" @click="stashRecord">暂存</el-button>
-              <el-button type="primary" size="small" :loading="submitting" @click="submitRecord">提交病历</el-button>
-              <span v-if="savedHint" class="saved-hint">{{ savedHint }}</span>
-            </div>
-          </div>
-
-          <div class="diagnosis-section">
-            <div class="diag-section-header">
-              <span class="diag-section-title">📌 诊断</span>
-              <div class="diag-section-actions">
-                <el-button type="primary" size="small">保存诊断</el-button>
-                <el-button size="small">编辑</el-button>
-              </div>
-            </div>
-            <div class="diag-list">
-              <div class="diag-empty">暂无确诊诊断</div>
-            </div>
-            <div class="suspected-diag-section">
-              <div class="suspected-diag-title">疑似诊断（AI 推测）</div>
-              <div class="suspected-diag-list">
-                <el-tag
-                  v-for="item in summary?.suspected_diagnoses ?? []"
-                  :key="item.name"
-                  class="suspected-diag-tag"
-                  type="warning"
-                  effect="plain"
-                >
-                  <span class="sd-name">{{ item.name }}</span>
-                  <span v-if="item.icd" class="sd-icd">[{{ item.icd }}]</span>
-                  <span class="sd-conf">{{ item.confidence }}%</span>
-                </el-tag>
-                <span v-if="!summary?.suspected_diagnoses?.length" class="diag-empty">
-                  {{ ws.loadingSummary ? '智能体分析中…' : '暂无疑似诊断' }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="record-form-scroll">
-            <div class="form-row">
-              <span class="fl required-mark">主诉</span>
-              <div class="fi"><textarea v-model="form.chief_complaint" class="form-textarea" rows="2" /></div>
-            </div>
-            <div class="form-row">
-              <span class="fl required-mark">现病史</span>
-              <div class="fi"><textarea v-model="form.present_illness" class="form-textarea" rows="4" /></div>
-            </div>
-            <div class="form-row">
-              <span class="fl">既往史</span>
-              <div class="fi"><textarea v-model="form.past_history" class="form-textarea" rows="3" /></div>
-            </div>
-            <div class="form-row">
-              <span class="fl">个人史</span>
-              <div class="fi"><textarea v-model="form.personal_history" class="form-textarea" rows="2" /></div>
-            </div>
-            <div class="form-row single-line">
-              <span class="fl">过敏史</span>
-              <div class="fi"><input v-model="form.allergies" class="form-input" /></div>
-            </div>
-
-            <div class="form-row single-line vitals-row">
-              <span class="fl">体征</span>
-              <div class="fi vitals-inline">
-                <div class="vf-item"><span class="vf-label">身高</span><input v-model="vitals.height" class="vf-input" /><span class="vf-unit">CM</span></div>
-                <div class="vf-item"><span class="vf-label">体重</span><input v-model="vitals.weight" class="vf-input" /><span class="vf-unit">KG</span></div>
-                <div class="vf-item"><span class="vf-label">BMI</span><input v-model="vitals.bmi" class="vf-input" /></div>
-                <div class="vf-item"><span class="vf-label">体温</span><input v-model="vitals.temp" class="vf-input" /><span class="vf-unit">℃</span></div>
-                <div class="vf-item"><span class="vf-label">脉搏</span><input v-model="vitals.pulse" class="vf-input" /><span class="vf-unit">次/分</span></div>
-                <div class="vf-item"><span class="vf-label">呼吸</span><input v-model="vitals.breath" class="vf-input" /><span class="vf-unit">次/分</span></div>
-                <div class="vf-item bp-item">
-                  <span class="vf-label">血压</span>
-                  <input v-model="vitals.bpHigh" class="vf-input bp-half" /><span class="vf-slash">/</span
-                  ><input v-model="vitals.bpLow" class="vf-input bp-half" />
-                </div>
-                <div class="vf-item"><span class="vf-label">心率</span><input v-model="vitals.hr" class="vf-input" /><span class="vf-unit">次/分</span></div>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <span class="fl">体格检查</span>
-              <div class="fi"><textarea v-model="form.physical_exam" class="form-textarea" rows="3" /></div>
-            </div>
-            <div class="form-row auxiliary-row">
-              <span class="fl auxiliary-label">辅助检查</span>
-              <div class="fi"><textarea v-model="form.auxiliary_exam" class="form-textarea" rows="3" /></div>
-            </div>
-            <div class="form-row">
-              <span class="fl">建议</span>
-              <div class="fi"><textarea v-model="form.advice" class="form-textarea" rows="2" /></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 医嘱 -->
-        <div class="his-orders-panel">
-          <div class="panel-title-bar">
-            <span class="pt-title">💊 医嘱</span>
-            <el-button
-              type="primary"
-              size="small"
-              :icon="Plus"
-              @click="orderTab === 'drug' ? openOrderDialog() : (examDialog = true)"
-            >
-              开嘱
-            </el-button>
-          </div>
-
-          <div class="order-sub-tabs">
-            <div class="ostab" :class="{ active: orderTab === 'drug' }" @click="orderTab = 'drug'">
-              💊 药品<span class="ostab-badge">{{ drugOrders.length }}</span>
-            </div>
-            <div class="ostab" :class="{ active: orderTab === 'exam' }" @click="orderTab = 'exam'">
-              🔬 检查<span class="ostab-badge">{{ examOrders.length }}</span>
-            </div>
-            <div class="ostab" :class="{ active: orderTab === 'lab' }" @click="orderTab = 'lab'">
-              🧪 检验<span class="ostab-badge">{{ labResults.length }}</span>
-            </div>
-          </div>
-
-          <div class="order-table-wrap">
-            <el-table v-if="orderTab === 'drug'" :data="drugOrders" class="compact-table" size="small" border stripe height="100%">
-              <el-table-column label="药品名称" min-width="150">
-                <template #default="{ row }">{{ row.drug ?? row.name }}</template>
-              </el-table-column>
-              <el-table-column prop="dose" label="剂量" width="80" />
-              <el-table-column prop="freq" label="频次" width="70" />
-              <el-table-column prop="route" label="用法" width="70" />
-              <el-table-column prop="days" label="天数" width="60" />
-              <el-table-column prop="status" label="状态" width="70" />
-            </el-table>
-
-            <el-table v-else-if="orderTab === 'exam'" :data="examOrders" class="compact-table" size="small" border stripe height="100%">
-              <el-table-column prop="name" label="检查项目" min-width="180" />
-              <el-table-column prop="type" label="类型" width="90" />
-              <el-table-column prop="date" label="日期" width="110" />
-              <el-table-column label="结论" min-width="160">
-                <template #default="{ row }">
-                  <span :class="{ danger: String(row.conclusion).includes('异常') }">{{ row.conclusion || '—' }}</span>
-                </template>
-              </el-table-column>
-            </el-table>
-
-            <el-table v-else :data="labResults" class="compact-table" size="small" border stripe height="100%">
-              <el-table-column prop="name" label="指标名称" min-width="160" />
-              <el-table-column label="结果" width="110">
-                <template #default="{ row }">
-                  <span :class="{ danger: row.abnormal }">{{ row.value }}{{ row.unit ?? '' }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column prop="ref" label="参考" width="90" />
-              <el-table-column prop="trend" label="趋势" width="70" />
-            </el-table>
-          </div>
-
-          <div class="result-panel">
-            <div class="result-panel-header">
-              <span class="rp-title">
-                <span v-if="openedResult">📊 {{ openedResult.label }}</span>
-                <span v-else>⚠ 阳性结果 ({{ positiveResults.length }})</span>
-              </span>
-              <el-button v-if="openedResult" link size="small" type="primary" @click="openedResult = null">
-                ← 查看全部
-              </el-button>
-            </div>
-
-            <!-- 展开某一条时列表让位给详情；再点同一条或「查看全部」回到列表 -->
-            <div v-if="openedResult" class="result-detail">
-              <div class="rd-type">{{ openedResult.type === 'exam' ? '🔬 检查结果' : '🧪 检验结果' }}</div>
-              <div class="rd-content">{{ openedResult.detail }}</div>
-              <div class="rd-extra" :class="openedAbnormal ? 'abnormal' : 'normal'">{{ openedResult.extra }}</div>
-            </div>
-
-            <div v-else class="result-list-wrap">
-              <div v-if="!positiveResults.length" class="no-abnormal">暂无阳性结果</div>
-              <div v-else class="result-list">
-                <div
-                  v-for="item in positiveResults"
-                  :key="item.id"
-                  class="result-list-item"
-                  :class="item.type"
-                  @click="toggleResult(item)"
-                >
-                  <span class="rli-badge">{{ item.type === 'lab' ? '检验' : '检查' }}</span>
-                  <span class="rli-name">{{ item.label }}</span>
-                  <span class="rli-extra">{{ item.extra }}</span>
-                  <span class="rli-arrow">›</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
+    <!--
+      这里原本是三栏 HIS 复刻：左侧患者头像栏 + 门诊病历表单 + 医嘱/阳性结果面板。
+      **整块撤掉。** 病历并没有消失 —— AI 助手里本来就有自己那一份
+      （「病历 AI 生成」那一栏），它才是 AI 草稿的落点与「确认后写回」的发生地。
+      撤掉的是那份仿真的 HIS 数据展示，留下的是 AI 真正产出的东西。
+    -->
     <AiEmrFloat v-if="patient" />
-
-    <el-dialog v-model="referralDialog" title="挂转诊号" width="460px">
-      <el-form label-width="80px" size="small">
-        <el-form-item label="转入科室">
-          <el-select v-model="newReferral.target_dept" filterable placeholder="选择科室" style="width: 100%">
-            <el-option v-for="d in DEPARTMENTS" :key="d" :label="d" :value="d" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="转诊理由">
-          <el-input v-model="newReferral.reason" type="textarea" :rows="3" placeholder="病情摘要与转诊目的" />
-        </el-form-item>
-        <el-form-item label="加急"><el-switch v-model="newReferral.urgent" /></el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-hint">写入本地库并留审计，不触达真实 HIS</span>
-        <el-button @click="referralDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submitReferral">确认挂号</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="admissionDialog" title="住院申请" width="460px">
-      <el-form label-width="80px" size="small">
-        <el-form-item label="入院科室">
-          <el-select v-model="newAdmission.target_dept" filterable placeholder="选择科室" style="width: 100%">
-            <el-option v-for="d in DEPARTMENTS" :key="d" :label="d" :value="d" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="入院指征">
-          <el-input v-model="newAdmission.indication" type="textarea" :rows="3" placeholder="需要住院的临床依据" />
-        </el-form-item>
-        <el-form-item label="加急"><el-switch v-model="newAdmission.urgent" /></el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-hint">
-          {{ ws.writeBackBlocked ? `${ws.openRedAlerts.length} 条红色风险未处置，已阻断` : '写入本地库并留审计' }}
-        </span>
-        <el-button @click="admissionDialog = false">取消</el-button>
-        <el-button type="primary" :disabled="ws.writeBackBlocked" :loading="submitting" @click="submitAdmission">
-          提交住院申请
-        </el-button>
-      </template>
-    </el-dialog>
 
     <el-dialog v-model="examDialog" title="开立检查/检验" width="460px">
       <el-form label-width="80px" size="small">

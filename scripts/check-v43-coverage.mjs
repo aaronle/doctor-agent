@@ -138,6 +138,16 @@ async function ensureFloat(page) {
     await round.click();
     await page.waitForTimeout(400);
   }
+  // AI 助手 2026-09-02 起**默认收起**（问诊前不该先把结论摆出来）。
+  // 采类名之前必须先展开，否则整个抽屉都不在 DOM 里，
+  // 八页会被报成「重建版全缺」—— 那是默认态差异，不是漏做。
+  const toggle = page.locator('.assistant-toggle').first();
+  if (!(await page.locator('.tips-drawer').first().isVisible().catch(() => false))
+      && await toggle.isVisible().catch(() => false)) {
+    await toggle.click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(400);
+  }
+  await page.locator('.tips-drawer').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
 }
 
 /**

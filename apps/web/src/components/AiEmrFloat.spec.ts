@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -86,7 +86,23 @@ async function renderFloat() {
     attachTo: document.body,
   })
   await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+  await expandAssistant(wrapper)
   return wrapper
+}
+
+/**
+ * AI 助手默认是**收起**的（2026-09-02：一进来只有医生智能体）。
+ * 绝大多数用例断言的是抽屉里的内容，所以挂载后统一先把它展开。
+ *
+ * 用真实的开关按钮而不是直接改内部状态 —— 那个按钮本身就是这次要保证的东西，
+ * 绕过它的话，哪天开关坏了这批用例照样全绿。
+ */
+async function expandAssistant(wrapper: VueWrapper) {
+  const toggle = wrapper.find('.assistant-toggle')
+  if (toggle.exists() && !wrapper.find('.tips-drawer').exists()) {
+    await toggle.trigger('click')
+    await wrapper.vm.$nextTick()
+  }
 }
 
 afterEach(() => {
@@ -101,19 +117,41 @@ describe('浮层重新唤出', () => {
     expect(wrapper.find('.solo-tips-open-btn').exists()).toBe(false)
   })
 
-  it('只关抽屉、面板还开着 → 不出浮动按钮，靠面板上的 ‹ › 唤回', async () => {
+  it('只关抽屉、面板还开着 → 不出浮动按钮，靠医生智能体里的开关卡片唤回', async () => {
     const wrapper = await renderFloat()
     await wrapper.find('.tips-close').trigger('click')
 
-    // 原件实测就是这个行为：面板边缘的 toggle 已经能唤回抽屉，
-    // 这时再挂一个浮动按钮属于凭空加 UI。
+    // 面板里的开关卡片已经能唤回抽屉，这时再挂一个浮动按钮属于凭空加 UI。
     expect(wrapper.find('.ai-float-btn').exists()).toBe(false)
     expect(wrapper.find('.solo-tips-open-btn').exists()).toBe(false)
 
-    const toggle = wrapper.find('.panel-tips-toggle')
+    // 开关做成整块卡片而不是 ‹ › 小箭头：它要表达「AI 助手是医生智能体的延伸」，
+    // 而且医生第一次用时得看得出那里可以点。
+    const toggle = wrapper.find('.assistant-toggle')
     expect(toggle.exists()).toBe(true)
+    expect(toggle.text()).toContain('AI 助手')
+    expect(toggle.classes()).not.toContain('expanded')
+
     await toggle.trigger('click')
     expect(wrapper.find('.tips-drawer').exists()).toBe(true)
+    expect(wrapper.find('.assistant-toggle').classes()).toContain('expanded')
+  })
+
+  it('一进来 AI 助手是收起的 —— 问诊前不该先把结论摆出来', async () => {
+    // 病历、鉴别诊断、风险、共病都由这一场问诊推导。问诊前先给结论，
+    // 会让医生把「模型基于旧资料的猜测」当成本次判断 —— 那正是问诊门禁
+    // 存在的理由，界面不该反过来把门禁的结论提前展示。
+    stubFetch()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [createPinia(), router, ElementPlus] },
+      attachTo: document.body,
+    })
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+
+    expect(wrapper.find('.tips-drawer').exists()).toBe(false)
+    const toggle = wrapper.find('.assistant-toggle')
+    expect(toggle.exists()).toBe(true)
+    expect(toggle.text()).toContain('问诊后自动展开')
   })
 
   it('抽屉和面板都关 → 显示圆形 AI 钮', async () => {
@@ -288,6 +326,7 @@ describe('病历质控提醒', () => {
     useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+  await expandAssistant(wrapper)
     await wrapper.findAll('.ttab').find((t) => t.text().includes('病历管理'))!.trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.rc-risk-list').exists()).toBe(true))
     return wrapper
@@ -390,6 +429,7 @@ describe('诊断命令接进界面', () => {
     useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+  await expandAssistant(wrapper)
     await wrapper.findAll('.ttab').find((t) => t.text().includes('诊断管理'))!.trigger('click')
     return wrapper
   }
@@ -470,6 +510,7 @@ describe('临床知识库', () => {
     useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+  await expandAssistant(wrapper)
     await wrapper.find('.chat-textarea-wrap textarea').setValue('这个患者的胸闷怎么看')
     await wrapper.find('.float-send-btn').trigger('click')
     await vi.waitFor(() => expect(wrapper.findAll('.kb-link').length).toBeGreaterThan(0))
@@ -494,6 +535,7 @@ describe('临床知识库', () => {
     useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+  await expandAssistant(wrapper)
     await wrapper.find('.chat-textarea-wrap textarea').setValue('今天天气不错')
     await wrapper.find('.float-send-btn').trigger('click')
     await vi.waitFor(() => expect(wrapper.findAll('.msg-bubble').length).toBeGreaterThan(0))
@@ -564,6 +606,7 @@ describe('预警评估 · 风险色点与动作', () => {
     useWorkstation(pinia).visit = UNLOCKED_VISIT as never
     await useWorkstation(pinia).selectPatient('P001')
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+  await expandAssistant(wrapper)
     await wrapper.findAll('.ttab').find((t) => t.text().includes('预警评估'))!.trigger('click')
     await vi.waitFor(() => expect(wrapper.findAll('.risk-card').length).toBe(3))
     return wrapper
@@ -631,6 +674,7 @@ describe('专项评估默认态', () => {
     })
     // 专项评估在「智慧诊疗」页，那一页受问诊门禁
     useWorkstation(pinia).visit = UNLOCKED_VISIT as never
+    await expandAssistant(wrapper)
     await vi.waitFor(() => expect(wrapper.findAll('.ka-cat-header').length).toBe(2))
     return wrapper
   }
@@ -700,6 +744,7 @@ describe('问诊门禁', () => {
     })
     useWorkstation(pinia).visit = visit as never
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+  await expandAssistant(wrapper)
     return wrapper
   }
 
@@ -804,6 +849,7 @@ describe('风险名按等级着色', () => {
     ws.visit = UNLOCKED_VISIT as never
     ws.summary = { risk_assessments: ALERTS, risk_alerts: [], _meta: {} } as never
     await wrapper.vm.$nextTick()
+    await expandAssistant(wrapper)
 
     const names = wrapper.findAll('.ra-card-name')
     expect(names).toHaveLength(2)
@@ -822,6 +868,7 @@ describe('风险名按等级着色', () => {
     ws.visit = UNLOCKED_VISIT as never
     ws.summary = { risk_assessments: ALERTS, risk_alerts: [], _meta: {} } as never
     await wrapper.vm.$nextTick()
+    await expandAssistant(wrapper)
 
     const cards = wrapper.findAll('.ra-card')
     expect(cards[0].classes()).toContain('ra-card-danger')

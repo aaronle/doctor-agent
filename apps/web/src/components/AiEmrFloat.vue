@@ -76,14 +76,27 @@ async function skipInterview() {
 }
 
 const activeTab = ref<Tab>('智慧诊疗')
-const tipsOpen = ref(true)
+
+/**
+ * AI 助手是否展开。**默认收起**（2026-09-02）。
+ *
+ * 一进来只有「医生智能体」。病历、鉴别诊断、风险、共病都由这一场问诊推导，
+ * 问诊前先把结论摆出来，会让医生把「模型基于旧资料的猜测」当成本次判断 ——
+ * 那正是问诊门禁存在的理由，界面不该反过来把门禁的结论提前展示。
+ *
+ * 「结束问诊」后自动展开（见 finishAndGenerate），医生也可以随时手动开合。
+ */
+const tipsOpen = ref(false)
 const panelOpen = ref(true)
+
+/** 这次展开是「结束问诊」自动触发的，用于在开关上标一句，让医生知道是谁打开的。 */
+const justAutoExpanded = ref(false)
 
 /**
  * 浮层全关后的重新唤出入口。
  *
- * 只在「抽屉与面板都关」时出现 —— 面板还开着时，抽屉由面板边缘的
- * .panel-tips-toggle（‹ ›）唤回，不需要浮动按钮。这与 V4.3 实测行为一致。
+ * 只在「抽屉与面板都关」时出现 —— 面板还开着时，抽屉由面板里的
+ * .assistant-toggle 卡片唤回，不需要浮动按钮。
  *
  * 缺了它，医生把两个 × 都点掉就只能刷新页面。
  *
@@ -908,6 +921,11 @@ async function finishAndGenerate() {
     actionStep.value = '起草病历…'
     await generateRecord()
 
+    // 结束问诊后自动展开 AI 助手：这一刻医生要看的正是刚算出来的东西，
+    // 让他再去点一下开关是多余的一步。标上「刚刚自动展开」，
+    // 免得界面自己变了而医生不知道是什么触发的。
+    tipsOpen.value = true
+    justAutoExpanded.value = true
     ElMessage.success('问诊已结束，病历与分析已按本次内容生成')
   } catch (error) {
     ElMessage.error(`生成失败：${(error as Error).message}`)
@@ -1934,10 +1952,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         </div>
       </div>
 
-      <div class="panel-tips-toggle" :class="{ active: tipsOpen }" @click="tipsOpen = !tipsOpen" title="展开/收起 AI 助手">
-        {{ tipsOpen ? '›' : '‹' }}
-      </div>
-
       <!-- ======================= 医生智能体 ======================= -->
       <div v-if="panelOpen" class="assistant-panel connected-left">
         <div class="panel-header">
@@ -1946,6 +1960,36 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             <el-button text size="small" class="panel-action-btn panel-close" @click="panelOpen = false">×</el-button>
           </div>
         </div>
+
+        <!--
+          AI 助手的展开开关。**做成一整块带说明的卡片，不是一个小箭头** ——
+          它要承担「AI 助手是医生智能体的延伸」这个意思，一个 ‹ › 承担不起，
+          而且医生第一次用时根本不知道那里可以点。
+
+          收起态是虚线灰框（看着「还没打开」），展开态是实线蓝框加蓝底
+          （看着「正开着」）。两种状态的差别要一眼可辨，否则等于没有状态。
+        -->
+        <button
+          class="assistant-toggle"
+          :class="{ expanded: tipsOpen }"
+          type="button"
+          @click="tipsOpen = !tipsOpen; justAutoExpanded = false"
+        >
+          <span class="at-main">
+            <span class="at-title">
+              <span class="at-icon">⌘</span>
+              <span class="at-name">AI 助手</span>
+              <span v-if="tipsOpen && justAutoExpanded" class="at-badge auto">刚刚自动展开</span>
+              <span v-else-if="!tipsOpen" class="at-badge">问诊后自动展开</span>
+            </span>
+            <span class="at-desc">
+              {{ tipsOpen
+                ? '病历、鉴别诊断、风险与共病已展开在左侧。'
+                : '病历、鉴别诊断、风险与共病都在这里。问诊结束会自动打开，也可以现在手动展开。' }}
+            </span>
+          </span>
+          <span class="at-arrow">{{ tipsOpen ? '⟨ 收起' : '展开 ⟩' }}</span>
+        </button>
 
         <div class="copilot-tab-bar">
           <div class="ctab active">

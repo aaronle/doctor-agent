@@ -137,10 +137,14 @@ async function ensureAiFloat(page) {
     await round.click();
     await page.waitForTimeout(400);
   }
-  const toggle = page.locator('.panel-tips-toggle').first();
+  // AI 助手 2026-09-02 起**默认收起**（问诊前不该先把结论摆出来），
+  // 且唤回入口从 ‹ › 小箭头换成了医生智能体里的整块开关卡片。
+  // 比对这一侧的内容之前必须先展开，否则取到的是「什么都没有」，
+  // 而那会被报成「重建版整块缺失」。
+  const toggle = page.locator('.assistant-toggle').first();
   if (!(await page.locator('.tips-drawer').first().isVisible().catch(() => false))
       && await toggle.isVisible().catch(() => false)) {
-    await toggle.click();
+    await toggle.click({ timeout: 3000 }).catch(() => {});
     await page.waitForTimeout(400);
   }
   await page.locator('.tips-drawer').first().waitFor({ state: 'visible', timeout: 8000 });
@@ -169,9 +173,18 @@ const PAGES = [
     // 用 P006：只有带红色预警的患者才会渲染 risk-alert-section
     hash: '#/outpatient/P006',
     path: '/outpatient/P006',
+    // AI 助手默认收起（问诊前不该先摆结论），比之前先展开
+    prepare: async (page) => { await ensureAiFloat(page); },
+    // **比对范围已收窄到 AI 助手内部**（2026-09-02）。
+    //
+    // 撤掉的那些（.workstation-body / .his-record-panel / .form-row / .fl /
+    // .panel-title-bar / 医嘱面板 / 阳性结果）不再复刻 V4.3 —— 那是有意的产品
+    // 决策，留在门禁里只会每次报「缺失」，而缺失的含义应该是「漏做了」。
+    //
+    // 页头与身份条保留：它们还在，只是内容简化了。
     selectors: [
-      '.workstation-page', '.his-header', '.basic-info-strip', '.workstation-body', '.his-record-panel',
-      '.panel-title-bar', '.form-row', '.fl', '.tips-drawer', '.tips-tab-nav', '.ttab', '.assistant-panel',
+      '.workstation-page', '.his-header', '.basic-info-strip',
+      '.tips-drawer', '.tips-tab-nav', '.ttab', '.assistant-panel',
       '.rc-label', '.skill-chip',
       // 鉴别诊断与风险提示：首轮重建做成了自拟结构，与原件差得最远的两块
       '.dd-card', '.dd-header', '.dd-title', '.dd-confirm-btn', '.dd-rec-item', '.dd-card-top',
@@ -264,36 +277,21 @@ const PAGES = [
     prepare: async (page) => {
       await ensureAiFloat(page);
       await page.locator('.action-bar button', { hasText: '语音问诊' }).first().click();
-      await page.locator('.pending-float').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-      await page.locator('.msg-bubble').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      // 原来等 .pending-float（AI 追问提示）—— 那一块一期已撤，等它只会白等 30 秒。
+      // 现在等第一条对话气泡出现，那才是这个场景真正要比的东西。
+      await page.locator('.msg-bubble').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
       await page.waitForTimeout(800);
     },
-    selectors: [
-      '.pending-float', '.pending-title', '.pending-list', '.pq-item', '.pq-num', '.pq-text',
-      '.msg-bubble', '.bubble-role', '.bubble-content', '.mode-badge',
-    ],
+    // 「AI 追问提示」六个类（.pending-* / .pq-*）已从清单摘掉：
+    // 一期撤掉了那个功能（没有临床知识库支撑时，建议错一条的代价大于不给建议），
+    // 这是**有意偏离原件**。留在清单里只会每次报「缺失」，
+    // 而「缺失」的含义应该是「漏做了」，不是「有意没做」。
+    selectors: ['.msg-bubble', '.bubble-role', '.bubble-content', '.mode-badge'],
   },
 
-  {
-    name: '阳性结果展开态',
-    hash: '#/outpatient/P001',
-    path: '/outpatient/P001',
-    prepare: async (page) => {
-      // 阳性结果在 HIS 医嘱区下方，被 AI 浮层盖住，先关掉浮层
-      for (const sel of ['.tips-close', '.panel-close']) {
-        const btn = page.locator(sel).first();
-        if (await btn.isVisible().catch(() => false)) {
-          await btn.click();
-          await page.waitForTimeout(350);
-        }
-      }
-      await page.locator('.result-list-item').first().click();
-      await page.locator('.result-detail').first().waitFor({ state: 'visible', timeout: 8000 });
-      await page.waitForTimeout(300);
-    },
-    selectors: ['.result-detail', '.rd-type', '.rd-content', '.rd-extra'],
-  },
-
+  // 「阳性结果展开态」场景已移除（2026-09-02）：阳性结果面板随 HIS 门面一起撤掉，
+  // 场景里等的 .result-list-item 永远不会出现，整条门禁会挂在 30 秒超时上 ——
+  // 而报错长得像「点不到元素」，查起来会先去怀疑选择器。
   {
     name: '质控明细展开',
     hash: '#/outpatient/P001',

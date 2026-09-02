@@ -9,7 +9,6 @@
 .ai-emr-root.fullpage .assistant-panel{width:300px;flex-shrink:0;border-radius:0;box-shadow:none}
 .ai-emr-root.fullpage .assistant-panel.wide{width:400px}
 .ai-emr-root.fullpage .assistant-panel.connected-left{border-radius:0}
-.ai-emr-root.fullpage .panel-tips-toggle{display:none}
 .ai-emr-root.fullpage .tips-header{border-radius:0;padding:8px 14px}
 .ai-emr-root.fullpage .panel-header{border-radius:0}
 .ai-float-btn{position:fixed;right:24px;bottom:32px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#1677ff,#0958d9);box-shadow:0 4px 16px #1677ff66;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2000;transition:transform .2s,box-shadow .2s}
@@ -55,10 +54,6 @@
 .assistant-panel{width:300px;flex-shrink:0;background:#fff;border-radius:12px;box-shadow:0 8px 40px #0000002e;border:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;transition:width .25s ease;position:relative}
 .assistant-panel.wide{width:600px}
 .assistant-panel.connected-left{border-radius:0 12px 12px 0}
-.panel-tips-toggle{position:absolute;top:52px;z-index:2010;width:10px;height:28px;border-radius:6px;background:#fff;border:1px solid #d0d7de;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#606266;pointer-events:auto;box-shadow:2px 0 6px #0000001a;transition:background .2s,color .2s,border-color .2s;transform:translate(0)}
-.panel-tips-toggle:hover{background:#e6f0ff;border-color:#1677ff;color:#1677ff}
-.panel-tips-toggle.active{background:#1677ff;color:#fff;border-color:#1677ff}
-.panel-tips-toggle.active:hover{background:#1677ff;color:#fff}
 .toggle-dot{position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:#e6191a;border:1px solid #fff}
 .panel-header{padding:8px 12px;background:linear-gradient(135deg,#0f2b54,#1a3a6a);display:flex;align-items:center;flex-shrink:0}
 .panel-title{flex:1;font-size:13px;font-weight:700;color:#e8f0fe;display:flex;align-items:center;gap:6px}
@@ -867,3 +862,20 @@
    但这处复用的交互还在，所以把样式改名留下，而不是连坐删掉。 */
 .note-hit-item{font-size:12px;padding:4px 8px;border-radius:6px;background:#fff;border:1px solid #e8ecf2;cursor:pointer;transition:all .12s;color:#374151}
 .note-hit-item:hover{border-color:#1677ff;background:#f0f7ff;color:#1677ff}
+/* AI 助手展开开关。做成整块卡片而不是小箭头 —— 它要表达「助手是这里的延伸」，
+   而且医生第一次用时得看得出那里可以点。收起态虚线灰框、展开态实线蓝框，
+   两态差别要一眼可辨，否则等于没有状态。 */
+.assistant-toggle{display:flex;align-items:center;gap:10px;width:calc(100% - 20px);margin:10px;padding:10px 12px;border-radius:10px;background:#f7f8fa;border:1px dashed #dcdfe6;cursor:pointer;text-align:left;transition:background .15s,border-color .15s}
+.assistant-toggle:hover{border-color:#1677ff;background:#f2f7ff}
+.assistant-toggle.expanded{background:#eef4ff;border-style:solid;border-width:1.5px;border-color:#b7cbf2}
+.at-main{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+.at-title{display:flex;align-items:center;gap:6px}
+.at-icon{font-size:13px;font-weight:700;color:#8a9099}
+.assistant-toggle.expanded .at-icon{color:#1677ff}
+.at-name{font-size:13px;font-weight:700;color:#414750}
+.assistant-toggle.expanded .at-name{color:#1677ff}
+.at-badge{font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:#eef0f2;color:#8a9099}
+.at-badge.auto{background:#edfaed;color:#16a34a}
+.at-desc{font-size:10px;color:#8a9099;line-height:1.6}
+.at-arrow{font-size:12px;font-weight:700;color:#8a9099;flex-shrink:0}
+.assistant-toggle.expanded .at-arrow{color:#1677ff}

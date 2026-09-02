@@ -67,7 +67,10 @@ async function render() {
   ws.patientId = 'P001'
   ws.patient = PATIENT as never
   ws.summary = SUMMARY as never
-  await vi.waitFor(() => expect(wrapper.findAll('.result-list-item').length).toBeGreaterThan(0))
+  // 等页头出现即可。原来等的是 `.result-list-item`（阳性结果列表），
+  // 那个面板 2026-09-02 随 HIS 门面一起撤了 —— 等一个永远不会出现的东西，
+  // 每条用例都会挂在超时上，而报错长得像「整个工作站没渲染」。
+  await vi.waitFor(() => expect(wrapper.find('.his-header').exists()).toBe(true))
   return wrapper
 }
 
@@ -76,176 +79,60 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-describe('阳性结果', () => {
-  it('只列异常项，检查在前检验在后', async () => {
+describe('HIS 门面已整块撤掉', () => {
+  /**
+   * 这套界面复刻的是 V4.3 演示件，不是北大国际医院的真实 HIS，而链接会被
+   * 转发出去 —— 一个长得像 HIS 的页面很容易让人以为「已经和院内系统打通了」。
+   *
+   * 所以 2026-09-02 把仿真的 HIS 数据展示整块拿掉：左侧患者头像栏、
+   * 门诊病历表单、医嘱面板、阳性结果、转诊 / 住院。
+   *
+   * **病历没有消失** —— AI 助手里本来就有自己那一份（「病历 AI 生成」那一栏），
+   * 它才是 AI 草稿的落点与「确认后写回」的发生地。撤掉的是那份仿真展示。
+   */
+  it('不再渲染任何模拟 HIS 的面板', async () => {
     const wrapper = await render()
-    const items = wrapper.findAll('.result-list-item')
-
-    // 血钾正常，不该进来
-    expect(items).toHaveLength(3)
-    expect(items[0].find('.rli-badge').text()).toBe('检查')
-    expect(items[1].find('.rli-badge').text()).toBe('检验')
-    expect(wrapper.text()).not.toContain('血钾')
+    for (const gone of [
+      '.workstation-body', '.sidebar', '.his-record-panel', '.his-orders-panel',
+      '.record-form-scroll', '.diagnosis-section',
+    ]) {
+      expect(wrapper.find(gone).exists(), `${gone} 还在`).toBe(false)
+    }
   })
 
-  it('标题显示条数', async () => {
+  it('页头常驻「未接入院内 HIS」标识，且不可关闭', async () => {
+    // 这不是提示，是声明：看页面的人第一眼就该知道这不是院内系统。
     const wrapper = await render()
-    expect(wrapper.find('.rp-title').text()).toContain('阳性结果 (3)')
+    const badge = wrapper.find('.demo-badge')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toContain('未接入任何院内 HIS')
+    // 没有任何关闭它的控件
+    expect(badge.find('button').exists()).toBe(false)
   })
 
-  it('点一条展开该条详情，列表让位', async () => {
+  it('转诊 / 住院这类模拟 HIS 的动作不再提供', async () => {
     const wrapper = await render()
-    expect(wrapper.find('.result-detail').exists()).toBe(false)
-
-    await wrapper.findAll('.result-list-item')[1].trigger('click')
-
-    const detail = wrapper.find('.result-detail')
-    expect(detail.exists()).toBe(true)
-    expect(detail.find('.rd-type').text()).toContain('检验结果')
-    // detail 是「值 单位（参考: x）」，不是简单重复名称
-    expect(detail.find('.rd-content').text()).toContain('8.5')
-    expect(detail.find('.rd-content').text()).toContain('<7.0')
-    expect(wrapper.find('.result-list').exists()).toBe(false)
-  })
-
-  it('展开后标题换成该条名称，并给出返回入口', async () => {
-    const wrapper = await render()
-    await wrapper.findAll('.result-list-item')[1].trigger('click')
-
-    expect(wrapper.find('.rp-title').text()).toContain('空腹血糖')
-    expect(wrapper.find('.rp-title').text()).not.toContain('阳性结果')
-
-    const back = wrapper.findAll('button').find((b) => b.text().includes('查看全部'))
-    expect(back, '展开后必须能回到列表，否则等于把其余结果藏死了').toBeTruthy()
-    await back!.trigger('click')
-    expect(wrapper.find('.result-detail').exists()).toBe(false)
-    expect(wrapper.findAll('.result-list-item')).toHaveLength(3)
-  })
-
-  it('回列表后点另一条，显示的是新那条而不是上一条', async () => {
-    // 注：展开后列表被详情顶掉，所以「再点同一条收起」这条路在原件里也走不通，
-    // 回列表只能靠「查看全部」。真正要防的是详情没换、还留着上一条。
-    const wrapper = await render()
-    await wrapper.findAll('.result-list-item')[0].trigger('click')
-    expect(wrapper.find('.rd-content').text()).toContain('NPDR')
-
-    await wrapper.findAll('button').find((b) => b.text().includes('查看全部'))!.trigger('click')
-    await wrapper.findAll('.result-list-item')[1].trigger('click')
-    expect(wrapper.find('.rd-content').text()).toContain('8.5')
-    expect(wrapper.find('.rd-content').text()).not.toContain('NPDR')
-  })
-
-  it('换患者时收起展开态，不把上一位的结果留在面板里', async () => {
-    const wrapper = await render()
-    await wrapper.findAll('.result-list-item')[0].trigger('click')
-    expect(wrapper.find('.result-detail').exists()).toBe(true)
-
-    useWorkstation().patientId = 'P002'
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('.result-detail').exists()).toBe(false)
-  })
-
-  it('异常结论标红，正常不标', async () => {
-    const wrapper = await render()
-    // 双眼底照相的结论含「异常」
-    await wrapper.findAll('.result-list-item')[0].trigger('click')
-    expect(wrapper.find('.rd-extra').classes()).toContain('abnormal')
-  })
-
-  it('无异常时给空态，不出空列表', async () => {
-    stubFetch()
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        const u = String(url)
-        if (u.includes('/api/his/patient/')) {
-          return new Response(JSON.stringify({ ...PATIENT, lab_results: [] }), { status: 200 })
-        }
-        if (u.includes('report-summary')) {
-          return new Response(JSON.stringify({ ...SUMMARY, examinations: [] }), { status: 200 })
-        }
-        if (u.includes('/api/his/patients')) return new Response(JSON.stringify([PATIENT]), { status: 200 })
-        return new Response(JSON.stringify({ categories: [] }), { status: 200 })
-      }),
-    )
-    const pinia = createPinia()
-    const wrapper = mount(WorkstationView, {
-      global: { plugins: [pinia, router, ElementPlus] },
-      attachTo: document.body,
-    })
-    const ws = useWorkstation(pinia)
-    ws.patientId = 'P001'
-    ws.patient = { ...PATIENT, lab_results: [] } as never
-    ws.summary = { ...SUMMARY, examinations: [] } as never
-    await vi.waitFor(() => expect(wrapper.find('.result-panel').exists()).toBe(true))
-
-    expect(wrapper.find('.no-abnormal').exists()).toBe(true)
-    expect(wrapper.findAll('.result-list-item')).toHaveLength(0)
+    const labels = wrapper.findAll('button').map((b) => b.text()).join('|')
+    expect(labels).not.toContain('转诊')
+    expect(labels).not.toContain('住院')
   })
 })
 
 describe('候诊栏健壮性', () => {
   it('队列里某位患者缺名字，不该让整个工作站白屏', async () => {
-    // 渲染函数里一句 item.name.charAt(0) 就能做到这件事 ——
-    // Vue 的渲染throw 不是局部失败，是整棵树不渲染。
+    // Vue 的渲染 throw 不是局部失败，是整棵树不渲染 ——
+    // 渲染函数里一句 item.name.charAt(0) 就足以让整页空白。
+    //
+    // 原来这条靠 `.sa-avatar`（左侧患者头像栏）来验，那一栏已随 HIS 门面撤掉。
+    // 关切没变，所以留着这条，只是改成不依赖已删元素：脏数据进 store 之后，
+    // 页面骨架仍在、页头仍在。
     const wrapper = await render()
     const ws = useWorkstation()
     ws.queue = [{ id: 'P001', name: '王某某' }, { id: 'PX', dept: '内科' }] as never
 
     await wrapper.vm.$nextTick()
     expect(wrapper.find('.workstation-page').exists()).toBe(true)
-    expect(wrapper.findAll('.sa-avatar')).toHaveLength(2)
-  })
-})
-
-describe('医嘱三子页', () => {
-  it('角标计数：药品来自医嘱、检查来自检查记录、检验来自检验结果', async () => {
-    const wrapper = await render()
-    const badges = wrapper.findAll('.ostab-badge').map((b) => b.text())
-    // PATIENT 有 0 条药品医嘱、SUMMARY 有 1 条检查、3 条检验
-    expect(badges).toEqual(['0', '1', '3'])
-  })
-
-  it('「检查」页显示患者已做的检查，不是只显示新开的医嘱', async () => {
-    // 早先这一页的数据源接成了「category === exam 的医嘱」，
-    // 而种子医嘱都没有 category —— 于是患者明明做过心电图、眼底照相，
-    // 这一页却永远是空的。
-    const wrapper = await render()
-    await wrapper.findAll('.ostab')[1].trigger('click')
-
-    // 断言落在表格里，不是整页文本 —— 项目名在别处也出现，整页断言测不出东西
-    const rows = wrapper.findAll('.el-table__body .cell').map((c) => c.text())
-    expect(rows).toContain('双眼底照相')
-    expect(rows).toContain('异常: NPDR 轻度')
-  })
-
-  it('「检查」页的列头按原件：检查项目 / 类型 / 日期 / 结论', async () => {
-    const wrapper = await render()
-    await wrapper.findAll('.ostab')[1].trigger('click')
-    const heads = wrapper.findAll('.el-table__header th .cell').map((h) => h.text())
-    expect(heads).toEqual(['检查项目', '类型', '日期', '结论'])
-  })
-
-  it('「检验」页首列是「指标名称」，与原件一致', async () => {
-    const wrapper = await render()
-    await wrapper.findAll('.ostab')[2].trigger('click')
-    const heads = wrapper.findAll('.el-table__header th .cell').map((h) => h.text())
-    expect(heads).toEqual(['指标名称', '结果', '参考', '趋势'])
-  })
-
-  it('新开的检查也进这一页，标为待出结果', async () => {
-    const wrapper = await render()
-    const ws = useWorkstation()
-    ws.patient = {
-      ...PATIENT,
-      orders: [{ id: 'E001', name: '胸部CT', category: 'exam', exam_type: '检查', status: '新开' }],
-    } as never
-    await wrapper.vm.$nextTick()
-    await wrapper.findAll('.ostab')[1].trigger('click')
-
-    const rows = wrapper.findAll('.el-table__body .cell').map((c) => c.text())
-    expect(rows).toContain('胸部CT')
-    expect(rows).toContain('待出结果')
+    expect(wrapper.find('.his-header').exists()).toBe(true)
   })
 })
 

@@ -159,3 +159,9 @@
 .rb-names{font-size:11px;color:#e6191a}
 .rb-spacer{flex:1}
 .rb-note{font-size:10px;color:#c96a6a}
+
+/* 常驻的「未接入院内 HIS」标识。
+   这套界面复刻的是 V4.3 演示件，链接又会被转发出去 —— 一个长得像 HIS 的页面
+   很容易让人以为已经和院内系统打通了。所以这条不是提示，是**声明**：
+   常驻、不可关闭、放在页头身份旁边，看页面的人第一眼就会看到。 */
+.demo-badge{margin-left:10px;padding:2px 8px;border-radius:4px;background:#7c4a03;color:#ffd591;font-size:11px;font-weight:600;letter-spacing:.2px;white-space:nowrap}
