@@ -261,9 +261,42 @@ SPEC_EVIDENCE_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
+#: 一句话里出现这些字样，就认为这句只是在交代「这一项没有」，不承载内容。
+#: 模型的措辞不统一（未采集 / 未获得 / 未提供 都出现过），按语义收口而不是只认一种。
+_NO_CONTENT_MARKERS = (UNCOLLECTED, "未获得", "未提供", "未记录")
+
+#: 断句用。中英文标点都算，模型两种都会用。
+_CLAUSE_SEPARATORS = "。；;，,\n"
+
+
+def _has_substantive_content(text: str) -> bool:
+    """
+    去掉「××未采集」这类交代性小句之后，这一段还剩不剩实质内容。
+
+    **按小句判，不按整段找子串。** 这是 2026-09-02 修的一个假失败：
+    既往史写成「高血压10年，血压控制差；2型糖尿病8年，规律服药；过敏史未采集」——
+    主档的既往史一字不落地记下来了，只是**如实交代了过敏史没采集**
+    （主档 allergies 确实是空的，此时写「否认过敏史」才是伪造问诊）。
+    原来的判据是「整段里出现过『未采集』就算漏记」，于是把一个完全正确的
+    输出判成了不合格。
+
+    这不是把闸放松：整段只写「未采集」照样判失败（见
+    `test_blank_section_with_evidence_still_fails`）。改的是**判据的粒度** ——
+    要判的是「这一段有没有记下该记的东西」，不是「这三个字有没有出现过」。
+    """
+    for raw in "".join(ch if ch not in _CLAUSE_SEPARATORS else "\n" for ch in text).split("\n"):
+        clause = raw.strip(" 　、：:()（）")
+        if not clause:
+            continue
+        if any(marker in clause for marker in _NO_CONTENT_MARKERS):
+            continue
+        return True
+    return False
+
+
 def check_spec_no_blank_with_evidence(data: dict, ctx: dict) -> tuple[bool, str]:
     """
-    上下文里有料，对应段落就不能写「未采集」。
+    上下文里有料，对应段落就不能是空的。
 
     这一条才是有牙齿的那个：`check_spec_required_fields` 只看栏目在不在，
     模型把七段全填「未采集」也能过。而患者明明有 9 项异常检验，辅助检查
@@ -273,13 +306,13 @@ def check_spec_no_blank_with_evidence(data: dict, ctx: dict) -> tuple[bool, str]
     bad = []
     for field, evidence_keys in SPEC_EVIDENCE_FIELDS:
         value = str(src.get(field) or "")
-        if UNCOLLECTED not in value:
+        if _has_substantive_content(value):
             continue
         has_evidence = any(ctx.get(k) for k in evidence_keys)
         if has_evidence:
             bad.append(SECTION_LABELS.get(field, field))
     if bad:
-        return False, f"上下文有对应数据，但这些段落写了「{UNCOLLECTED}」：{'、'.join(bad)}"
+        return False, f"上下文有对应数据，但这些段落没有记下任何实质内容：{'、'.join(bad)}"
     return True, ""
 
 

@@ -26,6 +26,27 @@ SECTION_LABELS = dict(RECORD_SECTIONS)
 UNCOLLECTED = "未采集"
 
 
+def _archived_history(ctx: dict) -> str:
+    """
+    主档里已记载的既往史 + 过敏史，拼成一段。
+
+    过敏史这里写成「青霉素过敏」而不是「过敏史：青霉素」——
+    后者读起来像个字段名，前者才是病历里的话。**主档没记过敏就整句不写**，
+    绝不产出「否认过敏史」：那是一次没发生过的问答。
+    """
+    parts: list[str] = []
+    history = str(ctx.get("past_history") or "").strip()
+    if history:
+        parts.append(history)
+
+    allergies = ctx.get("allergies") or []
+    named = [str(a).strip() for a in allergies if str(a).strip()]
+    if named:
+        parts.append("、".join(named) + "过敏")
+
+    return "；".join(parts)
+
+
 class RecordAgent(Agent):
     key = "record"
     version = "mvp-1.0.0"
@@ -35,16 +56,38 @@ class RecordAgent(Agent):
         "vitals", "lab_results", "examinations", "dialog_script",
     )
     needs_exam_detail = False
+    # 2026-09-02 重写第 2–4 条。
+    #
+    # 原文只有一句「上下文中没有提及的内容一律写未采集」，**没说每一段的资料来源是什么**。
+    # Haiku 会顺手把主档既往史抄进去，所以一直是 10/10；换 Sonnet 后它开始较真
+    # 「本次问诊没问过既往史」，于是明明主档里写着「2型糖尿病 5 年」也填「未采集」——
+    # 十条用例掉到三到五条。
+    #
+    # 这不是 Sonnet 变差，是**这条提示词一直缺一半，只是被上一个模型的习惯盖住了**。
+    # 判据要写在提示词里，不能指望模型替你补。
     role_prompt = (
         "你负责根据问诊与检查资料起草门诊病历。\n"
         "硬性要求：\n"
         f"1. 严格输出七段：{'、'.join(SECTION_LABELS.values())}。不增段、不减段、不改名。\n"
-        f"2. **上下文中没有提及的内容，一律写「{UNCOLLECTED}」。**"
-        "绝对不允许写「否认药物过敏史」「无吸烟史」这类未经问诊的否定表述 —— "
-        "写「否认」意味着医生问过而患者否认，凭空写出来就是伪造问诊记录。\n"
-        "3. 不生成未经证实的体征。体格检查只写上下文中已记录的项。\n"
-        "4. 初步诊断中待排的写「待排」，不要表述成确诊。\n"
-        "5. 每段是连贯的中文段落，不用列表符号。"
+        "2. **每一段的资料来源是固定的，先认准来源再决定写什么：**\n"
+        "   - 主诉、现病史：本次主诉与问诊对话。\n"
+        "   - 既往史：**主档记载的既往史与过敏史**。主档里有就照写，"
+        "不要因为本次问诊没问到就写「未采集」—— 那是既有档案，不是本次问出来的。\n"
+        "   - 体格检查：只写上下文中已记录的体征，不生成未经证实的项。\n"
+        "   - 辅助检查：只写上下文中已有的检验值与检查结论，**每一句都要带上是哪一项检查**。"
+        "「未见异常」「大致正常」这类没有主语的话一律不许出现 —— "
+        "写「心电图未见明显 ST-T 改变」可以，光写「未见异常」不行，"
+        "因为没人知道你指的是哪一项、也无从核对。\n"
+        f"3. **只有该段的来源里确实没有资料，才写「{UNCOLLECTED}」**，"
+        f"且整段就是这三个字，不要拼在别的话前后（「否认药物过敏史{UNCOLLECTED}」这类是错的）。\n"
+        "4. **本次问诊没有涉及的症状或病史，整句略过不写**（既往史里主档已记载的除外）。"
+        "不要用「否认…」「无…」「未见…」去补位 —— 那意味着医生问过而患者否认，"
+        "凭空写出来就是伪造问诊记录。少写一句是留白，编一句是造假。\n"
+        "5. **病历里只写患者的事实，不写关于这份病历本身的话。**"
+        "「否认表述均未采集」「本段无相关记录」这类自我说明不是病历内容，一律不要出现；"
+        "该留白就按第 3 条写「未采集」三个字。\n"
+        "6. 初步诊断中待排的写「待排」，不要表述成确诊。\n"
+        "7. 每段是连贯的中文段落，不用列表符号。"
     )
     output_schema = {
         "type": "object",
@@ -64,7 +107,9 @@ class RecordAgent(Agent):
         return (
             "起草本次就诊的门诊病历七段。\n"
             "资料来源仅限患者上下文中的主诉、既往史、检验值、体征、对话脚本。"
-            f"任何一段没有可用资料就写「{UNCOLLECTED}」。{extra}"
+            f"任何一段**它自己的来源里**没有可用资料，才写「{UNCOLLECTED}」——"
+            "主档已记载的既往史属于有资料。"
+            f"{extra}"
         )
 
     def validate(self, data: dict, ctx: dict) -> dict:
@@ -73,6 +118,19 @@ class RecordAgent(Agent):
         if missing:
             raise ValueError(f"病历缺少段落：{'、'.join(missing)}")
         cleaned = {key: str(fields.get(key) or "").strip() or UNCOLLECTED for key in SECTION_KEYS}
+
+        # 既往史是**主档里已有的事实**，不是这次问出来的，所以它不该取决于模型的心情。
+        #
+        # 提示词已经写清了「主档里有就照写」，Sonnet 大多数时候照做，但仍会偶尔
+        # 填「未采集」—— 而这个模型上 temperature 已废弃，压不住抖动（见 15 号文档 §6）。
+        # 与其把一条确定的事实交给概率，不如让代码兜底：模型漏了就补，写了就不动。
+        #
+        # 只在模型**整段留白**时才补。它若结合问诊补充了内容，那是它该做的事，不覆盖。
+        if cleaned["past_history"] == UNCOLLECTED:
+            archived = _archived_history(ctx)
+            if archived:
+                cleaned["past_history"] = archived
+
         return {"fields": cleaned}
 
     def fallback(self, ctx: dict, **kwargs) -> dict:

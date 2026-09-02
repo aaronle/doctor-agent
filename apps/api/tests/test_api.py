@@ -2206,3 +2206,89 @@ def test_unknown_patient_is_404(client):
     assert client.post(
         "/api/orchestration/ask", json={"patient_id": "P999", "question": "x"}
     ).status_code in (404, 503)
+
+
+# ---------------------------------------------------------------- 病历「未采集」的判据粒度
+
+
+def test_section_that_records_the_history_passes_even_if_it_notes_a_missing_subitem():
+    """
+    既往史照实记了主档内容，另起一句交代「过敏史未采集」—— 这是合规的。
+
+    主档 allergies 确实是空的，此时写「否认过敏史」才是伪造问诊。
+    原来的判据是「整段里出现过『未采集』就算漏记」，把这种正确输出判成了不合格。
+    """
+    from app.eval_cases import check_spec_no_blank_with_evidence
+
+    ok, detail = check_spec_no_blank_with_evidence(
+        {"fields": {"past_history": "高血压10年，血压控制差；2型糖尿病8年，规律服药；过敏史未采集。"}},
+        {"past_history": "高血压10年；2型糖尿病8年。"},
+    )
+    assert ok, detail
+
+
+def test_blank_section_with_evidence_still_fails():
+    """
+    粒度改细了，牙齿不能掉：整段只有「未采集」而主档有料，照样判失败。
+
+    这条和上一条是一对 —— 少了它，上面那个放宽就没有边界了。
+    """
+    from app.eval_cases import check_spec_no_blank_with_evidence
+
+    for text in ("未采集", "未采集。", " 未采集 ", "未获得", "过敏史未采集；既往史未获得"):
+        ok, detail = check_spec_no_blank_with_evidence(
+            {"fields": {"past_history": text}},
+            {"past_history": "高血压10年；2型糖尿病8年。"},
+        )
+        assert not ok, f"{text!r} 应判失败"
+        assert "既往史" in detail
+
+
+def test_auxiliary_exam_blank_with_labs_still_fails():
+    """患者有 9 项异常检验，辅助检查写「未采集」是漏记 —— 这条不能被上面的改动带松。"""
+    from app.eval_cases import check_spec_no_blank_with_evidence
+
+    ok, detail = check_spec_no_blank_with_evidence(
+        {"fields": {"past_history": "高血压10年。", "auxiliary_exam": "未采集"}},
+        {"past_history": "高血压10年。", "lab_results": [{"name": "空腹血糖", "value": "8.5"}]},
+    )
+    assert not ok
+    assert "辅助检查" in detail
+
+
+def test_past_history_is_backfilled_from_the_master_record():
+    """
+    既往史是主档里已有的事实，不该取决于模型的心情。
+
+    Sonnet 5 上 temperature 已废弃、压不住抖动，模型偶尔会把整段填成「未采集」。
+    模型整段留白时由代码补上；它写了内容就不动 —— 结合问诊补充是它该做的事。
+    """
+    from app.agents import record_agent
+
+    ctx = {"past_history": "2型糖尿病 5 年", "allergies": ["青霉素"]}
+    blank = {k: "未采集" for k in ("chief_complaint", "present_illness", "past_history",
+                                   "personal_history", "physical_exam", "auxiliary_exam",
+                                   "preliminary_diagnosis")}
+    out = record_agent.validate({"fields": dict(blank)}, ctx)
+    assert out["fields"]["past_history"] == "2型糖尿病 5 年；青霉素过敏"
+
+    written = dict(blank, past_history="高血压 3 年，规律服药。")
+    kept = record_agent.validate({"fields": written}, ctx)
+    assert kept["fields"]["past_history"] == "高血压 3 年，规律服药。"
+
+
+def test_backfill_never_invents_a_denial_when_the_master_record_is_empty():
+    """
+    主档没记过敏，就整句不写 —— 绝不产出「否认过敏史」。
+    那是一次没发生过的问答，和模型编造否认是同一条红线。
+    """
+    from app.agents import record_agent
+
+    out = record_agent.validate(
+        {"fields": {k: "未采集" for k in ("chief_complaint", "present_illness", "past_history",
+                                          "personal_history", "physical_exam", "auxiliary_exam",
+                                          "preliminary_diagnosis")}},
+        {"past_history": "高血压 3 年", "allergies": []},
+    )
+    assert out["fields"]["past_history"] == "高血压 3 年"
+    assert "否认" not in out["fields"]["past_history"]
