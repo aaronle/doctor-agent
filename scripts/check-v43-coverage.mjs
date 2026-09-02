@@ -141,7 +141,13 @@ async function ensureFloat(page) {
   // AI 助手 2026-09-02 起**默认收起**（问诊前不该先把结论摆出来）。
   // 采类名之前必须先展开，否则整个抽屉都不在 DOM 里，
   // 八页会被报成「重建版全缺」—— 那是默认态差异，不是漏做。
-  const toggle = page.locator('.assistant-toggle').first();
+  //
+  // 2026-09-03：开关由 .assistant-toggle（大卡片）改成 .assistant-handle（抽屉把手）。
+  // 改名当天忘了同步这里，门禁立刻报「缺失 236 个类名」—— 而每一页都恰好是
+  // 「重建 68 类」这种整齐的数字，那是抽屉压根没打开、采到面板类名的特征。
+  // **门禁里的选择器和产品代码是同一份契约**，改名必须一起改，
+  // 否则失败信息会把人引向「界面被改坏了」，而真相是脚本点不动那个按钮了。
+  const toggle = page.locator('.assistant-handle').first();
   if (!(await page.locator('.tips-drawer').first().isVisible().catch(() => false))
       && await toggle.isVisible().catch(() => false)) {
     await toggle.click({ timeout: 3000 }).catch(() => {});

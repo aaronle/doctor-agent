@@ -33,6 +33,10 @@ class Patient(Base):
     name: Mapped[str] = mapped_column(String(64))
     gender: Mapped[str] = mapped_column(String(8))
     age: Mapped[int] = mapped_column(Integer)
+    #: 出生日期 `YYYY-MM-DD`。**由 id_no 推导，不手工录**（见 seed.py）——
+    #: 两处各录一次必然会漂，而修 fixture 时发现七个患者里五个已经漂了。
+    #: 界面上只显示到月：门诊核对身份用不到日，写全反而把那一行挤爆。
+    birth_date: Mapped[str] = mapped_column(String(16), default="")
     id_no: Mapped[str] = mapped_column(String(64), default="")
     phone: Mapped[str] = mapped_column(String(32), default="")
     visit_type: Mapped[str] = mapped_column(String(32), default="")

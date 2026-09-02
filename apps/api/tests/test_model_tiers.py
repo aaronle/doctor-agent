@@ -20,10 +20,10 @@ from app.agents import (
     record_agent,
     risk_agent,
     summary_agent,
-    voice_plan_agent,
+    voice_summary_agent,
 )
 
-ALL_AGENTS = (summary_agent, record_agent, diagnosis_agent, risk_agent, comorbidity_agent, voice_plan_agent)
+ALL_AGENTS = (summary_agent, record_agent, diagnosis_agent, risk_agent, comorbidity_agent, voice_summary_agent)
 
 
 def test_tiers_actually_resolve_to_different_models():
@@ -164,7 +164,7 @@ def test_unmeasured_agents_stay_on_the_stronger_side():
     而且算术上也没理由动前三个：它们在 report-summary 里**并发**跑，
     只要 risk 还是长杆，把它们换成快档一秒都省不下来。
     """
-    for agent in (summary_agent, diagnosis_agent, comorbidity_agent, voice_plan_agent):
+    for agent in (summary_agent, diagnosis_agent, comorbidity_agent, voice_summary_agent):
         assert agent.model_tier != "clinical_fast", f"{agent.key} 没有数据支撑就被降级了"
 
 

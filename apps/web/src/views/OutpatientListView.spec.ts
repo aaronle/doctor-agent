@@ -9,12 +9,15 @@ import type { PatientListItem } from '../api'
 
 const PATIENTS: PatientListItem[] = [
   {
-    id: 'P001', name: '王某某', gender: '女', age: 58, visit_type: '复诊', dept: '内分泌科',
+    id: 'P001', name: '王某某', gender: '女', age: 58, birth_date: '1968-03-15',
+    // 已问过、患者否认 —— 不给标记
+    allergy: { status: 'denied', items: [] }, visit_type: '复诊', dept: '内分泌科',
     doctor: '李医生', visit_date: '2026-06-17', chief_complaint: '血糖控制不佳，口渴多饮 2 周',
     primary_diagnosis: '2型糖尿病', risk_level: '高风险',
   },
   {
-    id: 'P002', name: '张某', gender: '男', age: 45, visit_type: '初诊', dept: '心内科',
+    id: 'P002', name: '张某', gender: '男', age: 45, birth_date: '1981-05-22',
+    allergy: { status: 'confirmed', items: ['青霉素'] }, visit_type: '初诊', dept: '心内科',
     doctor: '王医生', visit_date: '2026-06-17', chief_complaint: '胸闷气短 1 个月',
     primary_diagnosis: '冠心病', risk_level: '中风险',
   },
@@ -39,7 +42,7 @@ describe('候诊列表', () => {
 
     const cards = wrapper.findAll('.patient-card')
     expect(cards).toHaveLength(2)
-    expect(cards[0].find('.patient-name').text()).toBe('王某某')
+    expect(cards[0].find('.pn-text').text()).toBe('王某某')
     expect(cards[0].find('.patient-meta').text()).toContain('58岁')
     expect(cards[0].find('.card-complaint').text()).toContain('血糖控制不佳')
   })
@@ -50,7 +53,7 @@ describe('候诊列表', () => {
 
     await wrapper.find('.toolbar-left input').setValue('胸闷')
     expect(wrapper.findAll('.patient-card')).toHaveLength(1)
-    expect(wrapper.find('.patient-name').text()).toBe('张某')
+    expect(wrapper.find('.pn-text').text()).toBe('张某')
   })
 
   it('候诊人数跟随过滤结果', async () => {

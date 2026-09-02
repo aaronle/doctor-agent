@@ -74,7 +74,6 @@
 .ctab-close{font-size:14px;color:#c0c4cc;cursor:pointer}
 .ctab-close:hover{color:#e6191a}
 .mode-badge{font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center}
-.mode-badge.voice{background:#fee2e2;color:#dc2626}
 .mode-badge.ai{background:#dbeafe;color:#1677ff}
 .patient-tab-name{font-weight:600;color:#1a2a4a}
 .patient-tab-meta{color:#909399;font-size:12px}
@@ -865,20 +864,6 @@
 /* AI 助手展开开关。做成整块卡片而不是小箭头 —— 它要表达「助手是这里的延伸」，
    而且医生第一次用时得看得出那里可以点。收起态虚线灰框、展开态实线蓝框，
    两态差别要一眼可辨，否则等于没有状态。 */
-.assistant-toggle{display:flex;align-items:center;gap:10px;width:calc(100% - 20px);margin:10px;padding:10px 12px;border-radius:10px;background:#f7f8fa;border:1px dashed #dcdfe6;cursor:pointer;text-align:left;transition:background .15s,border-color .15s}
-.assistant-toggle:hover{border-color:#1677ff;background:#f2f7ff}
-.assistant-toggle.expanded{background:#eef4ff;border-style:solid;border-width:1.5px;border-color:#b7cbf2}
-.at-main{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
-.at-title{display:flex;align-items:center;gap:6px}
-.at-icon{font-size:13px;font-weight:700;color:#8a9099}
-.assistant-toggle.expanded .at-icon{color:#1677ff}
-.at-name{font-size:13px;font-weight:700;color:#414750}
-.assistant-toggle.expanded .at-name{color:#1677ff}
-.at-badge{font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:#eef0f2;color:#8a9099}
-.at-badge.auto{background:#edfaed;color:#16a34a}
-.at-desc{font-size:10px;color:#8a9099;line-height:1.55}
-.at-arrow{font-size:11px;font-weight:700;color:#8a9099;flex-shrink:0;align-self:center;white-space:nowrap}
-.assistant-toggle.expanded .at-arrow{color:#1677ff}
 
 /* AI 助手收起时占位。HIS 门面撤掉后那是页面最大的一块，
    空着会让人以为「没加载完」。这张卡讲清「为什么现在没有结论」与两条出路。 */
@@ -889,3 +874,45 @@
 .ap-desc{margin:10px 0 0;font-size:12px;line-height:1.75;color:#8a9099}
 .ap-actions{margin-top:18px;display:flex;gap:8px;justify-content:center}
 .ap-hint{margin:16px 0 0;font-size:11px;color:#b0b5bd;line-height:1.6}
+
+/* ---------------------------------------------------------------- AI 助手抽屉把手
+
+   取代原来那张占三行的大卡片（.assistant-toggle）。那张卡片的问题不是不好看，
+   是它把「一个开关」做成了首屏最大的一块内容 —— 医生每次进来先读三行说明，
+   读完才发现它只是个展开按钮。
+
+   把手跨在面板左边线上（左右各露 11px），垂直居中。这是抽屉把手的通用形态：
+   位置本身就在说「这边能拉开」，不需要文字解释。 */
+/* flex 行里的独立一列，不是绝对定位 —— 见组件里那段注释：
+   放进 .assistant-panel 会被它的 overflow:hidden 裁掉。
+   align-self:center 让它落在面板高度的正中间，这是「边线中间」那个要求的实现。 */
+.assistant-handle{flex:0 0 22px;align-self:center;width:22px;height:56px;padding:0;
+  margin:0 -1px 0 2px;border-radius:8px;border:1px solid #e2e8f0;
+  background:#fff;box-shadow:-2px 2px 6px #0000001a;cursor:pointer;z-index:3;
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .15s,background .15s,color .15s}
+.assistant-handle:hover{border-color:#1677ff}
+.assistant-handle:hover .ah-chevron{color:#1677ff}
+.assistant-handle.expanded{border-color:#1677ff}
+.assistant-handle.expanded .ah-chevron{color:#1677ff}
+.ah-chevron{font-size:17px;font-weight:500;color:#8a9099;line-height:1;transition:color .15s}
+
+/* 问诊结束自动展开的那一刻闪一次。
+   取代原来那句「刚刚自动展开」的文字徽标 —— 同样看得见，但不占版面。 */
+.assistant-handle.attention{background:#1677ff;border-color:#1677ff;animation:ah-pulse 1.2s ease-in-out 2}
+.assistant-handle.attention .ah-chevron{color:#fff}
+@keyframes ah-pulse{0%,100%{box-shadow:-2px 2px 6px #0000001a}50%{box-shadow:0 0 0 5px #1677ff33}}
+
+/* ---------------------------------------------------------------- 过敏标记
+
+   这个位置以前挂的是红色的「语」（语音问诊模式）。删掉的理由有两条，
+   任一条单独成立：① 一期没有任何语音识别，它标的模式不存在；
+   ② 红色在本产品是临床风险语义（F06），不能拿来做模式色 ——
+   医生扫到患者名字旁边的红色，第一反应是找风险。
+
+   现在这个位置给药物过敏史，那才配得上这个颜色和这个位置。 */
+.allergy-badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;
+  border:1px solid transparent;white-space:nowrap;cursor:default}
+.allergy-badge.danger{background:#fee2e2;color:#dc2626;border-color:#fca5a5}
+/* 黄色不是「轻一点的红」，是另一件事：红=有过敏，黄=没人问过。 */
+.allergy-badge.warn{background:#fef3cd;color:#b7791f;border-color:#fbd38d;font-weight:600}

@@ -19,6 +19,10 @@ CLINICAL_FIELDS = (
     "suspected_diagnoses",
     "past_history",
     "allergies",
+    # **必须和 allergies 一起进。** 只给过敏原、不给采集状态的话，
+    # 模型看到空列表只能理解成「不过敏」—— 而那可能是「没人问过」。
+    # 硬规则已经因为分不清这两者而在六分之六的患者上失效过一次。
+    "allergy_status",
     "vitals",
     "lab_results",
     "orders",

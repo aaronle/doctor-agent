@@ -169,6 +169,33 @@ const summary = computed(() => ws.summary)
 const patient = computed(() => ws.patient)
 
 /**
+ * 患者信息行：性别 · 年龄 · 出生年月 · 就诊号，一行。
+ *
+ * 出生年月只到月。门诊核对身份用不到日，写全了这一行会被挤爆 ——
+ * 而这一行右边还要留给过敏标记，那才是必须看见的东西。
+ *
+ * 「就诊号」用的是 P001 这类患者 ID，**不是身份证号**。身份证号只在服务端
+ * 用来推出生日期，从不下发到前端（见 his.py 的 LIST_FIELDS）。
+ */
+const patientMeta = computed(() => {
+  const p = patient.value
+  if (!p) return ''
+  const parts = [p.gender, p.age ? `${p.age}岁` : '', (p.birth_date || '').slice(0, 7), p.id]
+  return parts.filter(Boolean).join(' · ')
+})
+
+/**
+ * 过敏史三态。
+ *
+ * 后端把状态和过敏原包在一个对象里下发，就是为了让这里想漏都漏不掉 ——
+ * 空的 items 既可能是「问过、没有」也可能是「没人问过」，只读 items 必然判错。
+ */
+const allergy = computed<{ status: string; items: string[] }>(() => {
+  const a = (patient.value as { allergy?: { status?: string; items?: string[] } } | null)?.allergy
+  return { status: a?.status || 'unknown', items: a?.items || [] }
+})
+
+/**
  * 两个浮层的位置。
  *
  * V4.3 把 position/right/top 写成内联样式（由 JS 按面板几何算出），
@@ -1983,6 +2010,28 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         </div>
       </div>
 
+      <!--
+        AI 助手抽屉把手。
+
+        它是面板的**兄弟节点**，不在面板里面：.assistant-panel 带 overflow:hidden
+        （用来裁子元素的圆角），放进去的话把手会被裁掉。做成 flex 行里独立的一列，
+        既不用绝对定位，也不会被任何祖先裁剪。
+
+        取代了原来那张占三行的大卡片 —— 那张卡把「一个开关」做成了首屏最大的一块，
+        医生每次进来先读三行说明，读完才发现它只是个展开按钮。
+      -->
+      <button
+          class="assistant-handle"
+          :class="{ expanded: tipsOpen, attention: justAutoExpanded }"
+          type="button"
+          :title="tipsOpen ? '收起 AI 助手' : '展开 AI 助手（病历、鉴别诊断、风险、共病）'"
+          :aria-label="tipsOpen ? '收起 AI 助手' : '展开 AI 助手'"
+          :aria-expanded="tipsOpen"
+          @click="tipsOpen = !tipsOpen; justAutoExpanded = false"
+      >
+        <span class="ah-chevron">{{ tipsOpen ? '›' : '‹' }}</span>
+      </button>
+
       <!-- ======================= 医生智能体 ======================= -->
       <div v-if="panelOpen" class="assistant-panel connected-left">
         <div class="panel-header">
@@ -2000,33 +2049,31 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           收起态是虚线灰框（看着「还没打开」），展开态是实线蓝框加蓝底
           （看着「正开着」）。两种状态的差别要一眼可辨，否则等于没有状态。
         -->
-        <button
-          class="assistant-toggle"
-          :class="{ expanded: tipsOpen }"
-          type="button"
-          @click="tipsOpen = !tipsOpen; justAutoExpanded = false"
-        >
-          <span class="at-main">
-            <span class="at-title">
-              <span class="at-icon">⌘</span>
-              <span class="at-name">AI 助手</span>
-              <span v-if="tipsOpen && justAutoExpanded" class="at-badge auto">刚刚自动展开</span>
-              <span v-else-if="!tipsOpen" class="at-badge">问诊后自动展开</span>
-            </span>
-            <span class="at-desc">
-              {{ tipsOpen
-                ? '病历、鉴别诊断、风险与共病已展开在左侧。'
-                : '病历、鉴别诊断、风险与共病都在这里。问诊结束会自动打开，也可以现在手动展开。' }}
-            </span>
-          </span>
-          <span class="at-arrow">{{ tipsOpen ? '⟨ 收起' : '展开 ⟩' }}</span>
-        </button>
-
         <div class="copilot-tab-bar">
           <div class="ctab active">
-            <span v-if="voice.state.value !== 'idle'" class="mode-badge voice">语</span>
             <span class="patient-tab-name">{{ patient?.name }}</span>
-            <span class="patient-tab-meta">· {{ patient?.gender }} · {{ patient?.age }}岁</span>
+            <span class="patient-tab-meta">{{ patientMeta }}</span>
+            <!--
+              过敏标记。**红色在这个产品里只给临床风险**（F06：不得用红色表示
+              普通删除、加载失败或表单校验），所以这个位置以前挂的那个红色「语」
+              标记已经删掉 —— 它标的是「语音问诊模式」，而一期根本没有语音识别，
+              等于用最强的颜色标了一个不存在的状态。
+
+              三态，不是两态：
+                有过敏 → 红标 + 过敏原（**必须写出是什么**，只写「有过敏」等于没说）
+                已否认 → 不给标记，干净就是信息
+                未采集 → 黄标。这不是「没有过敏」，是没人问过。
+            -->
+            <span
+              v-if="allergy.status === 'confirmed'"
+              class="allergy-badge danger"
+              :title="`药物过敏史：${allergy.items.join('、')}`"
+            >⚠ {{ allergy.items[0] }}过敏<template v-if="allergy.items.length > 1"> +{{ allergy.items.length - 1 }}</template></span>
+            <span
+              v-else-if="allergy.status === 'unknown'"
+              class="allergy-badge warn"
+              title="本次就诊未采集药物过敏史，开具处方前需补问"
+            >? 过敏史未采集</span>
           </div>
         </div>
 

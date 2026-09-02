@@ -141,7 +141,7 @@ async function ensureAiFloat(page) {
   // 且唤回入口从 ‹ › 小箭头换成了医生智能体里的整块开关卡片。
   // 比对这一侧的内容之前必须先展开，否则取到的是「什么都没有」，
   // 而那会被报成「重建版整块缺失」。
-  const toggle = page.locator('.assistant-toggle').first();
+  const toggle = page.locator('.assistant-handle').first();
   if (!(await page.locator('.tips-drawer').first().isVisible().catch(() => false))
       && await toggle.isVisible().catch(() => false)) {
     await toggle.click({ timeout: 3000 }).catch(() => {});
@@ -286,7 +286,13 @@ const PAGES = [
     // 一期撤掉了那个功能（没有临床知识库支撑时，建议错一条的代价大于不给建议），
     // 这是**有意偏离原件**。留在清单里只会每次报「缺失」，
     // 而「缺失」的含义应该是「漏做了」，不是「有意没做」。
-    selectors: ['.msg-bubble', '.bubble-role', '.bubble-content', '.mode-badge'],
+    //
+    // `.mode-badge`（红色的「语」）2026-09-03 同样摘掉，两条理由各自成立：
+    //   ① 它标的是「语音问诊模式」，而一期没有任何语音识别 ——
+    //      全仓零行 SpeechRecognition / MediaRecorder，标了一个不存在的模式；
+    //   ② 红色在本产品是临床风险语义（F06 明确禁止拿红色做别的用途）。
+    //      患者姓名旁边的红色现在给药物过敏史 —— 那才配得上这个颜色和这个位置。
+    selectors: ['.msg-bubble', '.bubble-role', '.bubble-content'],
   },
 
   // 「阳性结果展开态」场景已移除（2026-09-02）：阳性结果面板随 HIS 门面一起撤掉，

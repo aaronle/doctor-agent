@@ -113,8 +113,30 @@ onMounted(load)
           <div class="card-header">
             <div class="patient-avatar">{{ patient.name.charAt(0) }}</div>
             <div class="patient-basic">
-              <div class="patient-name">{{ patient.name }}</div>
-              <div class="patient-meta">{{ patient.gender }} · {{ patient.age }}岁 · {{ patient.dept }}</div>
+              <div class="patient-name">
+                <!-- 姓名单独成元素：标记是标记、姓名是姓名，取值时不该被拼在一起 -->
+                <span class="pn-text">{{ patient.name }}</span>
+                <!--
+                  过敏标记也要出现在候诊列表 —— 医生是在**这里**挑下一位患者的，
+                  开病历之前就该知道。只放在工作站里的话，等他看见时人已经叫进来了。
+
+                  三态和工作站完全一致：红=有过敏（写出过敏原）、无标记=问过且否认、
+                  黄=没人问过。列表这里空间紧，红标只显示首个过敏原。
+                -->
+                <span
+                  v-if="patient.allergy?.status === 'confirmed'"
+                  class="allergy-badge danger"
+                  :title="`药物过敏史：${patient.allergy.items.join('、')}`"
+                >⚠ {{ patient.allergy.items[0] }}<template v-if="patient.allergy.items.length > 1">+{{ patient.allergy.items.length - 1 }}</template></span>
+                <span
+                  v-else-if="patient.allergy?.status === 'unknown'"
+                  class="allergy-badge warn"
+                  title="尚未采集药物过敏史"
+                >? 过敏史未采集</span>
+              </div>
+              <div class="patient-meta">
+                {{ patient.gender }} · {{ patient.age }}岁 · {{ (patient.birth_date || '').slice(0, 7) }} · {{ patient.dept }}
+              </div>
             </div>
             <div class="card-badges">
               <el-tag size="small" type="success" round effect="light">{{ patient.visit_type }}</el-tag>

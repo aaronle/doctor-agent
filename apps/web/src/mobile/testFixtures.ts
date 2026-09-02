@@ -11,6 +11,8 @@ export const PATIENT = {
   name: '王某某',
   gender: '女',
   age: 58,
+  birth_date: '1968-03-15',
+  allergy: { status: 'confirmed' as const, items: ['青霉素'] },
   visit_type: '复诊',
   dept: '内分泌科',
   doctor: '李医生',

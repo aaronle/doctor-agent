@@ -39,11 +39,27 @@ const post = <T>(path: string, body: unknown) =>
 
 // ------------------------------------------------------------------ 类型
 
+/**
+ * 药物过敏史。**状态和过敏原绑在一个对象里，不拆成两个平级字段。**
+ *
+ * 拆开的话总有一处会只读 items 就下结论 —— 空列表既可能是「问过、没有」，
+ * 也可能是「没人问过」，而这两者在门诊完全不同。绑在一起，
+ * 拿到 items 时必然也拿到了 status。
+ */
+export interface Allergy {
+  /** confirmed=有明确过敏原　denied=问过且否认　unknown=没人问过 */
+  status: 'confirmed' | 'denied' | 'unknown'
+  items: string[]
+}
+
 export interface PatientListItem {
   id: string
   name: string
   gender: string
   age: number
+  /** `YYYY-MM-DD`，服务端由身份证号推导。界面只显示到月。 */
+  birth_date: string
+  allergy: Allergy
   visit_type: string
   dept: string
   doctor: string

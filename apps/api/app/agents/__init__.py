@@ -11,7 +11,7 @@ from .diagnosis import DiagnosisAgent
 from .record import RECORD_SECTIONS, SECTION_KEYS, SECTION_LABELS, RecordAgent, RecordFieldAgent
 from .risk import RiskAgent, hard_rule_alerts, merge_risks
 from .summary import SummaryAgent
-from .voice import VoiceCoverageAgent, VoicePlanAgent, VoiceSummaryAgent
+from .voice import VoiceSummaryAgent
 
 summary_agent = SummaryAgent()
 record_agent = RecordAgent()
@@ -19,9 +19,7 @@ record_field_agent = RecordFieldAgent()
 diagnosis_agent = DiagnosisAgent()
 risk_agent = RiskAgent()
 comorbidity_agent = ComorbidityAgent()
-voice_plan_agent = VoicePlanAgent()
 voice_summary_agent = VoiceSummaryAgent()
-voice_coverage_agent = VoiceCoverageAgent()
 
 # 供健康接口与运行控制台展示的岗位清单
 AGENT_REGISTRY: tuple[tuple[str, str, str], ...] = (
@@ -30,8 +28,6 @@ AGENT_REGISTRY: tuple[tuple[str, str, str], ...] = (
     ("diagnosis", "诊断智能体", diagnosis_agent.version),
     ("risk", "风险管理智能体", risk_agent.version),
     ("comorbidity", "共病管理智能体", comorbidity_agent.version),
-    # 指向 voice_summary_agent —— 它才是产品路径上真正在跑的那个（问诊小结）。
-    # voice_plan_agent（追问清单与补充观察）一期已撤，见 emr.py 的 voice_init。
     ("voice", "语音问诊智能体", voice_summary_agent.version),
 )
 
@@ -58,6 +54,4 @@ __all__ = [
     "risk_agent",
     "summary_agent",
     "voice_summary_agent",
-    "voice_plan_agent",
-    "voice_coverage_agent",
 ]

@@ -98,7 +98,7 @@ async function renderFloat() {
  * 绕过它的话，哪天开关坏了这批用例照样全绿。
  */
 async function expandAssistant(wrapper: VueWrapper) {
-  const toggle = wrapper.find('.assistant-toggle')
+  const toggle = wrapper.find('.assistant-handle')
   if (toggle.exists() && !wrapper.find('.tips-drawer').exists()) {
     await toggle.trigger('click')
     await wrapper.vm.$nextTick()
@@ -125,16 +125,20 @@ describe('浮层重新唤出', () => {
     expect(wrapper.find('.ai-float-btn').exists()).toBe(false)
     expect(wrapper.find('.solo-tips-open-btn').exists()).toBe(false)
 
-    // 开关做成整块卡片而不是 ‹ › 小箭头：它要表达「AI 助手是医生智能体的延伸」，
-    // 而且医生第一次用时得看得出那里可以点。
-    const toggle = wrapper.find('.assistant-toggle')
+    // 2026-09-03：开关从整块卡片改成面板左边线中间的抽屉把手。
+    //
+    // 那张卡片占三行、还带一段说明文字 —— 把「一个开关」做成了首屏最大的一块内容，
+    // 医生每次进来先读三行，读完才发现它只是个展开按钮。把手靠**位置**表达
+    // 「这边能拉开」，是抽屉的通用形态，不需要文字解释。
+    const toggle = wrapper.find('.assistant-handle')
     expect(toggle.exists()).toBe(true)
-    expect(toggle.text()).toContain('AI 助手')
     expect(toggle.classes()).not.toContain('expanded')
+    // 没有文字了，可读性靠 aria-label / title 承担 —— 屏幕阅读器和悬停提示都要有
+    expect(toggle.attributes('aria-label')).toContain('AI 助手')
 
     await toggle.trigger('click')
     expect(wrapper.find('.tips-drawer').exists()).toBe(true)
-    expect(wrapper.find('.assistant-toggle').classes()).toContain('expanded')
+    expect(wrapper.find('.assistant-handle').classes()).toContain('expanded')
   })
 
   it('一进来 AI 助手是收起的 —— 问诊前不该先把结论摆出来', async () => {
@@ -149,9 +153,10 @@ describe('浮层重新唤出', () => {
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
 
     expect(wrapper.find('.tips-drawer').exists()).toBe(false)
-    const toggle = wrapper.find('.assistant-toggle')
+    const toggle = wrapper.find('.assistant-handle')
     expect(toggle.exists()).toBe(true)
-    expect(toggle.text()).toContain('问诊后自动展开')
+    // 收起态箭头指向左边 —— 指的是「抽屉会从这边拉出来」
+    expect(toggle.text()).toContain('‹')
   })
 
   it('抽屉和面板都关 → 显示圆形 AI 钮', async () => {
@@ -904,5 +909,92 @@ describe('AI 助手收起时的空状态', () => {
     const wrapper = await renderFloat()
     expect(wrapper.find('.tips-drawer').exists()).toBe(true)
     expect(wrapper.find('.assistant-placeholder').exists()).toBe(false)
+  })
+})
+
+// ================================================================ 患者信息行与过敏标记
+
+/** 直接往 store 里放一位患者，绕开接口 —— 这批用例测的是渲染分支，不是取数 */
+async function renderWithPatient(allergy: { status: string; items: string[] }) {
+  stubFetch()
+  const pinia = createPinia()
+  const wrapper = mount(AiEmrFloat, {
+    global: { plugins: [pinia, router, ElementPlus] },
+    attachTo: document.body,
+  })
+  await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+
+  const ws = useWorkstation()
+  ws.patient = {
+    id: 'P001', name: '王某某', gender: '女', age: 58,
+    birth_date: '1968-03-15', allergy,
+    visit_type: '复诊', dept: '内分泌科', doctor: '李医生', visit_date: '2026-06-17',
+    chief_complaint: '血糖控制不佳', primary_diagnosis: '2型糖尿病', risk_level: '高风险',
+    id_no: '', phone: '', is_return_visit: true, pre_consultation_done: true,
+    nutrition_screening_score: 0,
+  } as never
+  await wrapper.vm.$nextTick()
+  return wrapper
+}
+
+describe('患者信息行', () => {
+  it('一行显示完：性别 · 年龄 · 出生年月 · 就诊号', async () => {
+    const wrapper = await renderWithPatient({ status: 'denied', items: [] })
+    const meta = wrapper.find('.patient-tab-meta').text()
+    expect(meta).toBe('女 · 58岁 · 1968-03 · P001')
+  })
+
+  it('出生年月只到月 —— 门诊核对身份用不到日，写全会把这一行挤爆', async () => {
+    const wrapper = await renderWithPatient({ status: 'denied', items: [] })
+    expect(wrapper.find('.patient-tab-meta').text()).not.toContain('1968-03-15')
+  })
+
+  it('身份证号不出现在界面上', async () => {
+    const wrapper = await renderWithPatient({ status: 'denied', items: [] })
+    expect(wrapper.text()).not.toMatch(/\d{17}[\dX]/)
+  })
+})
+
+describe('过敏标记', () => {
+  it('有过敏史 → 红标，并且写出过敏原是什么', async () => {
+    const wrapper = await renderWithPatient({ status: 'confirmed', items: ['青霉素'] })
+    const badge = wrapper.find('.allergy-badge')
+    expect(badge.exists()).toBe(true)
+    expect(badge.classes()).toContain('danger')
+    // 只写「有过敏」等于没说 —— 医生还得再点一次才知道是什么
+    expect(badge.text()).toContain('青霉素')
+  })
+
+  it('多个过敏原 → 首个 + 计数，完整清单进 title', async () => {
+    const wrapper = await renderWithPatient({ status: 'confirmed', items: ['青霉素', '磺胺', '头孢'] })
+    const badge = wrapper.find('.allergy-badge')
+    expect(badge.text()).toContain('青霉素')
+    expect(badge.text()).toContain('+2')
+    expect(badge.attributes('title')).toContain('磺胺')
+  })
+
+  it('已明确否认 → 不给任何标记，干净就是信息', async () => {
+    const wrapper = await renderWithPatient({ status: 'denied', items: [] })
+    expect(wrapper.find('.allergy-badge').exists()).toBe(false)
+  })
+
+  it('未采集 → 黄标，**不是无标记**', async () => {
+    // 这是整件事的重点：「问过、没有」和「没人问过」不能显示成同一个样子。
+    // 合并的话，医生看到的是「这个人不过敏」，而事实是从来没有人问过。
+    const wrapper = await renderWithPatient({ status: 'unknown', items: [] })
+    const badge = wrapper.find('.allergy-badge')
+    expect(badge.exists()).toBe(true)
+    expect(badge.classes()).toContain('warn')
+    expect(badge.text()).toContain('未采集')
+  })
+
+  it('红色只留给过敏 —— 原来那个红色的「语」标记必须消失', async () => {
+    // 删它的理由有两条，任一条单独成立：
+    // ① 一期没有任何语音识别（全仓零行 SpeechRecognition），它标的模式不存在；
+    // ② 红色在本产品是临床风险语义（F06 明确禁止拿红色做别的用途）——
+    //    医生扫到患者名字旁边的红色，第一反应是找风险。
+    const wrapper = await renderWithPatient({ status: 'denied', items: [] })
+    expect(wrapper.find('.mode-badge.voice').exists()).toBe(false)
+    expect(wrapper.find('.copilot-tab-bar').text()).not.toContain('语')
   })
 })

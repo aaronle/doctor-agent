@@ -64,12 +64,47 @@ def hard_rule_alerts(ctx: dict) -> list[dict]:
     alerts: list[dict] = []
 
     # 1) 过敏冲突：在用医嘱命中过敏原
+    #
+    # 过敏史有**三种**状态，不是两种。这里以前只认两种，代价很具体：
+    # 判据是「allergies 非空就是有过敏」，于是空字符串 = 无过敏 = 放行。
+    # 而种子数据里七个患者有六个是空字符串 —— 那六个人从来没有人问过过敏史，
+    # 界面和硬规则却一致地把他们当成「不过敏」。**这条拦截在六分之六的情况下等于没装。**
+    #
+    # | 状态 | 含义 | 硬规则 |
+    # | --- | --- | --- |
+    # | `confirmed` | 有明确过敏原 | 与在用医嘱比对，命中即高风险 |
+    # | `denied` | 问过，患者否认 | 不产出任何项 —— 干净就是信息 |
+    # | `unknown` | **没人问过** | 中风险：提醒补采，但不阻断就诊 |
+    #
+    # 「问过、没有」和「没问过」在临床上是两件事，这个仓库在别处一直分得很清
+    # （安全层第 5 条「未问诊不写否认」、病历的「未采集」），唯独在过敏史上合并了。
+    status = str(ctx.get("allergy_status") or "").strip().lower()
     allergies = ctx.get("allergies")
-    allergy_terms = []
+    allergy_terms: list[str] = []
     if isinstance(allergies, list):
-        allergy_terms = [str(a) for a in allergies if a]
+        allergy_terms = [str(a).strip() for a in allergies if str(a).strip()]
     elif isinstance(allergies, str) and allergies.strip() and allergies.strip() not in {"无", "否认"}:
         allergy_terms = [allergies.strip()]
+
+    # 没有显式状态时按有没有过敏原倒推，保证老数据不至于突然全变「未采集」
+    if not status:
+        status = "confirmed" if allergy_terms else "unknown"
+
+    if status == "unknown":
+        alerts.append(
+            {
+                "id": "hard_allergy_unknown",
+                "name": "过敏史未采集",
+                "level": "中风险",
+                "color": "warning",
+                "summary": "本次就诊未采集药物过敏史，开具处方前需补问。",
+                "evidence": "患者档案中过敏史为空，且未记录「否认药物过敏史」",
+                "source": "硬规则 · 过敏史采集状态",
+                "threshold": "allergy_status = unknown 即触发",
+                "suggestion": "问诊时补采药物过敏史；确认无过敏后在档案中显式记录「否认药物过敏史」。",
+                "rule": "allergy_not_collected",
+            }
+        )
 
     for term in allergy_terms:
         for order in ctx.get("orders", []) or []:

@@ -22,9 +22,12 @@ router = APIRouter(prefix="/api/his", tags=["his"])
 # 候诊列表只回这些字段。患者全量对象含 lab_results、health_archive 等大字段，
 # 列表页用不到，回传只是白白放大响应体与泄露面。
 LIST_FIELDS = (
-    "id", "name", "gender", "age", "visit_type", "dept", "doctor",
+    "id", "name", "gender", "age", "birth_date", "visit_type", "dept", "doctor",
     "visit_date", "chief_complaint", "primary_diagnosis", "risk_level",
 )
+
+#: **`id_no` 不在列表里，也不该进。** 出生年月由它推导后落成 `birth_date`，
+#: 界面要的是出生年月，不是身份证号 —— 把身份证发到前端只是白白扩大泄露面。
 
 
 class OrderIn(StrictIn):
@@ -73,8 +76,30 @@ def _patient_or_404(session: Session, patient_id: str) -> Patient:
     return patient
 
 
+def allergy_view(payload: dict) -> dict:
+    """
+    过敏史的对外形状。**状态和过敏原一起给，不拆成两个平级字段。**
+
+    拆开的话，前端总有一处会只读 items 就下结论 —— 空列表既可能是「问过、没有」，
+    也可能是「没人问过」，而这两者在门诊是完全不同的两件事。包成一个对象，
+    调用方拿到 items 时必然也拿到了 status，想漏都漏不掉。
+    """
+    items = payload.get("allergies") or []
+    if isinstance(items, str):
+        items = [items.strip()] if items.strip() and items.strip() not in {"无", "否认"} else []
+    items = [str(a).strip() for a in items if str(a).strip()]
+    status = str(payload.get("allergy_status") or "").strip().lower()
+    if status not in {"confirmed", "denied", "unknown"}:
+        # 老数据没有显式状态：有过敏原就是 confirmed，没有只能算「没人问过」。
+        # **不能默认 denied** —— 那等于替医生认领了一次没发生过的问诊。
+        status = "confirmed" if items else "unknown"
+    return {"status": status, "items": items}
+
+
 def _list_view(patient: Patient) -> dict:
-    return {field: getattr(patient, field) for field in LIST_FIELDS}
+    view = {field: getattr(patient, field) for field in LIST_FIELDS}
+    view["allergy"] = allergy_view(patient.payload or {})
+    return view
 
 
 def _full_view(session: Session, patient: Patient) -> dict:
@@ -85,6 +110,8 @@ def _full_view(session: Session, patient: Patient) -> dict:
         "name": patient.name,
         "gender": patient.gender,
         "age": patient.age,
+        "birth_date": patient.birth_date,
+        "allergy": allergy_view(patient.payload or {}),
         "id_no": patient.id_no,
         "phone": patient.phone,
         "visit_type": patient.visit_type,

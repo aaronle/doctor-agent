@@ -4,7 +4,7 @@
     "name": "王某某",
     "gender": "女",
     "age": 58,
-    "id_no": "310101196603150028",
+    "id_no": "310101196803150021",
     "phone": "138****8001",
     "visit_type": "门诊",
     "dept": "内分泌科",
@@ -35,7 +35,7 @@
       }
     ],
     "past_history": "2型糖尿病控诊5年，血糖未达标，合并高血压、血脂异常等。UACR↑，NPDR轻度，病历近似偶服。",
-    "allergies": "",
+    "allergies": [],
     "nutrition_screening_score": 5,
     "vitals": {
       "bp": "142/88 mmHg",
@@ -657,14 +657,16 @@
     "has_fundus_exam": false,
     "has_retinopathy": true,
     "retinopathy_grade": "NPDR 轻度",
-    "primary_diagnosis": "2型糖尿病"
+    "primary_diagnosis": "2型糖尿病",
+    "birth_date": "1968-03-15",
+    "allergy_status": "denied"
   },
   {
     "id": "P002",
     "name": "张某",
     "gender": "男",
     "age": 45,
-    "id_no": "310101198105220031",
+    "id_no": "310101198105220036",
     "phone": "139****8002",
     "visit_type": "门诊",
     "dept": "心内科",
@@ -695,7 +697,9 @@
       }
     ],
     "past_history": "",
-    "allergies": "青霉素过敏",
+    "allergies": [
+      "青霉素"
+    ],
     "nutrition_screening_score": 2,
     "vitals": {
       "bp": "136/82 mmHg",
@@ -767,14 +771,16 @@
     "has_fundus_exam": false,
     "has_retinopathy": false,
     "retinopathy_grade": "",
-    "primary_diagnosis": "冠心病"
+    "primary_diagnosis": "冠心病",
+    "birth_date": "1981-05-22",
+    "allergy_status": "confirmed"
   },
   {
     "id": "P003",
     "name": "李某某",
     "gender": "女",
     "age": 32,
-    "id_no": "310101199402108821",
+    "id_no": "31010119940210882X",
     "phone": "137****8003",
     "visit_type": "门诊",
     "dept": "内分泌科",
@@ -800,7 +806,7 @@
       }
     ],
     "past_history": "甲状腺功能亢进1年，服用丙基硫氧嘧啶，甲功复查。",
-    "allergies": "",
+    "allergies": [],
     "nutrition_screening_score": 1,
     "vitals": {
       "bp": "118/72 mmHg",
@@ -898,14 +904,16 @@
     "has_fundus_exam": false,
     "has_retinopathy": false,
     "retinopathy_grade": "",
-    "primary_diagnosis": "甲亢"
+    "primary_diagnosis": "甲亢",
+    "birth_date": "1994-02-10",
+    "allergy_status": "denied"
   },
   {
     "id": "P004",
     "name": "陈某",
     "gender": "男",
     "age": 67,
-    "id_no": "310101195909240019",
+    "id_no": "310101195809240015",
     "phone": "136****8004",
     "visit_type": "门诊",
     "dept": "神经内科",
@@ -955,7 +963,7 @@
       }
     ],
     "past_history": "高血压10年，血压控制差；2型糖尿病8年，规律服药；近1年出现头晕症状。",
-    "allergies": "",
+    "allergies": [],
     "nutrition_screening_score": 4,
     "vitals": {
       "bp": "168/102 mmHg",
@@ -1051,14 +1059,16 @@
     "has_fundus_exam": false,
     "has_retinopathy": false,
     "retinopathy_grade": "",
-    "primary_diagnosis": "高血压"
+    "primary_diagnosis": "高血压",
+    "birth_date": "1958-09-24",
+    "allergy_status": "unknown"
   },
   {
     "id": "P005",
     "name": "刘某某",
     "gender": "女",
     "age": 52,
-    "id_no": "310101197304210044",
+    "id_no": "310101197404210044",
     "phone": "135****8005",
     "visit_type": "门诊",
     "dept": "内分泌科",
@@ -1090,7 +1100,7 @@
       }
     ],
     "past_history": "否认其他慢病史，家族有糖尿病史（父亲）。",
-    "allergies": "",
+    "allergies": [],
     "nutrition_screening_score": 2,
     "vitals": {
       "bp": "122/76 mmHg",
@@ -1139,14 +1149,16 @@
     "has_fundus_exam": false,
     "has_retinopathy": false,
     "retinopathy_grade": "",
-    "primary_diagnosis": "糖尿病"
+    "primary_diagnosis": "糖尿病",
+    "birth_date": "1974-04-21",
+    "allergy_status": "unknown"
   },
   {
     "id": "P006",
     "name": "赵某某",
     "gender": "男",
     "age": 72,
-    "id_no": "310101195408150017",
+    "id_no": "310101195308150011",
     "phone": "133****8006",
     "visit_type": "门诊",
     "dept": "神经内科",
@@ -1202,7 +1214,7 @@
       }
     ],
     "past_history": "高血压15年，血压控制不佳；2型糖尿病10年，口服降糖药；1年前TIA发作1次，未规律服用抗血小板药。",
-    "allergies": "",
+    "allergies": [],
     "nutrition_screening_score": 4,
     "vitals": {
       "bp": "158/96 mmHg",
@@ -1559,14 +1571,16 @@
     "has_fundus_exam": false,
     "has_retinopathy": false,
     "retinopathy_grade": "",
-    "primary_diagnosis": "脑梗死"
+    "primary_diagnosis": "脑梗死",
+    "birth_date": "1953-08-15",
+    "allergy_status": "denied"
   },
   {
     "id": "P007",
     "name": "周某某",
     "gender": "男",
     "age": 61,
-    "id_no": "310101196502080033",
+    "id_no": "310101196402080034",
     "phone": "132****8007",
     "visit_type": "门诊",
     "dept": "内分泌科",
@@ -1599,7 +1613,7 @@
       }
     ],
     "past_history": "2型糖尿病8年，近半年未规律复诊；高血压病史。",
-    "allergies": "",
+    "allergies": [],
     "nutrition_screening_score": 4,
     "vitals": {
       "bp": "156/94 mmHg",
@@ -1693,6 +1707,8 @@
     "has_fundus_exam": false,
     "has_retinopathy": false,
     "retinopathy_grade": "",
-    "primary_diagnosis": "2型糖尿病"
+    "primary_diagnosis": "2型糖尿病",
+    "birth_date": "1964-02-08",
+    "allergy_status": "denied"
   }
 ]

@@ -219,20 +219,29 @@ def test_consultation_creates_referral_with_reason(client):
 @pytest.mark.parametrize(
     ("label", "ctx", "expected_rule"),
     [
-        ("过敏冲突", {"allergies": ["青霉素"], "orders": [{"drug": "注射用青霉素钠"}]}, "allergy_conflict"),
-        ("血糖危急值", {"lab_results": [{"name": "空腹血糖", "value": "18.9"}]}, "critical_lab"),
-        ("血钾危急值", {"lab_results": [{"name": "血钾", "value": "6.4"}]}, "critical_lab"),
-        ("血压危象", {"vitals": {"bp": "195/115 mmHg"}}, "vital_threshold"),
-        ("低血氧", {"vitals": {"spo2": 88}}, "vital_threshold"),
+        # 每条都显式写 allergy_status —— 不写的话过敏史算「未采集」，
+        # 会额外产出一条中风险，而这些用例测的是各自那一条规则，不是过敏。
+        ("过敏冲突", {"allergy_status": "confirmed", "allergies": ["青霉素"], "orders": [{"drug": "注射用青霉素钠"}]}, "allergy_conflict"),
+        ("血糖危急值", {"allergy_status": "denied", "lab_results": [{"name": "空腹血糖", "value": "18.9"}]}, "critical_lab"),
+        ("血钾危急值", {"allergy_status": "denied", "lab_results": [{"name": "血钾", "value": "6.4"}]}, "critical_lab"),
+        ("血压危象", {"allergy_status": "denied", "vitals": {"bp": "195/115 mmHg"}}, "vital_threshold"),
+        ("低血氧", {"allergy_status": "denied", "vitals": {"spo2": 88}}, "vital_threshold"),
     ],
 )
 def test_hard_rules_fire_without_model(label, ctx, expected_rule):
     alerts = hard_rule_alerts(ctx)
     assert alerts, f"{label} 应触发硬规则"
-    assert all(a["level"] == "高风险" for a in alerts)
-    assert any(a["rule"] == expected_rule for a in alerts)
+
+    # **按规则筛，不要断言整张表都是高风险。**
+    # 原来写的是 `all(a["level"] == "高风险")` —— 那在硬规则只有三条、
+    # 恰好全是高风险时成立，但它把一个巧合当成了不变量。
+    # 加了中风险的「阳性检查结论」和「过敏史未采集」之后，这个断言必然崩，
+    # 而崩的方式是「测血钾的用例报过敏的错」，排查时完全指错方向。
+    hit = [a for a in alerts if a["rule"] == expected_rule]
+    assert hit, f"{label} 应触发 {expected_rule}，实际只有 {[a['rule'] for a in alerts]}"
+    assert all(a["level"] == "高风险" for a in hit)
     # 红色风险必须证据、来源、阈值、建议齐备
-    for alert in alerts:
+    for alert in hit:
         for field in ("evidence", "source", "threshold", "suggestion"):
             assert alert[field], f"{label} 的红色风险缺少 {field}"
 
@@ -241,7 +250,11 @@ def test_hard_rules_silent_when_all_normal():
     ctx = {
         "vitals": {"bp": "120/78 mmHg", "hr": 72, "temp": 36.5, "spo2": 98},
         "lab_results": [{"name": "空腹血糖", "value": "5.4"}],
-        "allergies": "无",
+        # 原来这里写的是 `"allergies": "无"` —— 靠魔法字符串表达「没有过敏」，
+        # 而「无」和「没人问过」在这个字符串里是分不开的。
+        # 状态改成显式字段之后，「一切正常」的定义里就包含了「过敏史问过、是阴性」。
+        "allergy_status": "denied",
+        "allergies": [],
     }
     assert hard_rule_alerts(ctx) == []
 
@@ -2523,3 +2536,111 @@ def test_abnormal_examination_risks_are_yellow_not_red(client):
     # 顶部红色预警条不该被这些项冲淡
     _, red_bar, _ = merge_risks(hard, [])
     assert not [a for a in red_bar if a["id"].startswith("hard_exam_")]
+
+
+# ================================================================ 出生年月与过敏史
+
+
+def test_every_patient_birth_date_agrees_with_their_age(client):
+    """
+    出生年月与年龄必须自洽。
+
+    这条测试的由来：把出生年月加进患者信息行时，顺手核了一遍身份证 ——
+    **七个患者里五个对不上**，P001 差 2 岁。它一直没被发现，因为身份证号
+    从来不显示在界面上，两个数字没有机会被放在一起看。
+    现在它们紧挨着显示（`58岁 · 1968-03`），这道减法谁都会做。
+    """
+    from datetime import date
+
+    for row in client.get("/api/his/patients").json():
+        y, m, d = (int(x) for x in row["birth_date"].split("-"))
+        ref = date.fromisoformat(row["visit_date"])
+        age_at_visit = ref.year - y - ((ref.month, ref.day) < (m, d))
+        assert age_at_visit == row["age"], (
+            f"{row['id']} {row['name']}：出生 {row['birth_date']}，"
+            f"就诊日 {row['visit_date']} 应为 {age_at_visit} 岁，档案写的是 {row['age']} 岁"
+        )
+
+
+def test_id_card_number_never_reaches_the_patient_list(client):
+    """出生年月推导完就够了，身份证号不该发到前端 —— 界面要的是前者。"""
+    for row in client.get("/api/his/patients").json():
+        assert "id_no" not in row
+
+
+def test_allergy_unknown_is_not_the_same_as_denied(client):
+    """
+    「问过、患者否认」和「没人问过」是两件事，接口必须分得开。
+
+    合并的代价是具体的：合并之前硬规则的判据是「allergies 非空 = 有过敏」，
+    于是空字符串被当成无过敏放行 —— 而七个种子患者里有六个是空字符串。
+    **那条过敏拦截在六分之六的患者上等于没装**，而且界面还一致地显示「无过敏」。
+    """
+    from app.routers.his import allergy_view
+
+    assert allergy_view({"allergy_status": "denied", "allergies": []})["status"] == "denied"
+    assert allergy_view({"allergy_status": "unknown", "allergies": []})["status"] == "unknown"
+    assert allergy_view({"allergy_status": "confirmed", "allergies": ["青霉素"]}) == {
+        "status": "confirmed", "items": ["青霉素"],
+    }
+
+
+def test_missing_allergy_status_falls_back_to_unknown_not_denied(client):
+    """
+    老数据没有显式状态时，**只能当「没人问过」**。
+
+    默认成 denied 就是替医生认领了一次没发生过的问诊 —— 那正是安全层第 5 条
+    （未问诊不写否认）禁止的事，只不过这次是代码替模型犯的。
+    """
+    from app.routers.his import allergy_view
+
+    assert allergy_view({})["status"] == "unknown"
+    assert allergy_view({"allergies": []})["status"] == "unknown"
+    # 有过敏原、但没记状态 → 显然是有过敏
+    assert allergy_view({"allergies": ["磺胺"]})["status"] == "confirmed"
+
+
+def test_seed_actually_contains_all_three_allergy_states(client):
+    """
+    三态在演示数据里都要出现。
+
+    少了任何一种，那一支界面分支就没人见过 —— 尤其是「未采集」，
+    它是这次改动的全部意义所在，不能只活在代码里。
+    """
+    # **查库，不查候诊队列。**
+    # `/api/his/patients` 只回 in_queue 的人，而前面的用例提交病历会把患者移出队列 ——
+    # 单跑绿、全量跑红，报的还是「种子里没有 confirmed」，指向完全错误的方向。
+    # 这条测的是种子内容，判据就该落在种子上。
+    from app.database import SessionLocal
+    from app.models import Patient
+    from app.routers.his import allergy_view
+
+    with SessionLocal() as session:
+        states = {
+            allergy_view(p.payload or {})["status"]
+            for p in session.query(Patient).all()
+        }
+    assert states == {"confirmed", "denied", "unknown"}, f"种子里只有 {states}"
+
+
+def test_uncollected_allergy_history_raises_a_yellow_flag_not_a_red_one(client):
+    """
+    未采集 → 中风险，不是高风险。
+
+    判红会阻断提交。拿「过敏史还没问」挡住医生下班，一周之内他就会学会
+    绕过阻断，那时真正该拦的红色也拦不住了。这里只要求他看见并补问。
+    """
+    from app.agents.context import build_context
+    from app.agents.risk import hard_rule_alerts
+    from app.database import SessionLocal
+    from app.models import Patient
+
+    with SessionLocal() as session:
+        unknown_ctx = build_context(session, session.get(Patient, "P004"))
+        denied_ctx = build_context(session, session.get(Patient, "P001"))
+
+    hits = [a for a in hard_rule_alerts(unknown_ctx) if a["rule"] == "allergy_not_collected"]
+    assert len(hits) == 1 and hits[0]["level"] == "中风险"
+
+    # 已否认的不该产出任何过敏项 —— 干净就是信息
+    assert not [a for a in hard_rule_alerts(denied_ctx) if a["rule"].startswith("allergy")]

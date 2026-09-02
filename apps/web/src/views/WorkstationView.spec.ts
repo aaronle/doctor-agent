@@ -12,6 +12,7 @@ const PATIENT = {
   id: 'P001', name: '王某某', gender: '女', age: 58, visit_type: '复诊', dept: '内分泌科',
   doctor: '李医生', visit_date: '2026-06-17', chief_complaint: '血糖控制不佳',
   primary_diagnosis: '2型糖尿病', risk_level: '高风险',
+  birth_date: '1968-03-15', allergy: { status: 'unknown' as const, items: [] },
   id_no: '', phone: '', is_return_visit: true, pre_consultation_done: true,
   nutrition_screening_score: 1,
   lab_results: [

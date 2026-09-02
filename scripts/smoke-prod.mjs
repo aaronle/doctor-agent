@@ -25,7 +25,7 @@ const CHECKS = [
   { path: '/outpatient/list', must: ['.his-list-page', '.patient-card'], name: '候诊列表' },
   {
     path: '/outpatient/P002',
-    must: ['.workstation-page', '.his-header', '.demo-badge', '.assistant-panel', '.assistant-toggle'],
+    must: ['.workstation-page', '.his-header', '.demo-badge', '.assistant-panel', '.assistant-handle'],
     // AI 助手默认收起，抽屉这时**不该**在
     mustNot: ['.tips-drawer', '.workstation-body', '.his-orders-panel'],
     name: '门诊工作站',
