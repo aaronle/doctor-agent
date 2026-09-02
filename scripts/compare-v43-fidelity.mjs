@@ -470,8 +470,17 @@ for (const target of PAGES) {
   // 等页面骨架，不等网络 —— 分析是后台慢慢回来的，不该卡住导航
   await appPage.locator(target.path.includes('/list') ? '.his-list-page' : '.workstation-page')
     .first().waitFor({ state: 'visible', timeout: 30000 });
-  // 工作站首屏要等四个岗位跑完，给足时间
-  await appPage.waitForTimeout(target.path.includes('/outpatient/P') ? 25000 : 2000);
+  // 工作站首屏要等四个岗位跑完。
+  //
+  // **不要在这里写死秒数。** 原来是 `waitForTimeout(25000)`，那个数字是
+  // Haiku 时代量出来的；换 Sonnet 后 report-summary 要 61 秒，于是
+  // 「门诊工作站」这一屏的鉴别诊断与风险提示共十四个元素被判成缺失 ——
+  // 而它们只是还没渲染。这个场景没有 prepare，所以 settle() 也没跑到。
+  //
+  // 判据放主循环里而不是各场景的 prepare 里：靠每个场景自己记得调，
+  // 迟早漏一个 —— 上一轮漏的就是这一个。
+  await settle(appPage);
+  await appPage.waitForTimeout(target.path.includes('/outpatient/P') ? 1200 : 800);
 
   // 两边各自「准备完立刻采集」，不能先准备两边再一起采：
   // 原件的问诊浮层约 7 秒后随播放结束消失，而重建版要等真实模型返回，
