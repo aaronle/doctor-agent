@@ -2292,3 +2292,44 @@ def test_backfill_never_invents_a_denial_when_the_master_record_is_empty():
     )
     assert out["fields"]["past_history"] == "高血压 3 年"
     assert "否认" not in out["fields"]["past_history"]
+
+
+def test_record_rules_exist_in_both_copies_of_the_prompt():
+    """
+    病历的临床红线**有两份拷贝**，必须都写着同样的话。
+
+    产品路径 `/api/emr/*` 跑的是 `app/agents/record.py` 的 `role_prompt`；
+    编排层跑的是 `skills/record-generation/SKILL.md`。两边是同一个岗位的
+    同一份临床要求，但物理上是两个文件 —— 只改一处就会出现「修好的那条路
+    没人走，走的那条路还是坏的」。
+
+    2026-09-02 就发生过：把「既往史来自主档」补进了 role_prompt，
+    SKILL.md 里那份忘了，同样的缺口原封不动留着。
+
+    这条测试不比对措辞（两边的读者不同，本来就该有差异），
+    只要求这几条红线在两份里都能找到。
+    """
+    from app.agents import record_agent
+    from app.orchestration import load_all_skills
+
+    code_prompt = record_agent.role_prompt
+    skill_body = load_all_skills()["record-generation"].body
+
+    # 每一条都是真出过事的那一类，不是凑数的
+    required = {
+        "既往史来自主档": "主档",
+        "不写关于病历本身的话": "不写关于这份病历本身的话",
+        "辅助检查不许没有主语": "未见异常",
+        "未问诊不写否认": "否认",
+    }
+    for rule, keyword in required.items():
+        assert keyword in code_prompt, f"role_prompt 里缺「{rule}」（找不到 {keyword!r}）"
+        assert keyword in skill_body, f"SKILL.md 里缺「{rule}」（找不到 {keyword!r}）"
+
+
+def test_record_skill_is_still_wired_to_the_record_worker():
+    """上一条只有在这份 skill 真的挂在病历 worker 上时才有意义。"""
+    from app.orchestration import load_all_agents
+
+    _master, workers = load_all_agents()
+    assert "record-generation" in workers["record"].skills
