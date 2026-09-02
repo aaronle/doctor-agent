@@ -101,6 +101,7 @@ npm run extract       # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM 
 | **新增埋点** | `docs/product/13-日志与可观测性说明.md` 的埋点表；新字段若可能含正文，必须加进 `obs.py` 的 `_REDACTED` |
 | **新增界面** | 还要给 `extract-v43-dom.mjs` 加采集态、给 `compare-v43-fidelity.mjs` 加场景 —— 否则它落在门禁外。**例外**：`/admin` 与 `/delivery` 不在 V4.3 原件里，两道界面闸不比它们，靠单测守 |
 | **交付平台** | `docs/product/16-交付平台-CICD需求规格说明书.md` + `apps/web/src/views/DeliveryView.spec.ts` + `apps/api/tests/test_delivery.py` |
+| **标志 / 分享卡片** | 改 `design/logo/logo.mjs` 后跑 `npm run logo`；文案改 `app/seo.py` + `apps/api/tests/test_seo.py`。**不要手改 `apps/web/public/` 下的产物** |
 | API 形状 | `docs/product/08-V4.3界面基准与后端API契约.md` + `apps/api/tests/test_api.py` + 重跑 `contracts:export` |
 | Agent 输出结构 | 规格里该岗位的输出约束 + 对应校验测试 |
 | 安全红线 | 规格第 7 节 + 一条能失败的测试（红线没有测试等于没有红线） |
@@ -171,7 +172,42 @@ doctor-agent/
 
 改动界面后跑 `node scripts/compare-v43-fidelity.mjs` 做数值回归（需先起 `npm run dev`）。
 
-## 4.1 设计资产
+## 4.1 标志与分享卡片
+
+标志方案 **F1「气泡里的听诊器」**：对话气泡是这个产品「落地即对话」的前提，
+听诊器是临床，两件事合成一个形，且避开了满大街的医疗十字。
+
+**唯一定义源是 `design/logo/logo.mjs`。** 改它，然后：
+
+```sh
+npm run logo    # 重新生成 apps/web/public/ 下的全部图标与分享图
+```
+
+`apps/web/public/` 下的 PNG 全是产物，**手改会在下次重跑时丢失**，
+而且会和 SVG 悄悄不一致。
+
+选型时试过六个方向，成图之后砍掉了四个（记在 `design/logo/png/全部候选对照.png`）：
+「白大褂领口」读成了钥匙孔，「医字几何化」读成了字母 E，
+「十字+心电波」的心电波在成图里根本看不见。**描述里成立不等于渲出来成立。**
+
+### 分享卡片按路由变
+
+`apps/api/app/seo.py` 在下发 index.html 时按路由替换 `<!--SEO:START-->`
+到 `<!--SEO:END-->` 之间的整块，让 `/`、`/admin`、`/delivery` 各是一张卡片。
+
+**必须在服务端做**：微信这类爬虫不执行 JavaScript，Vue 注入的 title/og 它们读不到。
+
+两个容易踩的点：
+
+- **`og:image` 给方图不给横图。** 微信把卡片图裁成正方形，1200×630 会被拦腰切掉。
+  横版 `og-cover.png` 留给别的平台，不进 og:image。
+- **标记被删不会报错**，只会退化成所有页面共用一张卡片。所以除了单测，
+  部署脚本还会实打实地比对线上 `/` 与 `/admin` 的 `<title>` 是否不同。
+
+能保证的是「按规范把该给的都给全」；**不能保证微信一定照着显示** ——
+那需要公众号 + JS-SDK 签名，这套凭据项目里没有。
+
+## 4.2 设计资产
 
 Figma：**AI 门诊工作站 · 一期设计系统**
 `https://www.figma.com/design/c79Yrkq4MOgwjN3dulIvO7`

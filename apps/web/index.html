@@ -4,7 +4,33 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <title>AI 门诊工作站</title>
+
+    <!--
+      图标由 `npm run logo` 从 design/logo/logo.mjs 生成，不要手改 public/ 下的产物。
+      SVG 排在最前：支持它的浏览器优先用，任何尺寸都清晰；32px 那张是兜底。
+    -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!--
+      下面这一整块由服务端按路由替换（apps/api/app/seo.py），
+      让 / 、/admin、/delivery 各有各的标题与描述。
+
+      **两个标记不能删、不能改。** 微信等爬虫不执行 JS，Vue 注入的 meta 它们读不到；
+      这是唯一能被抓到的地方。标记没了就退化成所有页面共用同一张卡片，
+      而且不会报错 —— 部署脚本因此专门比对了 / 与 /admin 的标题是否不同。
+    -->
+    <!--SEO:START-->
+    <title>Doctor Agent · AI 门诊工作站</title>
+    <meta name="description" content="医生超级智能体：语音问诊、病历生成、鉴别诊断、风险与共病管理。演示环境，全部为虚构病例，不含真实患者数据。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Doctor Agent" />
+    <meta property="og:title" content="Doctor Agent · AI 门诊工作站" />
+    <meta property="og:description" content="医生超级智能体：语音问诊、病历生成、鉴别诊断、风险与共病管理。演示环境，全部为虚构病例，不含真实患者数据。" />
+    <meta property="og:image" content="https://da.aaronhealth.cn/share-square.png" />
+    <meta itemprop="image" content="https://da.aaronhealth.cn/share-square.png" />
+    <!--SEO:END-->
   </head>
   <body>
     <div id="app"></div>

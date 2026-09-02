@@ -21,7 +21,8 @@
     "verify": "node scripts/verify.mjs",
     "coverage": "node scripts/check-v43-coverage.mjs",
     "verify:legacy": "npm run test:all && npm run build && npm run contracts:export && npm run fidelity && npm run coverage",
-    "deploy": "node scripts/deploy.mjs"
+    "deploy": "node scripts/deploy.mjs",
+    "logo": "node design/logo/build-assets.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

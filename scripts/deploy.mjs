@@ -181,6 +181,25 @@ for (const [name, path] of CHECKS) {
   console.log(`  ${ok ? '✓' : '✗'} ${name.padEnd(11)} ${code || '—'}  ${path}${retried}`);
 }
 
+// ── 5b. 分享卡片的 meta 真的按路由变了吗 ───────────────────────────────────
+//
+// 这一步查的是**一个不会报错的失效**：构建把 index.html 里的 SEO 标记吃掉之后，
+// 注入静默退化成「所有页面共用同一张卡片」，页面本身完全正常、状态码全 200。
+// 只有比对两条路径的 title 才看得出来。
+{
+  const titleOf = async (p) => {
+    try {
+      const html = await (await fetch(`${PUBLIC}${p}`, { signal: AbortSignal.timeout(20000) })).text();
+      return (html.match(/<title>(.*?)<\/title>/) || [, ''])[1];
+    } catch { return ''; }
+  };
+  const [home, admin] = await Promise.all([titleOf('/'), titleOf('/admin')]);
+  const ok = home && admin && home !== admin;
+  if (!ok) bad += 1;
+  log.push([stamp(), `分享卡片  ${ok ? '按路由生效' : '未按路由生效'}：/ = ${home || '空'}｜/admin = ${admin || '空'}`, ok ? 'ok' : 'err']);
+  console.log(`  ${ok ? '✓' : '✗'} 分享卡片    / = ${home || '(空)'}  |  /admin = ${admin || '(空)'}`);
+}
+
 // ── 6. 不能伤到邻居 ────────────────────────────────────────────────────────
 // 同机还有 aits(3100) 与个人站(3200)。禁止 compose down、禁止 prune -a。
 const neighbours = sshRun(

@@ -14,9 +14,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -31,6 +31,7 @@ from .routers import emr as emr_router
 from .routers import his as his_router
 from .routers import orchestration as orchestration_router
 from .seed import seed_database
+from .seo import inject
 from .obs import event
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -142,9 +143,17 @@ if WEB_DIST.is_dir():
     app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
-    def spa_fallback(path: str) -> FileResponse:
+    def spa_fallback(path: str) -> Response:
         candidate = WEB_DIST / path
         if path and candidate.is_file():
             return FileResponse(candidate)
-        # history 模式：未匹配路径一律回 index.html，由前端路由接管
-        return FileResponse(WEB_DIST / "index.html")
+
+        # history 模式：未匹配路径一律回 index.html，由前端路由接管。
+        #
+        # 回之前按路由把分享用的 meta 换掉（见 seo.py）：微信这类爬虫不执行 JS，
+        # 前端注入的 title/og 它们读不到，只有这里下发的静态 HTML 算数。
+        #
+        # 每次读盘而不是启动时缓存：这条路径的开销相对于整页加载可以忽略，
+        # 而缓存会让「改了 index.html 但没重启」变成一个查起来很费劲的问题。
+        html = (WEB_DIST / "index.html").read_text(encoding="utf-8")
+        return HTMLResponse(inject(html, path))
