@@ -239,6 +239,66 @@ class OperationLog(Base):
     error_code: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+class DeliveryRun(Base):
+    """
+    一次交付流水线运行。两条线共用这张表，靠 `lane` 区分。
+
+    **功能线与智能体线并排、不合并**，理由见
+    `docs/product/16-交付平台-CICD需求规格说明书.md` §1：阶段名看着一样，
+    但失败的含义完全不同 —— 功能线失败是「构建挂了」，一眼看得见；
+    智能体线失败是「输出退化了」，测试照样全绿。
+
+    但它们的**记录结构**是一样的（一串有序阶段，各有状态与耗时），
+    所以存一张表、查询时按 lane 分开。共用结构不等于共用判定。
+
+    `stages` 用 JSON 而不是拆子表：阶段是整体替换的（每次上报覆盖当前快照），
+    从来不需要单独查某一个阶段，拆表只会换来一次 join。
+    """
+
+    __tablename__ = "delivery_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    #: 上报方生成的幂等键。功能线用提交号，智能体线用 `<agent_key>@<草稿哈希>`。
+    #: 同一个 key 重复上报是更新而不是新增 —— 部署脚本会分多次上报同一次运行。
+    run_key: Mapped[str] = mapped_column(String(96), unique=True, index=True)
+    lane: Mapped[str] = mapped_column(String(16), index=True)  # feature | agent
+    title: Mapped[str] = mapped_column(String(255), default="")
+    subtitle: Mapped[str] = mapped_column(Text, default="")
+    #: running | passed | failed | deployed | blocked
+    status: Mapped[str] = mapped_column(String(16), default="running", index=True)
+    #: [{name, status, detail, elapsed_ms, note}]，有序
+    stages: Mapped[list] = mapped_column(JSON, default=list)
+    #: 提交号、分支、改动文件、构建日志尾部等
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class FeatureRelease(Base):
+    """
+    功能制品的发布记录。
+
+    **只存功能线。** 智能体线的发布记录已经在 `agent_versions` 里
+    （`status=published` + `published_at`），再存一份就会有两个真相，
+    而且回滚走的是 `agent_versions` 那条路径 —— 复制过来的那份必然过期。
+    发布历史接口在查询时把两边合成一条时间线，见 `routers/delivery.py`。
+    """
+
+    __tablename__ = "feature_releases"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    commit: Mapped[str] = mapped_column(String(40), index=True)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    detail: Mapped[str] = mapped_column(Text, default="")
+    image: Mapped[str] = mapped_column(String(128), default="")
+    #: current | superseded | rolled_back
+    status: Mapped[str] = mapped_column(String(16), default="current", index=True)
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)
+    released_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class EvalDatasetState(Base):
     """
     评测数据集的启停状态。

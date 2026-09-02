@@ -35,6 +35,23 @@ describe('路由 · 一期无登录', () => {
     expect(router.currentRoute.value.path).toBe('/admin')
   })
 
+  it('交付平台可直达，与控制台同口径', async () => {
+    await router.push('/delivery')
+    expect(router.currentRoute.value.path).toBe('/delivery')
+    expect(document.title).toContain('交付平台')
+  })
+
+  it('交付平台不占用 V4.3 定义的五个医生端页面', () => {
+    // /delivery 与 /admin 一样，是面向研发与调优的页面。
+    // 一旦挂到 /outpatient/* 下面，还原度与类名覆盖率两道闸就会开始比它 ——
+    // 而它压根不在 V4.3 原件里，比出来的「缺失」全是噪声。
+    const doctorPages = router.getRoutes()
+      .map((r) => r.path)
+      .filter((p) => p.startsWith('/outpatient'))
+    expect(doctorPages).not.toContain('/delivery')
+    expect(doctorPages.some((p) => p.includes('delivery'))).toBe(false)
+  })
+
   it('页面标题跟着路由走', async () => {
     await router.push('/outpatient/manage')
     expect(document.title).toContain('患者管理')

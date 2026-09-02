@@ -372,6 +372,106 @@ export interface EvalResult {
   datasets?: { id: string; name: string; case_count: number }[]
 }
 
+// ------------------------------------------------------------------ 交付平台
+
+export type DeliveryLane = 'feature' | 'agent'
+export type StageStatus = 'idle' | 'running' | 'passed' | 'failed' | 'skipped'
+
+export interface DeliveryStage {
+  name: string
+  status: StageStatus
+  detail: string
+  elapsed_ms: number
+  note?: string
+}
+
+/** 门禁逐项。粒度比 stage 细：一个 stage 下可以有多个门禁。 */
+export interface DeliveryGate {
+  key: string
+  label: string
+  stage: string
+  ok: boolean
+  detail: string
+  elapsed_ms: number
+}
+
+export interface DeliveryRun {
+  run_key: string
+  lane: DeliveryLane
+  title: string
+  subtitle: string
+  status: 'running' | 'passed' | 'failed' | 'deployed' | 'blocked'
+  stages: DeliveryStage[]
+  meta: {
+    commit?: string
+    branch?: string
+    subject?: string
+    dirty_files?: number
+    diffstat?: string
+    gates?: DeliveryGate[]
+    /** 构建/部署日志尾部。[时刻, 内容, 语气] */
+    log?: [string, string, 'dim' | 'ok' | 'err' | 'fix'][]
+    /** 智能体线：回归集未过的条目及其原因 */
+    regressions?: { case: string; reason: string }[]
+    pass_rate?: { passed: number; total: number }
+    [k: string]: unknown
+  }
+  started_at: string | null
+  updated_at: string | null
+}
+
+export interface DeliveryPipelines {
+  lanes: Record<DeliveryLane, DeliveryRun | null>
+  deploy_executor: string
+  deploy_note: string
+}
+
+export interface DeliveryReleaseItem {
+  kind: DeliveryLane
+  ref: string
+  title: string
+  detail: string
+  status: 'current' | 'superseded' | 'rolled_back'
+  at: string | null
+  can_rollback: boolean
+  meta: Record<string, string>
+}
+
+export interface DeliveryReleases {
+  items: DeliveryReleaseItem[]
+  rollback_semantics: { feature: string; agent: string }
+}
+
+export interface DeliveryProduction {
+  from_image: {
+    release: string
+    commit: string
+    image: string
+    released_at: string | null
+    runtime_mode: string
+    write_back_mode: string
+    model_fast: string
+    model_smart: string
+    model_orchestration: string
+    ai: string
+    timeout_ms: number
+  }
+  from_database: {
+    agents: {
+      agent_key: string
+      label: string
+      version: string
+      model_tier: string
+      published_at: string | null
+      source: 'database' | 'code_default'
+    }[]
+    datasets_enabled: number
+    datasets_disabled: number
+  }
+  note: string
+  at: string
+}
+
 export const api = {
   config: () => get<RuntimeConfig>('/api/config'),
 
@@ -556,6 +656,19 @@ export const api = {
     get<{ note: string; categories: { name: string; count: number; items: { name: string; level: string; desc: string }[] }[] }>(
       '/api/emr/assessment-catalog',
     ),
+
+  // ---------------------------------------------------------------- 交付平台
+  //
+  // 只读。写入（上报、发布记录、功能回滚）要 X-Delivery-Token，由脚本在开发机上带，
+  // **不下发到浏览器** —— 前端拿得到的令牌等于没有令牌。
+  // 智能体回滚是唯一的例外：它走控制台既有的 /api/admin 路径（见 adminRollback），
+  // 不在这里另开一条。
+  deliveryPipelines: () => get<DeliveryPipelines>('/api/delivery/pipelines'),
+  deliveryRuns: (lane?: 'feature' | 'agent') =>
+    get<{ items: DeliveryRun[] }>(`/api/delivery/runs${lane ? `?lane=${lane}` : ''}`),
+  deliveryRun: (runKey: string) => get<DeliveryRun>(`/api/delivery/runs/${runKey}`),
+  deliveryReleases: () => get<DeliveryReleases>('/api/delivery/releases'),
+  deliveryProduction: () => get<DeliveryProduction>('/api/delivery/production'),
 
   comorbidityCheck: (id: string) =>
     post<{ ok: boolean; comorbidity: ReportSummary['comorbidity'] }>('/api/emr/comorbidity/check', { patient_id: id }),

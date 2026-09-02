@@ -25,6 +25,7 @@ from ..agent_config import MODEL_TIERS, TIER_LABELS, ResolvedConfig, prompt_hash
 from ..agents import AGENT_REGISTRY, PROMPT_BUNDLE_VERSION
 from ..agents import base as agent_base
 from ..audit import DEMO_ACTOR, record_audit
+from ..delivery_lane import record_agent_lane_run
 from ..agents.context import build_context
 from ..eval_datasets import active_cases, describe as describe_datasets, set_enabled, universal_checks
 from ..obs import event
@@ -52,6 +53,10 @@ AGENTS = {
     "comorbidity": comorbidity_agent,
     "voice": voice_plan_agent,
 }
+
+# 岗位中文名。名字只在注册表里有一份，Agent 实例上没有 `.name` ——
+# 想当然去取会得到 AttributeError，而那个异常会被交付平台写入处的兜底吞掉。
+AGENT_NAMES = {key: name for key, name, _v in AGENT_REGISTRY}
 
 # 岗位承载的产品功能，控制台总览要显示
 AGENT_TASKS = {
@@ -637,6 +642,26 @@ async def run_eval(agent_key: str, body: EvalIn, session: Session = Depends(get_
           failed_cases="|".join(r["case_id"] for r in rows if not r["passed"]),
           degraded_cases=sum(1 for r in rows if r.get("degraded")),
           version=config.version, source=config.source)
+    # 顺手把这次回归写进交付平台的智能体线。
+    #
+    # 在进程内直接写，不走 /api/delivery/runs 的上报接口 —— 那条接口是给
+    # **开发机上的脚本**用的，需要令牌是因为它从公网进来。同一个进程里再绕一圈
+    # HTTP、再配一次令牌，只会多一个能配错的地方。
+    #
+    # 写失败不能影响回归结果：人是来看通过率的，不是来看交付平台的。
+    try:
+        record_agent_lane_run(
+            session,
+            agent_key=agent_key,
+            label=AGENT_NAMES.get(agent_key, agent_key),
+            use=body.use,
+            config_version=config.version,
+            rows=list(rows),
+            datasets=ran_datasets,
+        )
+    except Exception as exc:  # noqa: BLE001
+        event("delivery_lane_write_failed", agent=agent_key, error=f"{type(exc).__name__}: {exc}")
+
     return {
         "total": len(rows),
         "passed": passed,

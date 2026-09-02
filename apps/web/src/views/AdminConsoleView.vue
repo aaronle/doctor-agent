@@ -47,6 +47,7 @@ onMounted(async () => {
       </div>
       <div class="admin-header-right">
         <el-button size="small" @click="loadOverview">刷新</el-button>
+        <el-button size="small" @click="$router.push('/delivery')">交付平台</el-button>
         <el-button size="small" @click="$router.push('/outpatient/list')">返回医生站</el-button>
       </div>
     </header>

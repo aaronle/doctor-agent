@@ -18,8 +18,10 @@
     "typecheck": "npm run typecheck --workspace @doctor-agent/web",
     "fidelity": "node scripts/compare-v43-fidelity.mjs",
     "extract": "node scripts/extract-v43-assets.mjs && node scripts/extract-v43-dom.mjs && node scripts/split-v43-css.mjs",
-    "verify": "npm run test:all && npm run build && npm run contracts:export && npm run fidelity && npm run coverage",
-    "coverage": "node scripts/check-v43-coverage.mjs"
+    "verify": "node scripts/verify.mjs",
+    "coverage": "node scripts/check-v43-coverage.mjs",
+    "verify:legacy": "npm run test:all && npm run build && npm run contracts:export && npm run fidelity && npm run coverage",
+    "deploy": "node scripts/deploy.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

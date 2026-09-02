@@ -17,6 +17,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/outpatient/manage', name: 'PatientManage', component: () => import('./views/PatientManageView.vue'), meta: { title: '患者管理' } },
   // 控制台。面向管理员与调优人员，不占用 V4.3 定义的五个医生端页面。
   { path: '/admin', name: 'AdminConsole', component: () => import('./views/AdminConsoleView.vue'), meta: { title: 'Agent 控制台' } },
+  // 交付平台。与控制台同一类页面（面向研发与调优，不是医生端功能），
+  // 同样不占用 V4.3 定义的五个医生端页面。
+  { path: '/delivery', name: 'Delivery', component: () => import('./views/DeliveryView.vue'), meta: { title: '交付平台' } },
   { path: '/outpatient/:patientId', name: 'OutpatientWorkstation', component: () => import('./views/WorkstationView.vue'), meta: { title: '门诊工作站' } },
 ]
 
