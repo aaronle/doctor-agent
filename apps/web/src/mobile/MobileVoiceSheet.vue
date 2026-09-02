@@ -38,6 +38,10 @@ async function finish() {
   try {
     await props.voice.finish()
     await ws.loadSummary(true)
+    // 问诊结束就把这张单子收起来。留着它等于把「追问清单 / 补充观察 / 继续问诊」
+    // 一起留在屏幕上 —— 那是一场已经结束的问诊的界面，看着像没结束。
+    // 桌面端两个浮层是同一个道理（见 useVoiceInterview 的 observationsVisible）。
+    emit('close')
     ElMessage.success('问诊已结束，分析已按本次内容更新')
   } catch (error) {
     ElMessage.error(`结束失败：${(error as Error).message}`)

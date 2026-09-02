@@ -47,7 +47,8 @@ export function useVoiceInterview(getPatientId: () => string) {
   /** 模型给的候选观察项全集，不随对话变化 */
   const allObservations = ref<string[]>([])
   const pickedObservations = ref<Set<string>>(new Set())
-  // 问诊进行中自动浮出，不藏在按钮后面 —— 「待观察问题」本就该在对话过程中看得见
+  // 问诊进行中自动浮出，不藏在按钮后面 —— 「待观察问题」本就该在对话过程中看得见。
+  // **这个 ref 只表示「医生有没有把它收起来」，不表示它现在可不可见** —— 见 observationsVisible。
   const showObservations = ref(false)
   const error = ref('')
   const degraded = ref(false)
@@ -63,6 +64,21 @@ export function useVoiceInterview(getPatientId: () => string) {
    * 追问清单浮层要继续留着，让医生看到还有哪几条没问到。
    */
   const active = computed(() => state.value !== 'idle' && state.value !== 'ended')
+
+  /**
+   * 补充观察浮层到底显不显示。
+   *
+   * **两个条件相与**：问诊还在进行（`active`），且医生没把它收起来（`showObservations`）。
+   *
+   * 原来只看后者。它在 `start()` 里置 true，之后只有关闭按钮会清 ——
+   * 于是点完「结束问诊」浮层还挂在那里，盖着病历区，看着像问诊没结束。
+   * 「追问提示」一直是对的，因为它挂在 `active` 上；两个浮层各判各的，
+   * 才会只坏一个。
+   *
+   * 判据放在这里而不是模板里 AND 一下：桌面与移动共用这一份，
+   * 模板各写各的迟早会漏掉一处 —— 这次漏的就是一处。
+   */
+  const observationsVisible = computed(() => active.value && showObservations.value)
 
   /**
    * 追问清单的完成判定：**语义判定**，不是按轮次顺序划掉。
@@ -368,6 +384,7 @@ export function useVoiceInterview(getPatientId: () => string) {
     coveredObservations,
     pickedObservations,
     showObservations,
+    observationsVisible,
     manualThinking,
     finishing,
     error,

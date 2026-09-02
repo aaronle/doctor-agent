@@ -269,4 +269,60 @@ describe('语音问诊', () => {
     expect(voice.degraded.value).toBe(true)
     expect(voice.error.value).toContain('模型通道不可用')
   })
+
+  it('结束问诊后收起补充观察浮层', async () => {
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006')
+    await voice.start()
+    // 问诊中自动浮出，不藏在按钮后面
+    expect(voice.observationsVisible.value).toBe(true)
+
+    await voice.finish()
+
+    // 点完「结束问诊」它还挂在那里，会盖着病历区，看着像问诊没结束。
+    // 「追问提示」一直是对的（它挂在 active 上），两个浮层各判各的才会只坏一个。
+    expect(voice.state.value).toBe('ended')
+    expect(voice.observationsVisible.value).toBe(false)
+  })
+
+  it('医生自己收起过的浮层，继续问诊时不擅自弹回来', async () => {
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006')
+    await voice.start()
+
+    voice.showObservations.value = false
+    expect(voice.observationsVisible.value).toBe(false)
+
+    await voice.finish()
+    voice.resumeCapture()
+
+    // active 恢复了，但医生的「收起」是个明确意图，不该被状态变化覆盖
+    expect(voice.active.value).toBe(true)
+    expect(voice.observationsVisible.value).toBe(false)
+  })
+
+  it('结束后点继续问诊，浮层跟着回来', async () => {
+    stubInit()
+    const voice = useVoiceInterview(() => 'P006')
+    await voice.start()
+    await voice.finish()
+    expect(voice.observationsVisible.value).toBe(false)
+
+    voice.resumeCapture()
+    expect(voice.observationsVisible.value).toBe(true)
+  })
+
+  it('一条都没录到就点结束，状态机照样收尾', async () => {
+    stubInit({ dialog: [] })
+    const voice = useVoiceInterview(() => 'P006')
+    await voice.start()
+    expect(voice.messages.value).toHaveLength(0)
+
+    await voice.finish()
+
+    // 早先「有没有消息」的判断写在调用方，没消息就整个跳过 finish()，
+    // 于是分析已经解锁、界面却还停在 awaiting，一副问诊没结束的样子。
+    expect(voice.state.value).toBe('ended')
+    expect(voice.observationsVisible.value).toBe(false)
+  })
 })

@@ -905,10 +905,12 @@ async function finishAndGenerate() {
   if (!ws.patientId || finishing.value) return
   finishing.value = true
   try {
-    if (voice.messages.value.length) {
-      actionStep.value = '落库问诊记录…'
-      await voice.finish()
-    }
+    // **无条件调 finish()。** 它负责的是「收尾」：停定时器、置 ended、收起浮层。
+    // 落库那一步自己会判空（persist 里 `!messages.length` 直接返回），
+    // 所以这里不必也不该再判一次 —— 早先在外面判，医生在没录到内容时点结束，
+    // 状态机就停在 awaiting：分析已经解锁了，界面却还是一副问诊没结束的样子。
+    actionStep.value = voice.messages.value.length ? '落库问诊记录…' : '收尾…'
+    await voice.finish()
 
     actionStep.value = '重新分析病情、诊断与风险…'
     // 走状态机：voice/complete 已在服务端把这一场标为「问诊解锁」，
@@ -2135,7 +2137,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         补充观察：随对话动态过滤后的「待观察」清单。
         已经在对话里问到的条目会自动移出，剩下的才需要医生补问；勾选后并入问诊小结。
       -->
-      <div v-if="voice.showObservations.value" class="obs-float" :style="obsStyle">
+      <div v-if="voice.observationsVisible.value" class="obs-float" :style="obsStyle">
         <div class="obs-float-header">
           <span class="obs-float-title">补充观察</span>
           <el-button link size="small" class="obs-float-close" @click="voice.showObservations.value = false">✕</el-button>
