@@ -142,8 +142,19 @@ def health() -> dict:
 if WEB_DIST.is_dir():
     app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
-    @app.get("/{path:path}", include_in_schema=False)
-    def spa_fallback(path: str) -> Response:
+    # **必须同时接 HEAD。**
+    #
+    # `@app.get` 只注册 GET，Starlette 对 HEAD 直接回 405。/assets/* 走
+    # StaticFiles 挂载所以没事，但根目录下的 favicon.svg、share-square.png
+    # 这些走的是这条兜底路由 —— 于是 GET 200、HEAD 405。
+    #
+    # 抓链接的爬虫（微信在内）**通常先 HEAD 一下图片探类型和大小**，
+    # 405 就等于「这张图不能用」，卡片上显示成断链占位。图本身完全正常，
+    # 查的时候很容易一直盯着图看而想不到是方法不被允许。
+    #
+    # FileResponse 自己认 HEAD（只发头不发体），HTML 那条在下面单独处理。
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+    def spa_fallback(path: str, request: Request) -> Response:
         candidate = WEB_DIST / path
         if path and candidate.is_file():
             return FileResponse(candidate)
@@ -156,4 +167,13 @@ if WEB_DIST.is_dir():
         # 每次读盘而不是启动时缓存：这条路径的开销相对于整页加载可以忽略，
         # 而缓存会让「改了 index.html 但没重启」变成一个查起来很费劲的问题。
         html = (WEB_DIST / "index.html").read_text(encoding="utf-8")
-        return HTMLResponse(inject(html, path))
+        body = inject(html, path)
+        if request.method == "HEAD":
+            # 只回头不回体。长度仍按真实内容给 —— 回 0 会让按 Content-Length
+            # 判断页面是否为空的一方得出错误结论。
+            return Response(
+                status_code=200,
+                media_type="text/html; charset=utf-8",
+                headers={"content-length": str(len(body.encode("utf-8")))},
+            )
+        return HTMLResponse(body)

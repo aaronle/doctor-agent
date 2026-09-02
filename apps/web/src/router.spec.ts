@@ -52,9 +52,24 @@ describe('路由 · 一期无登录', () => {
     expect(doctorPages.some((p) => p.includes('delivery'))).toBe(false)
   })
 
-  it('页面标题跟着路由走', async () => {
+  it('标题按可分享的三个入口给，不暴露内部页名', async () => {
+    // 这个 title 会被微信当成卡片标题转发出去（从内置浏览器分享时微信读的是
+    // 当前 DOM）。线上出现过「候诊列表 · AI 门诊工作站」—— 一个内部页名
+    // 被转了出去。所以医生端各页统一用产品名，只有 /admin 与 /delivery 另起。
     await router.push('/outpatient/manage')
-    expect(document.title).toContain('患者管理')
+    expect(document.title).toBe('Doctor Agent · AI 门诊工作站')
+
+    await router.push('/admin')
+    expect(document.title).toBe('Agent 控制台 · Doctor Agent')
+
+    await router.push('/delivery')
+    expect(document.title).toBe('交付平台 · Doctor Agent')
+  })
+
+  it('就诊页标题不带就诊人标识 —— 它会被当成卡片标题转发出去', async () => {
+    await router.push('/outpatient/P001')
+    expect(document.title).toBe('Doctor Agent · AI 门诊工作站')
+    expect(document.title).not.toContain('P001')
   })
 })
 

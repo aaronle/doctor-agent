@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.seo import DEFAULT, SEO_END, SEO_START, build_block, inject, meta_for
+from app.seo import DEFAULT, ROUTES, SEO_END, SEO_START, build_block, inject, meta_for
 
 WEB = Path(__file__).resolve().parents[3] / "apps" / "web"
 
@@ -120,3 +120,44 @@ def test_icons_referenced_by_index_html_actually_exist():
 
 def test_share_image_file_exists():
     assert (WEB / "public" / "share-square.png").is_file()
+
+
+# ---------------------------------------------------------------- HEAD
+
+
+def test_head_on_static_files_is_allowed(client):
+    """
+    爬链接的一方（微信在内）**通常先 HEAD 一下图片**探类型和大小。
+
+    `@app.get` 只注册 GET，Starlette 对 HEAD 回 405 —— 图本身完全正常
+    （GET 200、image/png、600×600），卡片上却是断链占位。
+    这个 bug 在线上真发生过，查的时候很容易一直盯着图看。
+    """
+    for path in ("/share-square.png", "/favicon.svg", "/apple-touch-icon.png"):
+        head = client.head(path)
+        assert head.status_code == 200, f"HEAD {path} 返回 {head.status_code}"
+        assert client.get(path).status_code == 200
+
+
+def test_head_on_a_page_returns_headers_without_a_body(client):
+    """HEAD 只回头不回体，但 Content-Length 仍是真实长度。"""
+    head = client.head("/admin")
+    assert head.status_code == 200
+    assert head.content == b""
+    body = client.get("/admin").content
+    assert head.headers["content-length"] == str(len(body))
+
+
+def test_router_titles_match_the_server_side_ones():
+    """
+    从微信内置浏览器分享时，微信读的是**当前 DOM 的 title** —— 也就是
+    前端路由设的那份，不是服务端注入的这份。两边不一致，卡片标题就会
+    变成内部页名（线上出现过「候诊列表 · AI 门诊工作站」）。
+
+    跨语言没法共用常量，只能两边各钉一条。这里断言前端源码里的字面量
+    与 seo.py 逐字相同。
+    """
+    router = (WEB / "src" / "router.ts").read_text(encoding="utf-8")
+    assert f"'{DEFAULT[0]}'" in router, "router.ts 的默认标题与 seo.py 不一致"
+    for prefix, (title, _desc) in ROUTES.items():
+        assert f"'{prefix}': '{title}'" in router, f"router.ts 缺 {prefix} 的标题或与 seo.py 不一致"

@@ -25,7 +25,25 @@ const routes: RouteRecordRaw[] = [
 
 export const router = createRouter({ history: createWebHistory(), routes })
 
+/**
+ * 页面标题。**必须与 `apps/api/app/seo.py` 的 ROUTES 逐字一致。**
+ *
+ * 两处都要有，是因为它们服务于两种不同的抓取方式：
+ *   - 链接直接贴进聊天 → 爬虫读服务端下发的静态 HTML（seo.py 那份）
+ *   - 从微信内置浏览器点分享 → 微信读**当前 DOM**，也就是这里设的这份
+ *
+ * 只改一处的后果实测过：卡片标题变成「候诊列表 · AI 门诊工作站」——
+ * 一个内部页名被转发了出去。跨语言没法共用常量，只能两边各钉一条测试。
+ */
+const DOC_TITLES: Record<string, string> = {
+  '/admin': 'Agent 控制台 · Doctor Agent',
+  '/delivery': '交付平台 · Doctor Agent',
+}
+const DEFAULT_TITLE = 'Doctor Agent · AI 门诊工作站'
+
 router.beforeEach((to) => {
-  document.title = `${to.meta.title ?? '门诊'} · AI 门诊工作站`
+  // 就诊页刻意不带就诊人标识：这个标题会被微信当成卡片标题转发出去
+  const matched = Object.keys(DOC_TITLES).find((p) => to.path === p || to.path.startsWith(`${p}/`))
+  document.title = matched ? DOC_TITLES[matched] : DEFAULT_TITLE
   return true
 })
