@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 
 from .base import Agent, require_list
+from .schemas import RiskOut
 from .context import abnormal_labs
 
 LEVEL_COLOR = {"高风险": "danger", "中风险": "warning", "低风险": "success", "提示": "info"}
@@ -246,27 +247,7 @@ class RiskAgent(Agent):
     )
     needs_exam_detail = False
     skill = "risk-management"
-    output_schema = {
-        "type": "object",
-        "required": ["risk_assessments"],
-        "properties": {
-            "risk_assessments": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["name", "level", "evidence", "assessment", "suggestion"],
-                    "properties": {
-                        "name": {"type": "string", "description": "风险项名称，如「血糖控制评估」"},
-                        "level": {"type": "string", "enum": ["高风险", "中风险", "低风险"]},
-                        "summary": {"type": "string"},
-                        "evidence": {"type": "string", "description": "依据，必须引用上下文中的具体数值或病史"},
-                        "assessment": {"type": "string", "description": "判断"},
-                        "suggestion": {"type": "string", "description": "建议"},
-                    },
-                },
-            }
-        },
-    }
+    output_model = RiskOut
 
     def task_instruction(self, ctx: dict, **kwargs) -> str:
         hard = kwargs.get("hard_alerts", [])

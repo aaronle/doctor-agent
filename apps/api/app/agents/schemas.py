@@ -33,7 +33,62 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+import json
+
+from pydantic import BaseModel, Field, model_validator
+
+
+class ToolCallModel(BaseModel):
+    """
+    所有输出模型的基类：把嵌套对象「被序列化成字符串」这件事拉平。
+
+    实测（claude-sonnet-5，本项目网关）：工具调用的参数里，嵌套对象**约三次里有一次**
+    会以 JSON 字符串的形式回来 ——
+
+        overall_conclusion: '{"risk_level":"高风险",...}'   ← str，不是 dict
+
+    Pydantic 直接判 `model_type` 失败，岗位随即静默降级到本地规则。
+    界面上看是一段「模型通道不可用，以上为结构化数据直接汇总」的兜底文本，
+    而模型其实答得好好的 —— **静默降级正是这个项目栽过的那种坑**。
+
+    判据刻意收窄：只处理「以 `{` 或 `[` 开头、且能整段解析」的字符串。
+    解析不了就原样留给 Pydantic 报错 —— 这不是第二个 `extract_json_object`，
+    那个函数从自由文本里连蒙带猜地抠 JSON，而这里只是把一层多余的编码剥掉。
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _unwrap_stringified_objects(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        out = {}
+        for key, value in data.items():
+            if isinstance(value, str) and value[:1] in "{[":
+                try:
+                    # `strict=False` 允许字符串值内部出现裸换行。
+                    #
+                    # 这不是放水，是这里的必需项：模型把一段多行的病情概要
+                    # 序列化进字符串字段时不会转义 `\n`，而严格模式会报
+                    # `Invalid control character` 直接拒掉整份输出 ——
+                    # 于是岗位静默降级，而模型答得完全正确。
+                    value = json.loads(value, strict=False)
+                except (json.JSONDecodeError, ValueError):
+                    pass          # 解析不了就别动，让 Pydantic 如实报错
+            out[key] = value
+        return out
+
+
+
+#: 会诊科室闭集。**住在这里是因为它是输出契约的一部分** ——
+#: 它同时是 Pydantic schema 的 enum（约束模型生成）、`validate()` 的判据、
+#: 以及 SKILL.md 里 `<DEPARTMENTS>` 占位符的值。三处用同一个来源。
+#:
+#: 本院没有的科室不得出现：患者会照着去挂号，挂不到就是医院的事故。
+DEPARTMENTS = (
+    "内分泌科", "心内科", "神经内科", "肾内科", "消化内科", "呼吸内科",
+    "血液科", "风湿免疫科", "普外科", "骨科", "妇科", "眼科",
+    "营养科", "康复科", "精神心理科", "全科医学科",
+)
 
 #: 风险分级闭集。工作站顶部预警条按它取色，多一个值界面就没有对应样式。
 RiskLevel = Literal["高风险", "中风险", "低风险"]
@@ -46,7 +101,7 @@ ComorbidityLevel = Literal["高危", "中危", "低危"]
 # ---------------------------------------------------------------- 病情概况
 
 
-class OverallConclusion(BaseModel):
+class OverallConclusion(ToolCallModel):
     risk_level: RiskLevel
     summary: str = Field(description="150 字以内的整体概要")
     problems: list[str] = Field(default_factory=list, description="问题清单，每条一句话")
@@ -56,11 +111,11 @@ class OverallConclusion(BaseModel):
     )
 
 
-class TreatmentEffectiveness(BaseModel):
+class TreatmentEffectiveness(ToolCallModel):
     ai_summary: str = Field(description="疗效评价；没有历史数据就写「缺乏可比历史数据」")
 
 
-class SummaryOut(BaseModel):
+class SummaryOut(ToolCallModel):
     overall_conclusion: OverallConclusion
     treatment_effectiveness: TreatmentEffectiveness
 
@@ -68,7 +123,7 @@ class SummaryOut(BaseModel):
 # ---------------------------------------------------------------- 病历生成
 
 
-class RecordFields(BaseModel):
+class RecordFields(ToolCallModel):
     """病历七段。**闭集** —— 服务端按段切分流式下发，多一段前端无从对齐。"""
 
     chief_complaint: str = Field(description="主诉")
@@ -80,14 +135,14 @@ class RecordFields(BaseModel):
     preliminary_diagnosis: str = Field(description="初步诊断")
 
 
-class RecordOut(BaseModel):
+class RecordOut(ToolCallModel):
     fields: RecordFields
 
 
 # ---------------------------------------------------------------- 鉴别诊断
 
 
-class SuspectedDiagnosis(BaseModel):
+class SuspectedDiagnosis(ToolCallModel):
     name: str
     confidence: int = Field(ge=0, le=100, description="0–100，且必须是 5 的倍数")
     icd: str = Field(default="", description="不确定时留空，不要猜")
@@ -98,7 +153,7 @@ class SuspectedDiagnosis(BaseModel):
     missing: list[str] = Field(description="还缺什么信息")
 
 
-class DiagnosisOut(BaseModel):
+class DiagnosisOut(ToolCallModel):
     suspected_diagnoses: list[SuspectedDiagnosis] = Field(
         description="按 confidence 从高到低，最多 5 条"
     )
@@ -107,7 +162,7 @@ class DiagnosisOut(BaseModel):
 # ---------------------------------------------------------------- 风险管理
 
 
-class RiskAssessment(BaseModel):
+class RiskAssessment(ToolCallModel):
     name: str = Field(description="风险项名称，如「血糖控制评估」")
     level: RiskLevel
     summary: str = ""
@@ -116,23 +171,28 @@ class RiskAssessment(BaseModel):
     suggestion: str = Field(description="建议：可执行的下一步，不是「建议关注」这类空话")
 
 
-class RiskOut(BaseModel):
+class RiskOut(ToolCallModel):
     risk_assessments: list[RiskAssessment] = Field(description="2–4 条")
 
 
 # ---------------------------------------------------------------- 共病管理
 
 
-class ComorbidityCondition(BaseModel):
+class ComorbidityCondition(ToolCallModel):
     name: str
     icd: str = ""
     duration: str = ""
     risk_level: ComorbidityLevel
     analysis: str = Field(description="依据来自哪条病史或检验值")
-    recommended_dept: str = Field(description="必须取自科室闭集")
+    #: 科室闭集直接写进 schema 的 enum，模型在**生成时**就受约束，
+    #: 而不是生成完再被 validate() 打回来降级。闭集本身仍只有 DEPARTMENTS 一个来源。
+    recommended_dept: str = Field(
+        description="会诊科室，必须取自本院科室闭集",
+        json_schema_extra={"enum": list(DEPARTMENTS)},
+    )
 
 
-class ComorbidityOut(BaseModel):
+class ComorbidityOut(ToolCallModel):
     detected: bool
     risk_level: ComorbidityLevel | None = None
     summary: str = ""
@@ -143,8 +203,15 @@ class ComorbidityOut(BaseModel):
 # ---------------------------------------------------------------- 问诊小结
 
 
-class InterviewSummaryOut(BaseModel):
+class InterviewSummaryOut(ToolCallModel):
     chief_complaint: str = Field(description="用患者自己的说法，不要改写成诊断名")
     key_points: list[str] = Field(description="只归纳对话中实际出现的内容")
     gaps: list[str] = Field(description="对话没有涉及、还需要补问的方面")
     summary: str = ""
+
+
+# ---------------------------------------------------------------- 病历单段续写
+
+
+class RecordFieldOut(ToolCallModel):
+    generated_text: str = Field(description="这一段的文本，不要写段名，不要写其他段")

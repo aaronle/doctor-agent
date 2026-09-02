@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .base import Agent, require_dict
+from .schemas import SummaryOut
 from .context import abnormal_labs
 
 RISK_LEVELS = ("高风险", "中风险", "低风险")
@@ -19,35 +20,7 @@ class SummaryAgent(Agent):
     needs_lab_history = True
     needs_exam_detail = False
     skill = "condition-summary"
-    output_schema = {
-        "type": "object",
-        "required": ["overall_conclusion", "treatment_effectiveness"],
-        "properties": {
-            "overall_conclusion": {
-                "type": "object",
-                "required": ["risk_level", "summary"],
-                "properties": {
-                    "risk_level": {"type": "string", "enum": list(RISK_LEVELS)},
-                    "summary": {"type": "string", "description": "150 字以内的整体概要"},
-                    "problems": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "问题清单，每条一句话",
-                    },
-                    "conflicts": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "并列陈述的矛盾信息；没有则为空数组",
-                    },
-                },
-            },
-            "treatment_effectiveness": {
-                "type": "object",
-                "required": ["ai_summary"],
-                "properties": {"ai_summary": {"type": "string"}},
-            },
-        },
-    }
+    output_model = SummaryOut
 
     def task_instruction(self, ctx: dict, **kwargs) -> str:
         return (

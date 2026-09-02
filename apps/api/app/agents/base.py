@@ -13,32 +13,26 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..agent_config import resolve
+from ..model_gateway import model_is_configured
 from ..skills import load_all_skills
 from .safety import SAFETY_LAYER
-from ..llm import ChatMessage, LlmError, get_llm_client
+from .runtime import Generation, GenerationError, generate
 from ..models import AgentRun
 from .context import project
 from ..obs import event
 
 PROMPT_BUNDLE_VERSION = "pb-1.0.0"
 
-#: 输出格式要求。**和安全层分开**，因为它们是两类东西。
+#: 输出形状不再靠提示词恳求，由工具调用的参数 schema 保证 —— 见 runtime.py。
 #:
-#: 原先这两条（「只输出 JSON 对象」「字符串内不得出现半角双引号」）挤在
-#: SAFETY_LAYER 里，和「不得自行确诊」「不得编造检验值」排在同一张清单上。
-#: 但前者是给一个手写 JSON 解析器打的补丁（第二条是真事故：未转义的半角引号
-#: 会截断字符串，整份输出被丢弃），后者是**改了要有人签字**的临床红线。
-#:
-#: 混在一起的代价很实在：安全层因为格式微调而被改动，每改一次都在稀释
-#: 「这段文字不能随便动」这个约定。分开之后，安全层就只剩临床红线。
-OUTPUT_FORMAT = """【输出格式】
-严格按给定的 JSON Schema 输出。**只输出 JSON 对象本身**，不要解释、不要 Markdown 围栏、不要前后缀。
-字符串值内部**不得出现半角双引号 `"`**。需要引用原文时一律用中文引号「」——
-半角引号会截断 JSON 字符串，导致整份输出无法解析而被丢弃。"""
-
+#: 这里原先有一段 OUTPUT_FORMAT（「只输出 JSON 对象」「字符串内不得出现半角双引号」），
+#: 是给 `llm.extract_json_object` 打的补丁。那个函数从模型自由文本里抠 JSON，
+#: 而未转义的半角引号会截断字符串、整份输出被丢弃 —— 那是真出过的事故。
+#: 换成结构化生成之后，这两条连同被它们污染的安全层一起消失了。
 
 @dataclass
 class AgentOutcome:
@@ -67,7 +61,14 @@ class Agent:
 
     key: str = ""
     version: str = "mvp-1.0.0"
-    output_schema: dict = {}
+
+    #: 输出模型（Pydantic）。**同时是三样东西**：发给模型的工具参数 schema、
+    #: 回来时的校验器、给人读的契约。
+    #:
+    #: 取代了原先手写的 `output_schema` dict —— 那份 dict 只是塞进提示词里的
+    #: 一段文字，模型可以不照做，于是校验只能在事后手写一遍，两边还会不一致
+    #: （共病的 risk_level 顶层写「高风险」、条目级写「高危」，而顶层根本没人校验）。
+    output_model: type[BaseModel]
 
     #: 挂载的 skill 目录名。**岗位提示词的唯一来源。**
     #:
@@ -135,21 +136,23 @@ class Agent:
         dept = ctx.get("dept") or "全科"
         return f"当前科室：{dept}。请使用该科室的常规术语与诊疗习惯，不要越出本科范围给出建议。"
 
-    def build_messages(self, ctx: dict, *, role_prompt: str | None = None, **kwargs: Any) -> list[ChatMessage]:
+    def build_prompt(self, ctx: dict, *, role_prompt: str | None = None, **kwargs: Any) -> tuple[str, str]:
+        """装配 (system, user) 两段。
+
+        **不再把 JSON Schema 塞进提示词。** 输出形状由 runtime 的工具参数 schema
+        保证；写在提示词里只是让模型多读一遍，而它照样可以不照做。
+        """
         prompt_ctx = project(
             ctx,
             fields=self.context_fields,
             lab_history=self.needs_lab_history,
             exam_detail=self.needs_exam_detail,
         )
-        schema_text = json.dumps(self.output_schema, ensure_ascii=False, indent=2)
         system = "\n\n".join(
             [
                 SAFETY_LAYER,
                 f"【岗位职责】\n{role_prompt or self.role_prompt}",
                 f"【专科背景】\n{self.specialty_prompt(ctx)}",
-                f"【输出 JSON Schema】\n{schema_text}",
-                OUTPUT_FORMAT,
             ]
         )
         user = "\n\n".join(
@@ -158,7 +161,7 @@ class Agent:
                 f"【患者上下文】\n{json.dumps(prompt_ctx, ensure_ascii=False)}",
             ]
         )
-        return [ChatMessage("system", system), ChatMessage("user", user)]
+        return system, user
 
     async def run(
         self,
@@ -182,13 +185,11 @@ class Agent:
 
         产品路径一律用默认值，不传这两个参数。
         """
-        client = get_llm_client()
-
         # 运行时读已发布配置：Prompt 与模型档位都可能被控制台改过。
         # 读不到已发布版本才回落代码默认值，所以首次部署无需先建配置。
         config = config_override or resolve(session, self)
 
-        if not client.configured:
+        if not model_is_configured():
             outcome = AgentOutcome(
                 data=self.fallback(ctx, **kwargs),
                 provider="local-rules",
@@ -202,13 +203,16 @@ class Agent:
             return outcome
 
         try:
-            result = await client.complete_json(
-                self.build_messages(ctx, role_prompt=config.role_prompt, **kwargs),
-                model=config.model,
-                agent_key=self.key,
+            system, user = self.build_prompt(ctx, role_prompt=config.role_prompt, **kwargs)
+            result: Generation = await generate(
+                system=system,
+                user=user,
+                output_model=self.output_model,
+                model_name=config.model,
             )
+            # Pydantic 已经保证了形状；validate() 现在只做**临床归一化**
             data = self.validate(result.data, ctx)
-        except (LlmError, ValueError, KeyError, TypeError) as exc:
+        except (GenerationError, ValueError, KeyError, TypeError) as exc:
             outcome = AgentOutcome(
                 data=self.fallback(ctx, **kwargs),
                 provider="local-rules",

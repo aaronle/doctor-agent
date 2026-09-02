@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 
+from .schemas import RecordFieldOut, RecordOut
 from .base import Agent, require_dict
 
 # 病历七段，顺序即界面展示与流式下发顺序
@@ -113,17 +114,7 @@ class RecordAgent(Agent):
     # 十条用例掉到三到五条。
     #
     skill = "record-generation"
-    output_schema = {
-        "type": "object",
-        "required": ["fields"],
-        "properties": {
-            "fields": {
-                "type": "object",
-                "required": list(SECTION_KEYS),
-                "properties": {key: {"type": "string"} for key in SECTION_KEYS},
-            }
-        },
-    }
+    output_model = RecordOut
 
     def task_instruction(self, ctx: dict, **kwargs) -> str:
         note = str(kwargs.get("note_text") or "").strip()
@@ -210,11 +201,7 @@ class RecordFieldAgent(Agent):
     )
     needs_exam_detail = False
     skill = "record-field-continuation"
-    output_schema = {
-        "type": "object",
-        "required": ["generated_text"],
-        "properties": {"generated_text": {"type": "string"}},
-    }
+    output_model = RecordFieldOut
 
     def task_instruction(self, ctx: dict, **kwargs) -> str:
         field = kwargs.get("field", "")

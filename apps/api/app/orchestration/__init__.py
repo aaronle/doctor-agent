@@ -14,7 +14,7 @@
 
 from .agent_loader import AgentConfigError, AgentProfile, load_all_agents
 from .master_agent import build_master
-from .settings import DEFAULT_MODEL, model_is_configured
+from ..model_gateway import DEFAULT_MODEL, model_is_configured
 from ..skills import SkillLoadError, SkillManifest, load_all_skills
 from .tools import TOOL_REGISTRY
 from .worker_factory import SAFETY_LAYER, build_worker

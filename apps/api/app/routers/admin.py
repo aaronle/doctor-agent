@@ -197,7 +197,10 @@ def get_agent(agent_key: str, session: Session = Depends(get_session)) -> dict:
         "safety_layer": agent_base.SAFETY_LAYER,
         "safety_layer_editable": False,
         "code_default_prompt": agent.role_prompt,
-        "output_schema": agent.output_schema,
+        # 由 Pydantic 模型现算，不再是手写的 dict ——
+        # 控制台看到的 schema 和真正发给模型的那份**必然一致**，
+        # 手写两份时它们只是碰巧一样。
+        "output_schema": agent.output_model.model_json_schema(),
         "context_fields": list(agent.context_fields or []),
         "running": {
             "version": config.version,
@@ -628,13 +631,28 @@ async def run_eval(agent_key: str, body: EvalIn, session: Session = Depends(get_
                 ok, detail = False, f"校验执行异常：{exc}"
             results.append({"name": name, "passed": ok, "detail": detail})
 
+        # **降级一律判不通过。**
+        #
+        # 兜底输出是确定性本地规则产的，结构完全合法 —— 于是它会**通过所有结构校验**，
+        # 而模型其实一次都没跑成。2026-09-03 真的发生过：结构化输出里嵌套对象
+        # 偶尔以 JSON 字符串回来，summary 岗位每次都降级，而回归集一片绿。
+        # 那个 bug 是端到端实跑才抓到的，不是测出来的。
+        #
+        # 判据不是「兜底质量好不好」，是「这一次到底测没测到模型」——
+        # 「什么都没测」不能长得像「测了都过」。
+        if outcome.degraded:
+            results.insert(0, {
+                "name": "本次真正调用了模型",
+                "passed": False,
+                "detail": f"已降级为本地规则，本条未测到模型：{outcome.note[:160]}",
+            })
+
         return {
             "case_id": case.id,
             "name": case.name,
             "patient_id": case.patient_id,
             "dataset_id": case.dataset_id,
             "dataset_name": case.dataset_name,
-            # 降级时输出来自本地规则，判定结果说明不了提示词的好坏，单独标出来
             "degraded": outcome.degraded,
             "elapsed_ms": outcome.elapsed_ms,
             "passed": all(r["passed"] for r in results),

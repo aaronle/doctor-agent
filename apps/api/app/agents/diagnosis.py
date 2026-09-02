@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from .schemas import DiagnosisOut
 from .base import Agent, require_list
 
 # 置信度只允许 5 的倍数。不是为了好看：模型没有能力给出「73.6%」这种精度，
@@ -45,30 +46,7 @@ class DiagnosisAgent(Agent):
     )
     needs_lab_history = True
     skill = "differential-diagnosis"
-    output_schema = {
-        "type": "object",
-        "required": ["suspected_diagnoses"],
-        "properties": {
-            "suspected_diagnoses": {
-                "type": "array",
-                "maxItems": 5,
-                "items": {
-                    "type": "object",
-                    "required": ["name", "confidence", "desc", "supporting", "opposing", "missing"],
-                    "properties": {
-                        "name": {"type": "string"},
-                        "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
-                        "icd": {"type": "string"},
-                        "desc": {"type": "string", "description": "一句话说明该诊断的临床含义与下一步"},
-                        "suggestion": {"type": "string", "description": "针对该诊断的下一步建议，一句话"},
-                        "supporting": {"type": "array", "items": {"type": "string"}},
-                        "opposing": {"type": "array", "items": {"type": "string"}},
-                        "missing": {"type": "array", "items": {"type": "string"}},
-                    },
-                },
-            }
-        },
-    }
+    output_model = DiagnosisOut
 
     def task_instruction(self, ctx: dict, **kwargs) -> str:
         return (

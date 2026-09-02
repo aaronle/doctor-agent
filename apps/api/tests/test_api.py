@@ -648,11 +648,12 @@ def test_published_config_actually_drives_the_prompt(client):
     session = SessionLocal()
     try:
         config = resolve(session, comorbidity_agent)
-        messages = comorbidity_agent.build_messages({"id": "P001", "dept": "内分泌科"}, role_prompt=config.role_prompt)
+        system, _user = comorbidity_agent.build_prompt(
+            {"id": "P001", "dept": "内分泌科"}, role_prompt=config.role_prompt
+        )
     finally:
         session.close()
 
-    system = messages[0].content
     assert "控制台改过的版本" in system
     # 安全层仍在最前，且不可被岗位层挤掉
     assert system.index("不做确诊") < system.index("【岗位职责】")
@@ -1998,52 +1999,44 @@ def test_temperature_is_sent_only_to_models_that_accept_it():
         assert "temperature" not in body, f"{model} 不收 temperature，发过去会 400"
 
 
-def test_non_retryable_4xx_fails_fast_with_the_gateway_message(monkeypatch):
+def test_gateway_error_message_survives_to_the_caller():
     """
-    不在白名单里的 4xx 不重试，且要带上网关原话。
+    网关的原话必须传到调用方。
 
-    早先 raise_for_status() 抛的 HTTPStatusError 落进通用 except httpx.HTTPError，
-    于是 400 照样退避重试四次 —— 白名单注释写的「4xx 参数错误重试只会重复失败」
-    被下面的处理器架空了。换模型时三个岗位各白等 8 秒才降级。
+    这条教训来自 2026-09-02：三个岗位同时降级，而错误只报了一句
+    `HTTPStatusError` —— 网关那句 `temperature is deprecated for this model`
+    被丢掉了，只能手工二分才找到原因。
 
-    错误消息里必须有网关原话：只报一句 HTTPStatusError 什么线索都没有。
+    原来守它的测试打在 `llm.complete_json` 上，那个函数 2026-09-03 已随
+    结构化生成的落地删除。教训没变，所以判据搬到新的运行时：
+    `generate()` 把任何网关异常包成 `GenerationError`，且**带上原文**。
     """
     import asyncio
 
-    import httpx
     import pytest
 
-    from app import llm as llm_mod
-    from app.llm import ChatMessage, LlmClient, LlmError
+    from app.agents import runtime
+    from app.agents.runtime import GenerationError, generate
+    from app.agents.schemas import RecordFieldOut
 
-    calls = {"n": 0}
-    bad_body = '{"error":{"message":"`temperature` is deprecated for this model."}}'
+    class Boom:
+        async def __call__(self, *_a, **_k):
+            raise RuntimeError("`temperature` is deprecated for this model.")
 
-    def handler(_request: httpx.Request) -> httpx.Response:
-        calls["n"] += 1
-        return httpx.Response(400, text=bad_body)
+    # 打在 runtime 上，不是 model_gateway 上：
+    # runtime 是 `from ..model_gateway import build_chat_model`，名字已经绑好了，
+    # 改源模块对它没有影响 —— 这类 patch 不生效时测试会「意外地通过」，更危险。
+    original = runtime.build_chat_model
+    runtime.build_chat_model = lambda **_k: Boom()
+    try:
+        with pytest.raises(GenerationError) as exc:
+            asyncio.run(
+                generate(system="s", user="u", output_model=RecordFieldOut, model_name="m")
+            )
+    finally:
+        runtime.build_chat_model = original
 
-    real_client = httpx.AsyncClient
-
-    def fake_client(*_args, **kwargs):
-        kwargs.pop("timeout", None)
-        return real_client(transport=httpx.MockTransport(handler))
-
-    monkeypatch.setattr(llm_mod.httpx, "AsyncClient", fake_client)
-
-    client = LlmClient()
-    if not client.configured:
-        monkeypatch.setattr(client.settings, "api_key", "test-key", raising=False)
-        monkeypatch.setattr(type(client), "configured", property(lambda _self: True))
-
-    async def run() -> str:
-        with pytest.raises(LlmError) as exc:
-            await client.complete_json([ChatMessage(role="user", content="x")], model="claude-sonnet-5")
-        return str(exc.value)
-
-    message = asyncio.run(run())
-    assert calls["n"] == 1, f"400 不该重试，实际请求了 {calls['n']} 次"
-    assert "deprecated" in message, f"错误消息要带网关原话，实际：{message}"
+    assert "deprecated" in str(exc.value), f"网关原话没传出来：{exc.value}"
 
 
 def test_default_models_are_sonnet5():
@@ -2696,7 +2689,7 @@ def test_safety_layer_holds_clinical_rules_not_output_formatting():
     混着放的代价是：安全层会因为格式微调而被改动，每改一次都在稀释
     「这段文字不能随便动」这个约定。
     """
-    from app.agents.base import OUTPUT_FORMAT
+    from app.agents import risk_agent
     from app.agents.safety import SAFETY_LAYER
 
     # **按具体指令判，不按关键词判。**
@@ -2708,9 +2701,13 @@ def test_safety_layer_holds_clinical_rules_not_output_formatting():
     # 误报比没有校验更糟：这条测试会先被人加白名单，再被人删掉。
     for mechanic in ("Markdown 围栏", "半角双引号", "不要前后缀"):
         assert mechanic not in SAFETY_LAYER, f"序列化细节「{mechanic}」不该在安全层里"
-    # 反过来，格式块也不该混进临床判断
-    for clinical in ("确诊", "处方", "否认"):
-        assert clinical not in OUTPUT_FORMAT
+
+    # 而且这类话现在**整条链路上都不该有**：输出形状由工具调用的参数 schema
+    # 保证（runtime.py），不再靠提示词恳求模型配合。
+    # 2026-09-03 之前 base.py 里有个 OUTPUT_FORMAT 块专管这件事，已随之删除。
+    system, _user = risk_agent.build_prompt({"id": "P001", "dept": "内分泌科"})
+    for mechanic in ("Markdown 围栏", "半角双引号", "只输出 JSON"):
+        assert mechanic not in system, f"提示词里还在交代序列化细节：「{mechanic}」"
 
 
 # ================================================================ 临床提示词单一事实源
@@ -2806,7 +2803,7 @@ def test_department_closed_set_is_injected_not_hardcoded():
     加一个科室时提示词说可以、校验说不行，模型被自己的说明书坑。
     """
     from app.agents import comorbidity_agent
-    from app.agents.comorbidity import DEPARTMENTS
+    from app.agents.schemas import DEPARTMENTS
 
     prompt = comorbidity_agent.role_prompt
     assert "<DEPARTMENTS>" not in prompt, "占位符没被替换"
@@ -2917,3 +2914,135 @@ def test_a_documented_denial_is_left_alone():
 
     text = "高血压 10 年。否认药物过敏史。"
     assert _strip_unauthorized_denial(text, {"allergy_status": "denied"}) == text
+
+
+def test_stringified_nested_objects_are_unwrapped_not_degraded():
+    """
+    嵌套对象以 JSON 字符串回来时要拉平，而不是降级。
+
+    实测（claude-sonnet-5，本项目网关）：工具调用参数里的嵌套对象
+    **约三次里有一次**会被序列化成字符串。Pydantic 直接判 `model_type` 失败，
+    岗位随即静默降级 —— 界面上是一段「模型通道不可用」的兜底文本，
+    而模型其实答得好好的。
+
+    这个 bug 是端到端实跑才发现的：单元测试跑在 rules 模式下碰不到，
+    回归集（record / risk）恰好都没有嵌套对象，也碰不到。
+    """
+    import json
+
+    from app.agents.schemas import SummaryOut
+
+    nested = {
+        "risk_level": "高风险",
+        "summary": "血糖控制不佳",
+        "problems": ["空腹血糖 8.5"],
+        "conflicts": [],
+    }
+    parsed = SummaryOut.model_validate(
+        {
+            # 该是对象，却给了字符串
+            "overall_conclusion": json.dumps(nested, ensure_ascii=False),
+            "treatment_effectiveness": {"ai_summary": "较上次下降"},
+        }
+    )
+    assert parsed.overall_conclusion.risk_level == "高风险"
+    assert parsed.overall_conclusion.problems == ["空腹血糖 8.5"]
+
+
+def test_unwrapping_does_not_swallow_genuinely_broken_output():
+    """
+    只剥「能整段解析的 JSON 字符串」这一层，别的一律原样报错。
+
+    放宽成「尽量猜」就会变成第二个 `extract_json_object` ——
+    那个函数从自由文本里连蒙带猜地抠 JSON，正是这次重构要消灭的东西。
+    """
+    import pytest
+    from pydantic import ValidationError
+
+    from app.agents.schemas import SummaryOut
+
+    with pytest.raises(ValidationError):
+        SummaryOut.model_validate(
+            {"overall_conclusion": "模型直接说了一段话，不是 JSON", "treatment_effectiveness": {"ai_summary": "x"}}
+        )
+
+
+def test_unwrapping_tolerates_raw_newlines_inside_the_json_string():
+    """
+    被序列化的那段 JSON 里，字符串值内部会有**未转义的换行**。
+
+    `json.loads` 严格模式对此直接报 `Invalid control character` 并拒掉整份输出，
+    岗位随即静默降级 —— 而模型答得完全正确，只是多了一层带换行的编码。
+
+    这个分支是实跑抓出来的：加了字符串拉平之后**仍然三次里错一次**，
+    第一版只想到「可能是截断」，真相是控制字符。
+    """
+    import json
+
+    from app.agents.schemas import SummaryOut
+
+    nested = '{"risk_level": "中风险", "summary": "第一行\n第二行", "problems": [], "conflicts": []}'
+    # 先确认这确实是严格模式解不了的
+    try:
+        json.loads(nested)
+        raise AssertionError("这个 fixture 应该是严格模式解不了的，否则测不到东西")
+    except json.JSONDecodeError:
+        pass
+
+    parsed = SummaryOut.model_validate(
+        {"overall_conclusion": nested, "treatment_effectiveness": {"ai_summary": "x"}}
+    )
+    assert parsed.overall_conclusion.summary == "第一行\n第二行"
+
+
+def test_a_degraded_case_is_never_reported_as_passing(client, monkeypatch):
+    """
+    降级的用例不能算通过。
+
+    兜底输出是确定性本地规则产的，**结构完全合法** —— 它会通过所有结构校验，
+    而模型其实一次都没跑成。2026-09-03 真的发生过：结构化输出里嵌套对象
+    偶尔以 JSON 字符串回来，summary 每次都降级，回归集却一片绿。
+    那个 bug 是端到端实跑抓到的，不是测出来的。
+
+    判据不是「兜底质量好不好」，是「这一次到底测没测到模型」。
+    """
+    from app.agents import risk_agent
+    from app.agents.base import AgentOutcome
+
+    async def always_degraded(self, session, ctx, **kwargs):
+        return AgentOutcome(
+            data=self.fallback(ctx, **{k: v for k, v in kwargs.items() if k not in ("config_override", "record")}),
+            provider="local-rules",
+            degraded=True,
+            note="测试构造的降级",
+        )
+
+    monkeypatch.setattr(type(risk_agent), "run", always_degraded)
+    body = client.post("/api/admin/agents/risk/eval", json={"use": "published"}).json()
+
+    assert body["total"] > 0
+    assert body["passed"] == 0, "降级的用例被当成通过了"
+    first = body["cases"][0]["checks"][0]
+    assert first["name"] == "本次真正调用了模型" and not first["passed"]
+
+
+def test_gateway_retry_window_is_not_the_sdk_default():
+    """
+    重试窗口是**实测调出来的**，不能退回 SDK 默认值。
+
+    openai SDK 默认 max_retries=2，退避约 1.5 秒。本项目原先手写的重试是
+    500/1500/4000 毫秒 ≈ 6 秒，理由写在当时的注释里：首屏会并发发四个岗位的请求，
+    网关一次瞬时 502 会同时打掉四个、整页降级；抖动窗口比 2 秒长。
+
+    2026-09-03 换到 AgentScope 模型层时，这个常量差点随手写客户端一起消失 ——
+    它是用一次线上故障换来的，而丢了之后的症状（偶发整页降级）
+    和「模型今天有点慢」长得一模一样。
+    """
+    from app.model_gateway import build_chat_model
+
+    # 测试环境 AI_API_KEY 为空，openai 客户端会拒绝构造 —— 给个假 key，
+    # 这条测的是重试配置，不是鉴权
+    model = build_chat_model(model_name="claude-sonnet-5", api_key="test-key")
+    assert model.client.max_retries >= 4, (
+        f"重试次数被降到了 {model.client.max_retries}，重试窗口不够覆盖网关抖动"
+    )

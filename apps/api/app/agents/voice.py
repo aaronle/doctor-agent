@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+from .schemas import InterviewSummaryOut
 from .base import Agent, require_list
 
 
@@ -24,16 +25,7 @@ class VoiceSummaryAgent(Agent):
     version = "mvp-1.1.0"
     context_fields = ("primary_diagnosis", "diagnoses", "past_history")
     skill = "voice-interview"
-    output_schema = {
-        "type": "object",
-        "required": ["chief_complaint", "key_points", "gaps"],
-        "properties": {
-            "chief_complaint": {"type": "string"},
-            "key_points": {"type": "array", "items": {"type": "string"}},
-            "gaps": {"type": "array", "items": {"type": "string"}},
-            "summary": {"type": "string"},
-        },
-    }
+    output_model = InterviewSummaryOut
 
     def task_instruction(self, ctx: dict, **kwargs) -> str:
         conversation = str(kwargs.get("conversation_summary") or "").strip()

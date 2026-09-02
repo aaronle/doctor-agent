@@ -1,4 +1,19 @@
 """
+> **2026-09-03：这个模块只剩流式了。**
+>
+> 六个岗位的结构化生成已改走 `agents/runtime.py`（AgentScope 模型层 +
+> 工具调用 schema）。随之删掉的有 `complete_json`、`extract_json_object`
+> 与重试信号 `_Retry` —— 后者是一个从模型自由文本里**抠 JSON** 的函数，
+> 连同它在安全层里留下的两条补丁规矩（「只输出 JSON 对象」
+> 「字符串内不得出现半角双引号」）。那两条不是洁癖：未转义的半角引号
+> 会截断 JSON、整份输出被丢弃，是真出过的事故。
+>
+> 输出形状由协议保证之后，这一整条链路就没有存在的理由了。
+>
+> **留下的是流式**：Copilot 对话与病历流式生成 —— 它们要的是逐字吐出，
+> 不是结构化对象。换模型时挖出的三个坑（温度判据、400 不该重试、
+> 日志字段名）都在这条路径上继续有效，测试也都还在。
+
 OpenAI 兼容网关客户端，对齐 Ticket System 的接入方式。
 
 刻意保持薄：只负责「发请求、重试、记账、把响应解析成 JSON 对象」，
@@ -21,14 +36,9 @@ from .obs import event
 
 logger = logging.getLogger("doctor_agent.llm")
 
-# 仅这两类错误值得重试：限流与网关侧故障。4xx 参数错误重试只会重复失败。
-RETRYABLE_STATUS = {429, 500, 502, 503, 504}
-
-# 退避比 Ticket System 的 500/1500 更长：这里一次首屏会并发发四个岗位的请求，
-# 网关一次瞬时 502 就会同时打掉四个、整页降级。实测并发本身没问题，
-# 是抖动窗口比 2 秒重试窗口长，因此把总重试窗口拉到约 6 秒。
-BACKOFF_MS = (500, 1500, 4000)
-MAX_ATTEMPTS = len(BACKOFF_MS) + 1
+# 重试常量随 complete_json 一起删了：流式没有重试（一次连接吐到底，
+# 中途断了重来会让医生看到重复的半句），结构化生成的重试交给
+# openai SDK —— 它的默认策略不重试 4xx，正好是当初那条规矩要的。
 
 # 够装下最长的一份七段病历；再大只会拖慢首屏而没有实际收益
 MAX_TOKENS = 4096
@@ -121,112 +131,6 @@ class LlmClient:
             body["temperature"] = 0
         return body
 
-    async def complete_json(
-        self,
-        messages: list[ChatMessage],
-        *,
-        model: str | None = None,
-        agent_key: str = "",
-    ) -> LlmResult:
-        """调用模型并返回解析后的 JSON 对象。失败抛 LlmError，由调用方降级。"""
-        if not self.configured:
-            raise LlmError("模型通道未配置")
-
-        target_model = model or self.settings.fast_model
-        body = self._body(messages, model=target_model, json_mode=True, stream=False)
-        payload = json.dumps(body, ensure_ascii=False)
-        started = time.monotonic()
-
-        last_error: str = ""
-        for attempt in range(1, MAX_ATTEMPTS + 1):
-            try:
-                async with httpx.AsyncClient(timeout=self.settings.timeout_seconds) as client:
-                    response = await client.post(
-                        f"{self.settings.base_url}/chat/completions",
-                        headers=self._headers(),
-                        content=payload.encode("utf-8"),
-                    )
-                if response.status_code in RETRYABLE_STATUS:
-                    last_error = f"HTTP {response.status_code}"
-                    raise _Retry()
-                if response.status_code >= 400:
-                    # **不在白名单里的 4xx 直接失败，不重试。**
-                    #
-                    # 早先这里只有 raise_for_status()，抛出的 HTTPStatusError 落进下面
-                    # 那个通用 `except httpx.HTTPError`，于是 400 照样退避重试四次 ——
-                    # 上面白名单写的「4xx 参数错误重试只会重复失败」被下面的处理器架空了。
-                    # 2026-09-02 换模型时三个岗位各白等 8 秒才降级，就是这个原因。
-                    #
-                    # 而且要**带上网关的原话**。只报一句 HTTPStatusError 什么线索都没有；
-                    # 网关其实明说了 `temperature is deprecated for this model`。
-                    detail = response.text[:200].replace("\n", " ")
-                    last_error = f"HTTP {response.status_code}"
-                    self._log(agent_key, target_model, attempt, len(payload), last_error, started)
-                    raise LlmError(f"模型通道拒绝请求（HTTP {response.status_code}，不重试）：{detail}")
-                response.raise_for_status()
-                data = response.json()
-            except _Retry:
-                self._log(agent_key, target_model, attempt, len(payload), last_error, started)
-                if attempt < MAX_ATTEMPTS:
-                    await asyncio.sleep(BACKOFF_MS[attempt - 1] / 1000)
-                    continue
-                raise LlmError(f"模型通道重试 {MAX_ATTEMPTS} 次仍失败：{last_error}") from None
-            except httpx.HTTPError as exc:
-                last_error = type(exc).__name__
-                self._log(agent_key, target_model, attempt, len(payload), last_error, started)
-                if attempt < MAX_ATTEMPTS:
-                    await asyncio.sleep(BACKOFF_MS[attempt - 1] / 1000)
-                    continue
-                raise LlmError(f"模型通道请求失败：{last_error}") from exc
-
-            text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
-            usage = data.get("usage") or {}
-
-            # 解析失败时**带着纠错提示重问**，而不是去修补那串坏 JSON。
-            #
-            # 不能原样重发：temperature 固定为 0，同一请求必然得到同一份坏输出，
-            # 重试纯属浪费调用与时间。把上一轮的坏输出和错误原因回灌进去，
-            # 请求变了，模型才有机会改对。
-            #
-            # 也不做猜测性修补 —— 半截 JSON 补全后会变成一份看起来正常、
-            # 实则残缺的临床结论，这比降级到本地规则危险得多。
-            try:
-                parsed = extract_json_object(text)
-            except LlmError as exc:
-                self._log(agent_key, target_model, attempt, len(payload), "bad-json", started)
-                if attempt < MAX_ATTEMPTS:
-                    body["messages"] = [
-                        *body["messages"],
-                        {"role": "assistant", "content": text[:2000]},
-                        {
-                            "role": "user",
-                            "content": (
-                                f"上面的输出不是合法 JSON（{exc}）。"
-                                "最常见的原因是字符串值内部出现了半角双引号 \" —— 引用原文请改用中文引号「」。"
-                                "请重新输出一次完整且合法的 JSON 对象，内容不变，只修正格式。"
-                            ),
-                        },
-                    ]
-                    payload = json.dumps(body, ensure_ascii=False)
-                    await asyncio.sleep(BACKOFF_MS[attempt - 1] / 1000)
-                    continue
-                raise LlmError(f"模型连续返回不可解析的 JSON：{exc}", raw_excerpt=text) from exc
-
-            elapsed_ms = int((time.monotonic() - started) * 1000)
-            self._log(agent_key, target_model, attempt, len(payload), "ok", started)
-            return LlmResult(
-                data=parsed,
-                model=target_model,
-                elapsed_ms=elapsed_ms,
-                prompt_tokens=int(usage.get("prompt_tokens") or 0),
-                completion_tokens=int(usage.get("completion_tokens") or 0),
-                total_tokens=int(usage.get("total_tokens") or 0),
-                request_bytes=len(payload),
-                raw_text=text,
-            )
-
-        raise LlmError("模型通道不可用")
-
     async def stream_text(
         self,
         messages: list[ChatMessage],
@@ -289,63 +193,6 @@ class LlmClient:
             status=status,
             ms=int((time.monotonic() - started) * 1000),
         )
-
-
-class _Retry(Exception):
-    """内部信号：本次响应属于可重试状态码。"""
-
-
-def extract_json_object(text: str) -> dict:
-    """
-    从模型输出里取出第一个完整 JSON 对象。
-
-    只做两件事：剥 Markdown 围栏、按括号深度扫描配对。
-    刻意不做猜测性修补 —— 截断或非对象一律报错，
-    宁可降级到本地规则，也不让半截 JSON 变成看起来正常的临床结论。
-    """
-    if not text:
-        raise LlmError("模型返回为空")
-
-    body = text.strip()
-    if body.startswith("```"):
-        body = body.split("\n", 1)[1] if "\n" in body else ""
-        if body.rstrip().endswith("```"):
-            body = body.rstrip()[:-3]
-        body = body.strip()
-
-    start = body.find("{")
-    if start == -1:
-        raise LlmError("模型返回中没有 JSON 对象")
-
-    depth = 0
-    in_string = False
-    escaped = False
-    for index in range(start, len(body)):
-        char = body[index]
-        if in_string:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_string = False
-            continue
-        if char == '"':
-            in_string = True
-        elif char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(body[start : index + 1])
-                except json.JSONDecodeError as exc:
-                    raise LlmError(f"模型返回的 JSON 无法解析：{exc.msg}") from exc
-
-    raise LlmError("模型返回的 JSON 不完整（括号未闭合）")
-
-
-_client: LlmClient | None = None
 
 
 def get_llm_client() -> LlmClient:

@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
+from .schemas import DEPARTMENTS, ComorbidityOut
 from .base import Agent, require_list
 
 # 推荐科室取自闭集。放开自由生成会出现「代谢内分泌联合门诊」这类院内不存在的
 # 科室名，医生点了会诊却找不到对应科室。
-DEPARTMENTS = (
-    "内分泌科", "心内科", "神经内科", "肾内科", "消化内科", "呼吸内科",
-    "血液科", "风湿免疫科", "普外科", "骨科", "妇科", "眼科",
-    "营养科", "康复科", "精神心理科", "全科医学科",
-)
 
 # 营养筛查评分超过该值即触发营养共病提醒，与 V4.3 界面一致
 NUTRITION_ALERT_THRESHOLD = 3
@@ -28,31 +24,7 @@ class ComorbidityAgent(Agent):
     skill = "comorbidity-management"
     #: 科室闭集在代码里（DEPARTMENTS），SKILL.md 只留占位符 —— 值只有一个来源
     prompt_placeholders = {"<DEPARTMENTS>": lambda: "、".join(DEPARTMENTS)}
-    output_schema = {
-        "type": "object",
-        "required": ["detected", "conditions"],
-        "properties": {
-            "detected": {"type": "boolean"},
-            "risk_level": {"type": "string", "enum": ["高风险", "中风险", "低风险"]},
-            "summary": {"type": "string"},
-            "recommendation": {"type": "string"},
-            "conditions": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["name", "risk_level", "analysis", "recommended_dept"],
-                    "properties": {
-                        "name": {"type": "string"},
-                        "icd": {"type": "string"},
-                        "duration": {"type": "string"},
-                        "risk_level": {"type": "string", "enum": ["高危", "中危", "低危"]},
-                        "analysis": {"type": "string"},
-                        "recommended_dept": {"type": "string", "enum": list(DEPARTMENTS)},
-                    },
-                },
-            },
-        },
-    }
+    output_model = ComorbidityOut
 
     def task_instruction(self, ctx: dict, **kwargs) -> str:
         return (

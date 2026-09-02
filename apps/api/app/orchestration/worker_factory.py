@@ -26,7 +26,7 @@ from agentscope.tool import Toolkit
 
 from ..agents.safety import SAFETY_LAYER
 from .agent_loader import AgentProfile
-from .settings import build_chat_model
+from ..model_gateway import build_chat_model
 from ..skills import SkillManifest
 from .tools import TOOL_REGISTRY
 
