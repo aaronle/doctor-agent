@@ -42,7 +42,7 @@ from ..agents import (  # noqa: E402  循环导入规避：注册表在 agents �
     record_agent,
     risk_agent,
     summary_agent,
-    voice_summary_agent,
+    interview_agent,
 )
 
 AGENTS = {
@@ -52,11 +52,11 @@ AGENTS = {
     "risk": risk_agent,
     "comorbidity": comorbidity_agent,
     # **必须是产品路径上真正在跑的那个实例。**
-    # 原先指向 voice_plan_agent —— 而 /voice/complete 跑的是 voice_summary_agent。
+    # 原先指向 interview_agent —— 而 /interview/complete 跑的是 interview_agent。
     # 于是在控制台改「语音问诊」的提示词、存草稿、发布，改的全是一个已经不运行的岗位：
     # 界面一切正常，发布也成功，唯独线上行为一个字都不变。
     # 配置界面指错实例是最难发现的一类 bug —— 它没有任何报错。
-    "voice": voice_summary_agent,
+    "interview": interview_agent,
 }
 
 # 岗位中文名。名字只在注册表里有一份，Agent 实例上没有 `.name` ——
@@ -70,7 +70,7 @@ AGENT_TASKS = {
     "diagnosis": ["鉴别诊断", "诊断管理"],
     "risk": ["风险管理"],
     "comorbidity": ["共病管理"],
-    "voice": ["语音问诊"],
+    "interview": ["问诊小结"],
 }
 
 

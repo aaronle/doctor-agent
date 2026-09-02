@@ -271,7 +271,6 @@ export interface RuntimeConfig {
   model: string
   max_tokens: number
   mock_generation: boolean
-  voice_mode: string
 }
 
 export type QualityMetric = { name: string; value: number; basis: string }
@@ -573,7 +572,7 @@ export const api = {
     ),
 
   // 问诊开场包：一次返回播放一整场问诊所需的全部内容
-  voiceInit: (id: string) =>
+  interviewInit: (id: string) =>
     get<{
       greeting: string
       patient_name: string
@@ -584,7 +583,7 @@ export const api = {
       observations: string[]
       provider: string
       degraded: boolean
-    }>(`/api/emr/voice/init/${id}`),
+    }>(`/api/emr/interview/init/${id}`),
   /** 重新接诊：把已完成的患者放回候诊队列（提交病历会让患者出队）。 */
   requeuePatient: (patientId: string) =>
     post<{ ok: boolean; message: string; changed: boolean }>('/api/his/patients/requeue', { patient_id: patientId }),
@@ -647,15 +646,10 @@ export const api = {
     post<RecordQuality>('/api/emr/record/quality', { patient_id: patientId, fields }),
 
   /** 语义覆盖判定：判断追问清单里哪些已在对话中得到回答 */
-  voiceCoverage: (patientId: string, openQuestions: string[], transcript: { role: string; text: string }[]) =>
-    post<{ covered: { index: number; evidence: string }[]; provider: string; degraded: boolean }>(
-      '/api/emr/voice/coverage',
-      { patient_id: patientId, open_questions: openQuestions, transcript },
-    ),
-  voiceComplete: (body: Record<string, unknown>) => post<Record<string, unknown>>('/api/emr/voice/complete', body),
-  voiceHistory: (id: string) =>
+  interviewComplete: (body: Record<string, unknown>) => post<Record<string, unknown>>('/api/emr/interview/complete', body),
+  interviewHistory: (id: string) =>
     get<{ patient_id: string; sessions: { ended_at: string; summary: string; messages: unknown[] }[] }>(
-      `/api/emr/voice/history/${id}`,
+      `/api/emr/interview/history/${id}`,
     ),
 
   /** 确认并回写诊断。服务端会再校验一次红色风险闭环，前端禁用只是体验。 */

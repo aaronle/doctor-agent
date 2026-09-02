@@ -1,5 +1,5 @@
 """
-语音问诊智能体（F01）。
+问诊小结智能体（F01）。
 
 产出**问诊小结** —— 把一轮对话收敛成结构化摘要，供医生审阅后决定是否写进病历。
 
@@ -18,13 +18,13 @@ from .schemas import InterviewSummaryOut
 from .base import Agent, require_list
 
 
-class VoiceSummaryAgent(Agent):
+class InterviewSummaryAgent(Agent):
     """收尾：把整轮问诊收敛成结构化小结。"""
 
-    key = "voice"
+    key = "interview"
     version = "mvp-1.1.0"
     context_fields = ("primary_diagnosis", "diagnoses", "past_history")
-    skill = "voice-interview"
+    skill = "interview-summary"
     output_model = InterviewSummaryOut
 
     def task_instruction(self, ctx: dict, **kwargs) -> str:

@@ -32,7 +32,7 @@ from ..agents import (
     record_field_agent,
     risk_agent,
     summary_agent,
-    voice_summary_agent,
+    interview_agent,
 )
 from .. import cache
 from ..agents.context import build_context, has_interview, latest_dialog, seed_items, seed_payload
@@ -40,7 +40,7 @@ from ..audit import next_id, record_audit
 from ..schemas import StrictIn
 from ..database import SessionLocal, get_session
 from ..llm import ChatMessage, LlmError, get_llm_client
-from ..models import AuditLog, Patient, RecordDraft, Referral, VoiceSession
+from ..models import AuditLog, Patient, RecordDraft, Referral, InterviewSession
 from ..record_quality import evaluate
 from ..obs import event
 
@@ -212,7 +212,7 @@ def unlock_analysis(body: UnlockIn, session: Session = Depends(get_session)) -> 
     """
     解锁 AI 分析。
 
-    两条路径：问诊结束（`interview`，由 voice/complete 自动调）与
+    两条路径：问诊结束（`interview`，由 interview/complete 自动调）与
     医生显式跳过（`skipped`）。**跳过这条不能少** —— 复诊、患者不配合、
     医生已自行问完，这些情况下分析不能因此永远出不来。
     """
@@ -340,7 +340,7 @@ async def report_summary(
         "suspected_diagnoses": diagnosis_data.get("suspected_diagnoses", []),
         "differential_diagnosis": diagnosis_data.get("differential_diagnosis", {}),
         "visit_history": (patient.payload or {}).get("visit_history", []),
-        "voice_assessments": {},
+        "interview_assessments": {},
         "assessment_triggers": [],
         "comorbidity": comorbidity_data,
         # 种子是历史记录，审计是本次操作 —— 两段合起来才是完整的时间线
@@ -399,7 +399,7 @@ AUDIT_TIMELINE_LABELS = {
     "write_back_diagnosis": ("doctor", "确认并回写诊断"),
     "handle_red_alert": ("doctor", "处置红色风险"),
     "qc_review": ("doctor", "审阅质控提醒"),
-    "voice_complete": ("ai", "语音问诊完成"),
+    "interview_complete": ("ai", "问诊完成"),
     "request_consultation": ("doctor", "申请会诊"),
     "generate_record": ("ai", "生成病历草稿"),
     "create_referral": ("doctor", "提交转诊单"),
@@ -737,21 +737,21 @@ def record_quality(body: RecordQualityIn, session: Session = Depends(get_session
     return evaluate(body.fields, dialog_text=dialog_text)
 
 
-# ------------------------------------------------------------------ 语音问诊
+# ------------------------------------------------------------------ 问诊
 
 
-class VoiceCompleteIn(StrictIn):
+class InterviewCompleteIn(StrictIn):
     patient_id: str
     conversation_summary: str = ""
     messages: list = Field(default_factory=list)
 
 
-@router.get("/voice/init/{patient_id}")
-async def voice_init(patient_id: str, session: Session = Depends(get_session)) -> dict:
+@router.get("/interview/init/{patient_id}")
+async def interview_init(patient_id: str, session: Session = Depends(get_session)) -> dict:
     """
     问诊开场包。一次返回播放一整场问诊所需的全部内容。
 
-    **不再调模型**（2026-09-02）。原先这里会跑 `voice_plan_agent` 生成
+    **不再调模型**（2026-09-02）。原先这里会跑 `interview_agent` 生成
     「AI 追问提示」与「补充观察」两份清单 —— 那两块一期已撤（没有临床知识库
     支撑时，建议错一条的代价大于不给建议），产出没有任何消费方。
 
@@ -779,14 +779,14 @@ async def voice_init(patient_id: str, session: Session = Depends(get_session)) -
     }
 
 
-@router.post("/voice/complete")
-async def voice_complete(body: VoiceCompleteIn, session: Session = Depends(get_session)) -> dict:
+@router.post("/interview/complete")
+async def interview_complete(body: InterviewCompleteIn, session: Session = Depends(get_session)) -> dict:
     patient = _patient_or_404(session, body.patient_id)
     ctx = build_context(session, patient)
-    outcome = await _run_isolated(voice_summary_agent, ctx, conversation_summary=body.conversation_summary)
+    outcome = await _run_isolated(interview_agent, ctx, conversation_summary=body.conversation_summary)
 
-    record = VoiceSession(
-        id=next_id(session, VoiceSession, "V"),
+    record = InterviewSession(
+        id=next_id(session, InterviewSession, "V"),
         patient_id=body.patient_id,
         summary=outcome.data.get("summary", ""),
         messages=body.messages,
@@ -795,8 +795,8 @@ async def voice_complete(body: VoiceCompleteIn, session: Session = Depends(get_s
     session.add(record)
     record_audit(
         session,
-        action="voice_complete",
-        entity="voice_session",
+        action="interview_complete",
+        entity="interview_session",
         entity_id=record.id,
         patient_id=body.patient_id,
         detail={"provider": outcome.provider, "turns": len(body.messages)},
@@ -817,11 +817,11 @@ async def voice_complete(body: VoiceCompleteIn, session: Session = Depends(get_s
     }
 
 
-@router.get("/voice/history/{patient_id}")
-def voice_history(patient_id: str, session: Session = Depends(get_session)) -> dict:
+@router.get("/interview/history/{patient_id}")
+def interview_history(patient_id: str, session: Session = Depends(get_session)) -> dict:
     _patient_or_404(session, patient_id)
     sessions = session.scalars(
-        select(VoiceSession).where(VoiceSession.patient_id == patient_id).order_by(VoiceSession.ended_at.desc())
+        select(InterviewSession).where(InterviewSession.patient_id == patient_id).order_by(InterviewSession.ended_at.desc())
     ).all()
     return {
         "patient_id": patient_id,

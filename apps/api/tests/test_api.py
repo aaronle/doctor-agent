@@ -44,7 +44,10 @@ def test_health_never_leaks_api_key(client):
 def test_config_returns_empty_api_key(client):
     body = client.get("/api/config").json()
     assert body["api_key"] == ""
-    assert body["voice_mode"] == "webspeech"
+    # `voice_mode` 已于 2026-09-03 删除：它声称「一期 ASR 走浏览器 Web Speech API」，
+    # 而全仓零行 SpeechRecognition，前端也从没读过它。
+    # **接口契约里的一句假话，比缺一个字段危险得多。**
+    assert "voice_mode" not in body
     # 本地规则模式下必须告诉前端当前不是真实生成
     assert body["mock_generation"] is True
 
@@ -131,7 +134,7 @@ def test_report_summary_has_all_contract_fields(client):
         "overall_conclusion", "risk_assessments", "risk_alerts", "treatment_effectiveness",
         "recommended_orders", "examinations", "todos", "dialog_script", "record_nodes",
         "is_return_visit", "pre_consultation_done", "suspected_diagnoses",
-        "differential_diagnosis", "visit_history", "voice_assessments",
+        "differential_diagnosis", "visit_history", "interview_assessments",
         "assessment_triggers", "record_content", "comorbidity",
     ):
         assert field in body, f"聚合包缺少契约字段 {field}"
@@ -189,10 +192,10 @@ def test_record_field_fallback_preserves_doctor_input(client):
 
 def test_voice_session_is_persisted_and_listed(client):
     client.post(
-        "/api/emr/voice/complete",
+        "/api/emr/interview/complete",
         json={"patient_id": "P004", "conversation_summary": "头晕两周", "messages": [{"role": "patient", "text": "头晕"}]},
     )
-    history = client.get("/api/emr/voice/history/P004").json()
+    history = client.get("/api/emr/interview/history/P004").json()
     assert history["patient_id"] == "P004"
     assert len(history["sessions"]) >= 1
 
@@ -278,14 +281,14 @@ def test_voice_init_gives_the_script_without_calling_a_model(client):
     """
     问诊开场包只做数据组装，**不调模型**（2026-09-02）。
 
-    原先这里会跑 voice_plan_agent 生成追问清单与补充观察，那两块已撤，
+    原先这里会跑 interview_agent 生成追问清单与补充观察，那两块已撤，
     产出没有消费方 —— 留着等于每点一次「开始问诊」白花 7.3 秒和一次
     真实模型费用，换一份直接丢掉的输出。
 
     questions / observations 仍在返回体里但恒为空：保留字段是为了老前端
     拿到的形状不变，恒空是为了没人能顺手把它接回去而不被发现。
     """
-    body = client.get("/api/emr/voice/init/P006").json()
+    body = client.get("/api/emr/interview/init/P006").json()
     for field in ("greeting", "patient_name", "chief_complaint", "dialog"):
         assert field in body, f"问诊开场包缺少 {field}"
     assert len(body["dialog"]) > 0, "P006 应有演示对话脚本"
@@ -356,8 +359,8 @@ def test_removed_interview_suggestion_endpoints_stay_removed(client):
     「现在有知识库了吗」。
     """
     for path, payload in (
-        ("/api/emr/voice/coverage", {"patient_id": "P006", "open_questions": [], "transcript": []}),
-        ("/api/emr/voice/turn", {"patient_id": "P001", "patient_text": "最近口渴", "turn_index": 2}),
+        ("/api/emr/interview/coverage", {"patient_id": "P006", "open_questions": [], "transcript": []}),
+        ("/api/emr/interview/turn", {"patient_id": "P001", "patient_text": "最近口渴", "turn_index": 2}),
     ):
         code = client.post(path, json=payload).status_code
         # 405 而不是 404：SPA 兜底路由只接 GET/HEAD，POST 到未知路径落在它上面。
@@ -435,7 +438,7 @@ def test_context_prefers_real_interview_over_seed_script(client):
         session.close()
 
     client.post(
-        "/api/emr/voice/complete",
+        "/api/emr/interview/complete",
         json={
             "patient_id": "P005",
             "conversation_summary": "医生：最近怎么样？\n患者：体重又掉了两斤。",
@@ -665,7 +668,7 @@ def test_draft_rejects_empty_prompt_and_unknown_tier(client):
 
 
 def test_publish_without_draft_is_rejected(client):
-    assert client.post("/api/admin/agents/voice/publish").status_code == 400
+    assert client.post("/api/admin/agents/interview/publish").status_code == 400
 
 
 def test_run_log_never_returns_record_content(client):
@@ -1870,7 +1873,7 @@ def test_workstation_does_not_borrow_the_demo_script_as_this_visit_dialog():
 
 def test_finishing_the_interview_unlocks_and_marks_it_as_interviewed(client):
     """问诊结束是主路径：自动解锁，且标为 interview 而不是 skipped。"""
-    resp = client.post("/api/emr/voice/complete", json={
+    resp = client.post("/api/emr/interview/complete", json={
         "patient_id": "P004",
         "conversation_summary": "医生：头晕多久了\n患者：一个月",
         "messages": [{"role": "doctor", "text": "头晕多久了"}, {"role": "patient", "text": "一个月"}],
@@ -1891,7 +1894,7 @@ def test_after_a_real_interview_the_dialog_comes_from_it(client):
     from app.agents.context import latest_dialog
     from app.database import SessionLocal
 
-    client.post("/api/emr/voice/complete", json={
+    client.post("/api/emr/interview/complete", json={
         "patient_id": "P005",
         "conversation_summary": "医生：家里有糖尿病史吗\n患者：父亲有",
         "messages": [{"role": "doctor", "text": "家里有糖尿病史吗"}, {"role": "patient", "text": "父亲有"}],
@@ -2062,7 +2065,7 @@ def test_topology_exposes_all_four_layers(client):
     assert len(body["master"]["workflow"]) == 6
 
     names = {w["name"] for w in body["workers"]}
-    assert names == {"summary", "diagnosis", "record", "risk", "comorbidity", "voice"}
+    assert names == {"summary", "diagnosis", "record", "risk", "comorbidity", "interview"}
 
     for w in body["workers"]:
         assert w["skills"], f"{w['name']} 没挂 skill"
@@ -2715,7 +2718,7 @@ def test_safety_layer_holds_clinical_rules_not_output_formatting():
 
 ALL_PRODUCT_AGENTS = (
     "summary_agent", "record_agent", "record_field_agent", "diagnosis_agent",
-    "risk_agent", "comorbidity_agent", "voice_summary_agent",
+    "risk_agent", "comorbidity_agent", "interview_agent",
 )
 
 
@@ -3046,3 +3049,45 @@ def test_gateway_retry_window_is_not_the_sdk_default():
     assert model.client.max_retries >= 4, (
         f"重试次数被降到了 {model.client.max_retries}，重试窗口不够覆盖网关抖动"
     )
+
+
+def test_nothing_in_the_backend_claims_to_do_speech_recognition():
+    """
+    「语音」这个词不该出现在后端的岗位、技能与端点命名里。
+
+    全仓**零行语音识别代码** —— 没有 SpeechRecognition、MediaRecorder、
+    getUserMedia。实际形态是一个文本框：医生用系统的语音输入法或直接打字填，
+    再加一段脚本对话回放。
+
+    **标记一个不存在的能力比不标更糟**：它会让人以为系统在录音，
+    也会让下一个接手的人去找根本不存在的语音模块。
+    2026-09-03 起后端一律叫「问诊」。
+
+    CSS 类名（`voice-ready-hint` 等）不在此列 —— 那些是 V4.3 原件的类名，
+    是与参考实现的契约，还原度门禁在逐个比对，改了会破坏门禁而不带来任何收益。
+    """
+    from pathlib import Path
+
+    app_dir = Path(__file__).resolve().parents[1] / "app"
+    offenders = []
+    for path in app_dir.rglob("*.py"):
+        in_docstring = False
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.count('"""') == 1:
+                in_docstring = not in_docstring
+            low = line.lower()
+            if "voice" not in low and "语音" not in line:
+                continue
+            # 说明这段历史的注释与文档字符串是**应该保留**的 ——
+            # 「为什么表名还叫 voice_sessions」这类答案没了才是真问题
+            stripped = line.strip()
+            # **注释与文档字符串一律豁免。** 「为什么表名还叫 voice_sessions」
+            # 「这里为什么没有语音识别」这类说明正是要留住的东西 ——
+            # 把它们一起清掉，下一个人只会重新踩一遍。
+            if in_docstring or stripped.startswith(("#", '"""', "*", ">", "'", "语音", "-")):
+                continue
+            if "__tablename__" in line:      # 表名保留有据，见 models.py 的说明
+                continue
+            offenders.append(f"{path.name}:{lineno} {stripped[:80]}")
+
+    assert not offenders, "后端还有「语音」命名：\n" + "\n".join(offenders)

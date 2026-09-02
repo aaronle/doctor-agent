@@ -15,7 +15,7 @@ prompt-file: prompts/doctor-persona.md
 # 看诊不是固定流程：危急值优先、患者不配合时跳过问诊、复诊直接看趋势，都由 Master 判断。
 workflow:
   - call_risk_management
-  - call_voice_interview
+  - call_interview_summary
   - call_condition_summary
   - call_differential_diagnosis
   - call_comorbidity_management

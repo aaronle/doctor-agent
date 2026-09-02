@@ -75,7 +75,7 @@ const PROP_EXEMPTIONS = {
  * 锁着的（整页让位给说明卡）——不先解锁，这四页一个元素都取不到，
  * 比出来会是「重建版缺一大片」，而那是状态差异不是漏做。
  *
- * 走 voice/complete 而不是 analysis/unlock：前者会落一份真实 VoiceSession，
+ * 走 voice/complete 而不是 analysis/unlock：前者会落一份真实 InterviewSession，
  * 上下文里就有对话，产出的内容量与原件可比；后者是「跳过」，没有对话，
  * 分析会明显更薄，比的就不是同一个东西了。
  */
@@ -83,7 +83,7 @@ async function ensureAnalysisUnlocked(page, apiBase, patientId) {
   await page.evaluate(async ({ base, pid }) => {
     const state = await fetch(`${base}/api/emr/visit-state/${pid}`).then((r) => r.json()).catch(() => null);
     if (state?.analysis_unlocked) return;
-    await fetch(`${base}/api/emr/voice/complete`, {
+    await fetch(`${base}/api/emr/interview/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

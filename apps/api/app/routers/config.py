@@ -25,8 +25,10 @@ def _current() -> dict:
         "max_tokens": 4096,
         # 让前端知道当前是真实生成还是本地规则
         "mock_generation": not ai.configured,
-        # 一期 ASR 走浏览器 Web Speech API，不可用时降级为手动输入
-        "voice_mode": "webspeech",
+        # 这里原来有个 `"voice_mode": "webspeech"`，注释写着「一期 ASR 走浏览器
+        # Web Speech API」—— **那是假的**：全仓零行 SpeechRecognition，
+        # 前端也只声明了这个字段的类型、从没读过它。
+        # 一句写在接口契约里的假话，比没有这个字段危险得多。已于 2026-09-03 删除。
     }
 
 

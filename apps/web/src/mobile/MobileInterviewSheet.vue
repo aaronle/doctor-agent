@@ -3,12 +3,12 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import { useWorkstation } from '../stores/workstation'
-import type { useVoiceInterview } from '../composables/useVoiceInterview'
+import type { useInterview } from '../composables/useInterview'
 
 /**
  * 语音问诊底部面板。
  *
- * 复用桌面端同一个 useVoiceInterview —— 状态机、追问清单的语义覆盖判定、
+ * 复用桌面端同一个 useInterview —— 状态机、追问清单的语义覆盖判定、
  * 全都是同一份实现。手机上只是换了呈现：
  * 桌面把问诊做成右栏悬浮，手机没有那个空间，
  * 改为面板内两段。
@@ -17,7 +17,7 @@ import type { useVoiceInterview } from '../composables/useVoiceInterview'
  * 不触达 HIS/EMR，所以手机上允许。病历草稿的重新生成留在工作站。
  */
 
-const props = defineProps<{ open: boolean; voice: ReturnType<typeof useVoiceInterview> }>()
+const props = defineProps<{ open: boolean; voice: ReturnType<typeof useInterview> }>()
 const emit = defineEmits<{ close: [] }>()
 
 const ws = useWorkstation()

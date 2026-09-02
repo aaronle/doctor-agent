@@ -51,7 +51,7 @@ AGENT_LABELS = {
     "diagnosis": "鉴别诊断",
     "risk": "风险管理",
     "comorbidity": "共病管理",
-    "voice": "语音问诊",
+    "interview": "问诊小结",
 }
 
 

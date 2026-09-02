@@ -6,10 +6,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import MobileAnalysis from './MobileAnalysis.vue'
 import MobileMenu from './MobileMenu.vue'
 import MobileRecords from './MobileRecords.vue'
-import MobileVoiceSheet from './MobileVoiceSheet.vue'
+import MobileInterviewSheet from './MobileInterviewSheet.vue'
 import type { MenuAction, RecordSegment } from './types'
 import { useCopilotChat } from '../composables/useCopilotChat'
-import { useVoiceInterview } from '../composables/useVoiceInterview'
+import { useInterview } from '../composables/useInterview'
 import { useWorkstation } from '../stores/workstation'
 
 /**
@@ -44,7 +44,7 @@ const recordSegment = ref<RecordSegment | ''>('')
 const patient = computed(() => ws.patient)
 const summary = computed(() => ws.summary)
 
-const voice = useVoiceInterview(() => ws.patientId)
+const voice = useInterview(() => ws.patientId)
 
 const {
   chatInput,
@@ -398,7 +398,7 @@ function showDegraded() {
     </div>
 
     <MobileMenu :open="menuOpen" @close="menuOpen = false" @pick="onMenuPick" />
-    <MobileVoiceSheet :open="voiceOpen" :voice="voice" @close="voiceOpen = false" />
+    <MobileInterviewSheet :open="voiceOpen" :voice="voice" @close="voiceOpen = false" />
 
     <template v-if="promptsOpen">
       <div class="m-scrim" @click="promptsOpen = false" />

@@ -3,7 +3,7 @@
 
 分三组：
   - 临床种子：从 references/ui-demo/extracted/fixtures/ 导入，运行期只读。
-  - 运行时写入：医嘱、转诊、住院、语音会话、病历草稿、提醒。
+  - 运行时写入：医嘱、转诊、住院、问诊记录、病历草稿、提醒。
   - Agent 与治理：版本、每次运行记账、审计、请求日志。
 
 一期只用虚构病例，不接真实患者数据。
@@ -124,7 +124,22 @@ class Admission(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
-class VoiceSession(Base):
+class InterviewSession(Base):
+    """
+    一场问诊的记录：对话、小结、结构化分析。
+
+    **表名仍是 `voice_sessions`，是有意保留的。**
+
+    2026-09-03 类名从 `VoiceSession` 改成 `InterviewSession` —— 因为「语音」
+    在这个产品里名不副实：全仓零行语音识别代码（没有 SpeechRecognition、
+    MediaRecorder、getUserMedia），实际形态是一个文本框，医生用系统的
+    语音输入法或直接打字填，加一段脚本对话回放。
+
+    但表名没跟着改：生产库里有真实的演示问诊记录，`create_all` 不做迁移，
+    改名会建一张空表、把旧数据孤儿化。**为一个内部命名去冒丢数据的风险不划算。**
+    等哪天有了迁移机制再一起改；在此之前，这段注释就是那个「为什么不一致」的答案。
+    """
+
     __tablename__ = "voice_sessions"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)

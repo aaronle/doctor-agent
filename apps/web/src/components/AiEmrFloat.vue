@@ -6,7 +6,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, streamSse, type RecordQuality, type RiskItem } from '../api'
 import { RECORD_SECTIONS, useWorkstation } from '../stores/workstation'
 import { useCopilotChat } from '../composables/useCopilotChat'
-import { useVoiceInterview } from '../composables/useVoiceInterview'
+import { useInterview } from '../composables/useInterview'
 import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '../composables/diagnosisCommands'
 
 const ws = useWorkstation()
@@ -147,7 +147,7 @@ function startResize(event: MouseEvent) {
   window.addEventListener('mouseup', up)
 }
 
-const voice = useVoiceInterview(() => ws.patientId)
+const voice = useInterview(() => ws.patientId)
 
 /**
  * 外部（红线横幅的「逐条处置」）要求切到某个标签页。

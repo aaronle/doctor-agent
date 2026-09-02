@@ -41,7 +41,7 @@ export interface VoiceTurnMessage {
 /** 每条对话的播放间隔。太快看不清逐条推进，太慢演示拖沓。 */
 const TURN_INTERVAL_MS = 1400
 
-export function useVoiceInterview(getPatientId: () => string) {
+export function useInterview(getPatientId: () => string) {
   const state = ref<VoiceState>('idle')
   const messages = ref<VoiceTurnMessage[]>([])
   const error = ref('')
@@ -96,7 +96,7 @@ export function useVoiceInterview(getPatientId: () => string) {
     state.value = 'playing'
 
     try {
-      const init = await api.voiceInit(patientId)
+      const init = await api.interviewInit(patientId)
       degraded.value = Boolean(init.degraded)
       if (degraded.value) {
         error.value = '模型通道不可用，本次问诊按本地规则进行。'
@@ -176,7 +176,7 @@ export function useVoiceInterview(getPatientId: () => string) {
     const patientId = getPatientId()
     if (!patientId || !messages.value.length) return
     try {
-      await api.voiceComplete({
+      await api.interviewComplete({
         patient_id: patientId,
         conversation_summary: messages.value
           .map((m) => `${m.role === 'doctor' ? '医生' : '患者'}：${m.text}`)

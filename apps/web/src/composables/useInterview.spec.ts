@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useVoiceInterview } from './useVoiceInterview'
+import { useInterview } from './useInterview'
 
 const DIALOG = [
   { role: 'doctor', text: '哪一侧肢体无力？' },
@@ -17,7 +17,7 @@ function stubInit(payload: Partial<Record<string, unknown>> = {}, coverage: { in
       if (url.includes('/voice/coverage')) {
         return new Response(JSON.stringify({ covered: coverage, provider: 'haiku', degraded: false }), { status: 200 })
       }
-      if (url.includes('/voice/init/')) {
+      if (url.includes('/interview/init/')) {
         return new Response(
           JSON.stringify({
             greeting: '您好',
@@ -46,7 +46,7 @@ afterEach(() => {
 })
 
 /** 起播并推进 n 条对话 */
-async function play(voice: ReturnType<typeof useVoiceInterview>, turns: number) {
+async function play(voice: ReturnType<typeof useInterview>, turns: number) {
   await voice.start()
   // start() 内部第一条是立即播出的，其余按定时器推进
   for (let i = 1; i < turns; i += 1) await vi.advanceTimersByTimeAsync(1400)
@@ -55,7 +55,7 @@ async function play(voice: ReturnType<typeof useVoiceInterview>, turns: number) 
 describe('语音问诊', () => {
   it('按脚本逐条播放，不是一次性刷出全部对话', async () => {
     stubInit()
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
 
     await voice.start()
     expect(voice.messages.value).toHaveLength(1)
@@ -69,7 +69,7 @@ describe('语音问诊', () => {
 
   it('内容播完只进 awaiting，不算问诊结束', async () => {
     stubInit()
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await play(voice, DIALOG.length)
     await vi.advanceTimersByTimeAsync(1400)
 
@@ -81,7 +81,7 @@ describe('语音问诊', () => {
 
   it('awaiting 时问诊仍算进行中 —— 内容播完不等于问诊结束', async () => {
     stubInit()
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await play(voice, DIALOG.length)
     await vi.advanceTimersByTimeAsync(1400)
 
@@ -92,7 +92,7 @@ describe('语音问诊', () => {
 
   it('只有医生点结束才转 ended', async () => {
     stubInit()
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await play(voice, DIALOG.length)
     await vi.advanceTimersByTimeAsync(1400)
     expect(voice.state.value).toBe('awaiting')
@@ -104,7 +104,7 @@ describe('语音问诊', () => {
 
   it('结束后手动补录会回到 awaiting，不是重开一场', async () => {
     stubInit()
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await play(voice, DIALOG.length)
     await vi.advanceTimersByTimeAsync(1400)
     await voice.finish()
@@ -124,7 +124,7 @@ describe('语音问诊', () => {
 
   it('落库不改变状态 —— 生成/更新不该顺手把问诊结束掉', async () => {
     stubInit()
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await voice.start()
     expect(voice.state.value).toBe('playing')
 
@@ -140,7 +140,7 @@ describe('语音问诊', () => {
 
   it('继续问诊：脚本没播完就接着播', async () => {
     stubInit()
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await voice.start()
     await vi.advanceTimersByTimeAsync(1400)
     const played = voice.messages.value.length
@@ -157,7 +157,7 @@ describe('语音问诊', () => {
 
   it('继续问诊：内容已播完则切回可录入状态，不假装还有可播的', async () => {
     stubInit()
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await play(voice, DIALOG.length)
     await vi.advanceTimersByTimeAsync(1400)
     await voice.finish()
@@ -172,7 +172,7 @@ describe('语音问诊', () => {
 
   it('没有演示脚本时不假装播放', async () => {
     stubInit({ dialog: [] })
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await voice.start()
 
     expect(voice.state.value).toBe('awaiting')
@@ -182,7 +182,7 @@ describe('语音问诊', () => {
 
   it('模型降级时显式标注，不静默给通用清单', async () => {
     stubInit({ degraded: true })
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await voice.start()
 
     expect(voice.degraded.value).toBe(true)
@@ -194,7 +194,7 @@ describe('语音问诊', () => {
 
   it('一条都没录到就点结束，状态机照样收尾', async () => {
     stubInit({ dialog: [] })
-    const voice = useVoiceInterview(() => 'P006')
+    const voice = useInterview(() => 'P006')
     await voice.start()
     expect(voice.messages.value).toHaveLength(0)
 
@@ -214,7 +214,7 @@ describe('语音问诊', () => {
     // 等知识库就位再接），所以**必须有一条测试盯住前端不消费它们** ——
     // 否则哪天有人「顺手接上」，一个不准的清单就又回到医生眼前了。
     stubInit()
-    const voice = useVoiceInterview(() => 'P006') as unknown as Record<string, unknown>
+    const voice = useInterview(() => 'P006') as unknown as Record<string, unknown>
     await (voice.start as () => Promise<void>)()
 
     for (const gone of [
@@ -224,7 +224,7 @@ describe('语音问诊', () => {
       'toggleQuestionDone', 'toggleObservation', 'judgeCoverage', 'coverageDegraded',
       'askManual', 'manualThinking',
     ]) {
-      expect(voice[gone], `useVoiceInterview 不该再暴露 ${gone}`).toBeUndefined()
+      expect(voice[gone], `useInterview 不该再暴露 ${gone}`).toBeUndefined()
     }
   })
 })

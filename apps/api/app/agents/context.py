@@ -11,7 +11,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import Patient, SeedDocument, VoiceSession
+from ..models import Patient, SeedDocument, InterviewSession
 
 # 临床推理所需的最小充分集合。刻意排除 id_no、phone 等身份信息。
 CLINICAL_FIELDS = (
@@ -90,9 +90,9 @@ def build_context(
 
 
 def has_interview(session: Session, patient_id: str) -> bool:
-    """这一场就诊有没有真做过问诊（存在 VoiceSession 即为有）。"""
+    """这一场就诊有没有真做过问诊（存在 InterviewSession 即为有）。"""
     return session.scalar(
-        select(VoiceSession.id).where(VoiceSession.patient_id == patient_id).limit(1)
+        select(InterviewSession.id).where(InterviewSession.patient_id == patient_id).limit(1)
     ) is not None
 
 
@@ -103,15 +103,15 @@ def latest_dialog(session: Session, patient_id: str, *, seed_fallback: bool = Tr
     优先用**医生实际做过的那场问诊**。没有做过时：
 
     - `seed_fallback=True`（默认）退回演示脚本 —— 回归集与控制台试运行要靠它，
-      那些场景本来就不会有 VoiceSession。
+      那些场景本来就不会有 InterviewSession。
     - `seed_fallback=False` 返回空 —— **工作站走这条**。医生跳过问诊时，
       拿一段他从没做过的对话去生成「病情概要」「鉴别诊断」，比不给分析更糟：
       那是把演示数据当成了本次问诊的事实。
     """
     latest = session.scalar(
-        select(VoiceSession)
-        .where(VoiceSession.patient_id == patient_id)
-        .order_by(VoiceSession.ended_at.desc())
+        select(InterviewSession)
+        .where(InterviewSession.patient_id == patient_id)
+        .order_by(InterviewSession.ended_at.desc())
         .limit(1)
     )
     if latest and latest.messages:
