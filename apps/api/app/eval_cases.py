@@ -433,20 +433,53 @@ def _risk_items(data: dict) -> list[dict]:
     return [i for i in items if isinstance(i, dict)] if isinstance(items, list) else []
 
 
+#: 出现在数字**前面**的这些词，说明它是「目标值 / 阈值 / 参考范围」，
+#: 而不是「这位患者测出来的值」。
+#:
+#: 这批词是实测补出来的：第一版没有它，Haiku 的失败**全部**是
+#: 「血压控制目标 <140/90」「颈动脉狭窄 >70%」这类指南阈值被判成编造 ——
+#: 那是正当的临床知识，不是伪造患者数据。**误报比没有校验更糟**：
+#: 照那版结论会把 risk 判成「Haiku 会编数」，而事实完全不是。
+_THRESHOLD_MARKERS = (
+    "<", "＜", "≤", ">", "＞", "≥",
+    "小于", "低于", "高于", "大于", "超过", "不足",
+    "目标", "标准", "参考", "指南", "建议", "控制在", "达标", "理想", "阈值", "应",
+)
+
+#: 往数字前面看多少个字符找上述标记。太短会漏（「控制目标 <140/90」），
+#: 太长会把上一句的词算进来。
+_MARKER_WINDOW = 10
+
+
+def _looks_like_threshold(text: str, at: int) -> bool:
+    head = text[max(0, at - _MARKER_WINDOW) : at]
+    return any(m in head for m in _THRESHOLD_MARKERS)
+
+
 def check_risk_evidence_grounded(data: dict, ctx: dict) -> tuple[bool, str]:
     """
-    依据里出现的数字，**必须在上下文里找得到**。
+    依据里**作为患者实测值出现**的数字，必须在上下文里找得到。
 
     这是编造检测，不是质量检测：模型写「HbA1c 9.2%」而档案里是 8.6%，
     医生照着这条判断就是错的。比「没写数值」严重得多，所以单列一条。
+
+    **目标值与阈值不在此列** —— 「血压目标 <140/90」「狭窄 >70% 为重度」
+    是临床知识，不是患者数据。判据是数字前面有没有比较/目标类的词。
+
+    这是启发式，有其上限：模型完全可以把一个编造的患者值伪装成「目标」。
+    但另一种做法（凡是上下文里没有的数字一律判编造）会把每条带指南阈值的
+    依据都标红 —— 那样这条校验会先被人学会忽略，然后就再也不起作用了。
     """
     known = _context_numbers(ctx)
     bad: list[str] = []
     for item in _risk_items(data):
         text = f"{item.get('evidence', '')} {item.get('assessment', '')}"
-        for raw in _MEANINGFUL_NUMBER.findall(text):
-            if _norm_number(raw) not in known:
-                bad.append(f"{item.get('name', '?')}：{raw}")
+        for m in _MEANINGFUL_NUMBER.finditer(text):
+            if _norm_number(m.group()) in known:
+                continue
+            if _looks_like_threshold(text, m.start()):
+                continue
+            bad.append(f"{item.get('name', '?')}：{m.group()}")
     if bad:
         return False, f"依据里的数字在上下文中不存在（疑似编造）：{'；'.join(bad[:4])}"
     return True, ""
@@ -508,11 +541,70 @@ def check_risk_fields_filled(data: dict, ctx: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def check_risk_must_cover(keywords: list[str]) -> Callable:
+    """
+    上下文里已有阳性发现的，必须落成一条风险项 —— **漏项**。
+
+    这条是 2026-09-02 那次 Haiku/Sonnet 内容比对留下的。两边结构分打平
+    （各 8/8），但 P001 上下文里明明写着「双眼底照相示双眼糖尿病视网膜病变
+    （NPDR 轻度），微动脉瘤(+)」，Haiku 四条风险里一个字没提，Sonnet 列了。
+
+    漏项是这一岗最贵的错，也恰好是前面四条结构校验**一条都看不见**的：
+    格式、数值溯源、条数、字段完整全都正常，缺的那块在盘子外面。
+    人工比对能发现它，但人工比对不会自己重跑 —— 所以固化成用例。
+    """
+
+    def _check(data: dict, ctx: dict) -> tuple[bool, str]:
+        # 查的是**医生实际看到的那张表**，不是模型输出的那一半。
+        #
+        # 界面上的风险列表是 merge_risks(硬规则, 模型项)。只查模型项会两头错：
+        # 阳性检查改由硬规则保证之后，模型被明确告知「不要重复硬规则已识别的」，
+        # 于是它不再写眼底 —— 界面上明明在，校验却报漏。反过来，
+        # 硬规则要是哪天漏了一条，只查合并结果也照样能发现。
+        from app.agents.risk import hard_rule_alerts, merge_risks
+
+        merged, _, _ = merge_risks(hard_rule_alerts(ctx), _risk_items(data))
+        blob = json.dumps(merged, ensure_ascii=False)
+        if any(k in blob for k in keywords):
+            return True, ""
+        return False, f"上下文中有阳性发现却没有对应风险项（关键词均未出现：{'、'.join(keywords)}）"
+
+    return _check
+
+
+def check_risk_high_ratio(max_ratio: float) -> Callable:
+    """
+    高风险不能超过给定比例。
+
+    同一次比对里的第二处差别：Haiku 判「高风险」9/16，Sonnet 6/15。
+    多标不是更安全 —— 工作站上高风险是个红标，**满屏都红等于没有红**，
+    医生一周就学会跳过它，那时真正的高风险也一起被跳过了。
+
+    卡比例而不是卡条数：真有一位患者四条全高，那是患者的问题不是模型的问题；
+    但这在种子病例里不该发生，发生了就是分级在通胀。
+    """
+
+    def _check(data: dict, ctx: dict) -> tuple[bool, str]:
+        items = _risk_items(data)
+        if not items:
+            return False, "没有风险项"
+        high = [i for i in items if str(i.get("level", "")).strip() == "高风险"]
+        ratio = len(high) / len(items)
+        if ratio <= max_ratio + 1e-9:
+            return True, ""
+        names = "、".join(str(i.get("name", "?")) for i in high)
+        return False, f"{len(items)} 条里 {len(high)} 条判为高风险（上限 {max_ratio:.0%}）：{names}"
+
+    return _check
+
+
 CHECK_REGISTRY.update(
     {
         "risk_evidence_grounded": lambda args: check_risk_evidence_grounded,
         "risk_evidence_quantified": lambda args: check_risk_evidence_quantified,
         "risk_item_count": lambda args: check_risk_item_count(int(args["low"]), int(args["high"])),
         "risk_fields_filled": lambda args: check_risk_fields_filled,
+        "risk_must_cover": lambda args: check_risk_must_cover(list(args["keywords"])),
+        "risk_high_ratio": lambda args: check_risk_high_ratio(float(args["max_ratio"])),
     }
 )

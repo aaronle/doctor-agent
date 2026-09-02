@@ -867,7 +867,16 @@ def _assert_red_alerts_closed(session: Session, patient, handled: list[str], *, 
     hard = hard_rule_alerts(ctx)
     cached = cache.get(cache.context_key(patient.id, build_context(session, patient, include_dialog=True, seed_dialog_fallback=False)))
     model_alerts = (cached or {}).get("risk_alerts", [])
-    all_red = {a["id"] for a in hard} | {a["id"] for a in model_alerts if a.get("level") == "高风险"}
+    # 两边都按 level 筛。
+    #
+    # 原来这里是 `{a["id"] for a in hard}` —— 不看 level，默认「硬规则出的都是红的」。
+    # 那在当时成立（硬规则只有过敏冲突、危急值、生命体征越界三条，全是高风险），
+    # 但它把一个**巧合**当成了不变量：2026-09-03 加了「阳性检查结论」这条中风险
+    # 硬规则，提交立刻被拦，七个测试一起红 —— 而拦的是「心电图异常」这种
+    # 需要记录、不需要阻断就诊的项。零容忍门禁一旦拦错东西，医生下一步就是
+    # 想办法绕过它，那时真正该拦的也拦不住了。判据只能是 level，不能是来源。
+    is_red = lambda a: a.get("level") == "高风险"
+    all_red = {a["id"] for a in hard if is_red(a)} | {a["id"] for a in model_alerts if is_red(a)}
     open_red = sorted(all_red - set(handled or []))
     if open_red:
         # 红线拦截必须留日志：这是零容忍门禁真正生效的证据。

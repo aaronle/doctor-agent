@@ -1154,16 +1154,43 @@ def test_submit_is_blocked_by_open_red_alerts(client):
 
     session = SessionLocal()
     try:
-        patient = session.get(Patient, "P006")
+        patient = session.get(Patient, "P003")
         alerts = hard_rule_alerts(build_context(session, patient))
     finally:
         session.close()
-    if not alerts:
-        return  # 该病例本次无硬规则红线，跳过
+
+    # **只数红的。** 原来是 `if not alerts: return` —— 只要有任何硬规则项就往下走。
+    # 那在硬规则全是高风险时等价，但 2026-09-03 加了中风险的「阳性检查结论」之后
+    # 就不再等价了：P003 有两条中风险检查项、零条红线，测试照跑，然后在
+    # 「红线未处置」这一步必然对不上。这条测试测的是红线，判据就得是红线。
+    red = [a for a in alerts if a.get("level") == "高风险"]
+
+    # 先解锁分析。这一步以前**从来没跑到过** —— P006 当时一条硬规则都没有，
+    # 上面那个 `return` 每次都提前退出，整条测试是空过的（绿了三个月，什么都没测）。
+    # 加了检查规则它才第一次真正往下走，立刻撞在「尚未生成 AI 分析」上：
+    # 那是排在红线之前的另一道门，测试从来没满足过它的前置条件。
+    # reason 必须取自 UNLOCK_REASONS；写个 "test" 会被 400 挡掉，
+    # 而不检查返回值的话，那个 400 会安静地变成下一行的 409 —— 断言要跟到这一步。
+    unlocked = client.post("/api/emr/analysis/unlock", json={"patient_id": "P003", "reason": "skipped"})
+    assert unlocked.status_code == 200, unlocked.json()
+
+    # 用 P003 而不是 P006：解锁会留在库里，后面 test_cannot_write_back_before_analysis_exists
+    # 断言的正是「P006 还锁着」。同一个夹具里的患者状态是跨测试共享的，
+    # 在这儿解锁 P006 会让那条测试反过来绿得毫无道理。P003 全程被解锁/提交/重新入队，
+    # 没有任何测试断言它的锁状态。
+
+    if not red:
+        # 没有红线时也要验一件事：不能因为有中风险项就把提交拦下。
+        ok = client.post(
+            "/api/emr/record/submit",
+            json={"patient_id": "P003", "fields": {"chief_complaint": "x"}, "handled_alerts": []},
+        )
+        assert ok.status_code == 200, ok.json()
+        return
 
     r = client.post(
         "/api/emr/record/submit",
-        json={"patient_id": "P006", "fields": {"chief_complaint": "x"}, "handled_alerts": []},
+        json={"patient_id": "P003", "fields": {"chief_complaint": "x"}, "handled_alerts": []},
     )
     assert r.status_code == 409
     assert "未处置" in r.json()["detail"]
@@ -1171,9 +1198,9 @@ def test_submit_is_blocked_by_open_red_alerts(client):
     # 逐条处置后放行
     ok = client.post(
         "/api/emr/record/submit",
-        json={"patient_id": "P006", "fields": {"chief_complaint": "x"}, "handled_alerts": [a["id"] for a in alerts]},
+        json={"patient_id": "P003", "fields": {"chief_complaint": "x"}, "handled_alerts": [a["id"] for a in red]},
     )
-    assert ok.status_code == 200
+    assert ok.status_code == 200, ok.json()
 
 
 def test_stash_is_not_blocked_by_red_alerts(client):
@@ -2315,3 +2342,184 @@ def test_record_skill_is_still_wired_to_the_record_worker():
 
     _master, workers = load_all_agents()
     assert "record-generation" in workers["record"].skills
+
+
+# ---------------------------------------------------------------- 风险管理的校验项
+
+
+def test_risk_check_catches_fabricated_numbers():
+    """
+    依据里写「HbA1c 9.2%」而档案里是 8.6% —— 医生照着这条判断就是错的。
+    比「没写数值」严重得多，所以单列一条。
+    """
+    from app.eval_cases import check_risk_evidence_grounded
+
+    ctx = {"lab_results": [{"name": "HbA1c", "value": "8.6"}]}
+    ok, detail = check_risk_evidence_grounded(
+        {"risk_assessments": [{"name": "血糖", "evidence": "HbA1c 9.2%", "assessment": ""}]}, ctx
+    )
+    assert not ok and "编造" in detail
+
+    ok, _ = check_risk_evidence_grounded(
+        {"risk_assessments": [{"name": "血糖", "evidence": "HbA1c 8.6%", "assessment": ""}]}, ctx
+    )
+    assert ok, "引用了上下文里真实存在的数值，不该判成编造"
+
+
+def test_risk_check_catches_four_empty_sentences():
+    """
+    这一条冲着「四条空话」去的。「血糖控制不佳」「注意血压」这类没有数值的
+    判断，医生无法复核，也无从据此决定下一步 —— 换模型时它最先退化，
+    又最不容易被别的校验抓到。
+    """
+    from app.eval_cases import check_risk_evidence_quantified
+
+    ctx = {"lab_results": [{"name": "HbA1c", "value": "8.6"}], "vitals": {"bp": "142/88"}}
+    vague = {"risk_assessments": [
+        {"name": "血糖", "evidence": "血糖控制不佳"},
+        {"name": "血压", "evidence": "血压偏高"},
+    ]}
+    ok, detail = check_risk_evidence_quantified(vague, ctx)
+    assert not ok and "只有 0 条" in detail
+
+    half = {"risk_assessments": [
+        {"name": "血糖", "evidence": "HbA1c 8.6%，高于目标"},
+        {"name": "依从性", "evidence": "患者自述漏服"},
+    ]}
+    assert check_risk_evidence_quantified(half, ctx)[0], "定性风险项合理存在，不该一刀切"
+
+
+def test_risk_quantified_check_ignores_numbers_too_small_to_mean_anything():
+    """
+    单个数字（2、5）在任何上下文里都能撞上，拿它判「有没有引用依据」等于没判。
+    「2型糖尿病」里的 2 不算引用了检验值。
+    """
+    from app.eval_cases import check_risk_evidence_quantified
+
+    ok, _ = check_risk_evidence_quantified(
+        {"risk_assessments": [{"name": "血糖", "evidence": "2型糖尿病病史"}]},
+        {"past_history": "2型糖尿病 5 年"},
+    )
+    assert not ok, "单个小数字不该算作「引用了具体数值」"
+
+
+def test_risk_check_normalises_trailing_zeros():
+    """8.50 与 8.5 是同一个数。不归一的话「引用了原文」会被判成「编造」。"""
+    from app.eval_cases import check_risk_evidence_grounded
+
+    ok, _ = check_risk_evidence_grounded(
+        {"risk_assessments": [{"name": "血糖", "evidence": "空腹血糖 8.5"}]},
+        {"lab_results": [{"name": "空腹血糖", "value": "8.50"}]},
+    )
+    assert ok
+
+
+def test_risk_dataset_gives_the_tier_decision_a_denominator():
+    """
+    risk 是 report-summary 的长杆，换档位收益最大，也最不该拍脑袋 ——
+    而它在 2026-09-02 之前只有 **1 条**用例，1/1 对 0/1 什么都说明不了。
+
+    这条测试守的是「分母别又掉回去」。
+    """
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    data = json.loads((root / "app/data/eval_datasets/risk-safety-basic.json").read_text(encoding="utf-8"))
+    assert len(data["cases"]) >= 7, "risk 回归集的分母不该少于七条"
+
+    # 每条都得带上「依据可核对」那两项 —— 少了它们这一集就退化成只查格式
+    for case in data["cases"]:
+        kinds = {c["kind"] for c in case["checks"]}
+        assert "risk_evidence_grounded" in kinds, f"{case['id']} 缺「不得编造数值」"
+        assert "risk_evidence_quantified" in kinds, f"{case['id']} 缺「要引用具体数值」"
+
+
+def test_risk_check_lets_guideline_thresholds_through():
+    """
+    「血压目标 <140/90」「狭窄 >70% 为重度」是临床知识，不是伪造患者数据。
+
+    第一版没有这条豁免，结果 Haiku 的失败**全部**是指南阈值被判成编造 ——
+    照那版结论会把 risk 判成「会编数」，而事实完全不是。
+    **误报比没有校验更糟**：这条校验会先被人学会忽略，然后就再也不起作用了。
+    """
+    from app.eval_cases import check_risk_evidence_grounded
+
+    ctx = {"vitals": {"bp": "168/102"}, "lab_results": [{"name": "HbA1c", "value": "8.6"}]}
+    for evidence in (
+        "血压 168/102 mmHg，高于目标 140/90 mmHg",
+        "HbA1c 8.6%，高于 7.0% 的控制目标",
+        "颈动脉狭窄未达 >70% 的重度标准",
+        "LDL-C 建议控制在 1.8 mmol/L 以下",
+    ):
+        ok, detail = check_risk_evidence_grounded(
+            {"risk_assessments": [{"name": "x", "evidence": evidence}]}, ctx
+        )
+        assert ok, f"指南阈值被误判成编造：{evidence} → {detail}"
+
+
+def test_risk_check_still_catches_a_fabricated_patient_value():
+    """阈值豁免不能把真编造一起放过去 —— 那样这条校验就废了。"""
+    from app.eval_cases import check_risk_evidence_grounded
+
+    ctx = {"lab_results": [{"name": "HbA1c", "value": "8.6"}]}
+    ok, detail = check_risk_evidence_grounded(
+        {"risk_assessments": [{"name": "x", "evidence": "HbA1c 9.2%，控制不佳"}]}, ctx
+    )
+    assert not ok and "9.2" in detail
+
+
+def test_abnormal_examinations_become_hard_rule_risks(client):
+    """
+    检查报告标了 abnormal 的，必须由代码兜住，不能指望模型写。
+
+    这条规则的由来：P001 上下文里有「双眼底照相：异常 · NPDR 轻度」，
+    交给模型时两个候选模型各跑五轮、都只有三轮写进去。不是措辞问题 ——
+    风险项限 2–4 条而 P001 有九个异常，装不下，丢谁随机，
+    没有数值的影像结论最容易被挤掉。而这是最坏的丢法：
+    化验单医生自己会看，眼底报告他指望产品提醒。
+    """
+    from app.agents.risk import hard_rule_alerts
+    from app.agents.context import build_context
+    from app.database import SessionLocal
+    from app.models import Patient
+
+    with SessionLocal() as session:
+        ctx = build_context(session, session.get(Patient, "P001"))
+
+    exam_alerts = [a for a in hard_rule_alerts(ctx) if a.get("rule") == "abnormal_examination"]
+    covered = "".join(a["name"] + a["evidence"] for a in exam_alerts)
+
+    abnormal = [e["name"] for e in ctx["examinations"] if e.get("abnormal") is True]
+    assert abnormal, "种子数据里 P001 应当有阳性检查，否则这条测试是空过的"
+    for name in abnormal:
+        assert name in covered, f"阳性检查「{name}」没有对应的硬规则风险项"
+    # 正常的不能也报出来 —— 全部报等于没报
+    assert "颈动脉超声" not in covered, "结论「大致正常」的检查不该产生风险项"
+
+
+def test_abnormal_examination_risks_are_yellow_not_red(client):
+    """
+    定黄不定红。
+
+    红色会阻断提交。拿「心电图 ST-T 改变」挡住医生下班，一周之内他就会
+    学会绕过阻断 —— 那时真正该拦的红色也拦不住了。
+    这条同时守着 emr.py 里那个「红线判据只能看 level、不能看来源」的修复。
+    """
+    from app.agents.risk import hard_rule_alerts, merge_risks
+    from app.agents.context import build_context
+    from app.database import SessionLocal
+    from app.models import Patient
+
+    with SessionLocal() as session:
+        ctx = build_context(session, session.get(Patient, "P001"))
+
+    hard = hard_rule_alerts(ctx)
+    exam_alerts = [a for a in hard if a.get("rule") == "abnormal_examination"]
+    assert exam_alerts
+    for a in exam_alerts:
+        assert a["level"] == "中风险", f"{a['name']} 被判成了 {a['level']}"
+
+    # 顶部红色预警条不该被这些项冲淡
+    _, red_bar, _ = merge_risks(hard, [])
+    assert not [a for a in red_bar if a["id"].startswith("hard_exam_")]

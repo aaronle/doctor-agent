@@ -1,0 +1,391 @@
+{
+  "id": "risk-safety-basic",
+  "name": "风险管理 · 依据可核对性",
+  "description": "风险管理岗位的回归集。在此之前它只有 1 条用例（等级取自闭集），而 1/1 对 0/1 什么都说明不了 —— 它同时是 report-summary 的长杆（Sonnet 下 52.2s，占端到端 61s 的绝大部分），换档位收益最大，也最不该拍脑袋。这一集就是为了让那个决定有数据。校验项挑的是「换模型时最先退化、又最不容易被别的检查抓到」的东西：依据里有没有具体数值、那些数值是不是真的来自上下文。文档记载的 Haiku→Sonnet 收益正是「从四条没有数值的空话变成带数值、阈值、来源标注」，所以这两条正对着那个差别。 2026-09-02 补第二轮：结构校验打平之后做了 Haiku/Sonnet 的内容比对，发现两处结构校验完全看不见的差别 —— 漏掉上下文里的阳性检查（P001 眼底 NPDR），以及高风险分级通胀。前者已固化成 risk_must_cover；后者 n=3~4 时比例跳变太粗，阈值卡紧必闪，所以 risk_high_ratio 只当兜底（0.8，拦「几乎全红」），分级校准仍然是靠把 risk 留在推理档，不是靠这条门禁。",
+  "source": "自建虚构",
+  "reference": "docs/product/15-Agent架构重构-Master-Worker-Skill.md §6、§15",
+  "default_enabled": true,
+  "cases": [
+    {
+      "id": "RS-001",
+      "name": "复诊 · 内分泌科，七项异常检验（P001）",
+      "agent_key": "risk",
+      "patient_id": "P001",
+      "checks": [
+        {
+          "name": "等级取自闭集",
+          "kind": "closed_set",
+          "args": {
+            "field": "level",
+            "allowed": "risk_levels",
+            "in_list": "risk_assessments"
+          }
+        },
+        {
+          "name": "条数 2–4",
+          "kind": "risk_item_count",
+          "args": {
+            "low": 2,
+            "high": 4
+          }
+        },
+        {
+          "name": "五个字段都不是空壳",
+          "kind": "risk_fields_filled",
+          "args": {}
+        },
+        {
+          "name": "依据里的数字必须来自上下文",
+          "kind": "risk_evidence_grounded",
+          "args": {}
+        },
+        {
+          "name": "至少半数风险项引用具体数值",
+          "kind": "risk_evidence_quantified",
+          "args": {}
+        },
+        {
+          "name": "不得漏掉阳性检查（双眼底照相：异常 · NPDR 轻度）",
+          "kind": "risk_must_cover",
+          "args": {
+            "keywords": [
+              "视网膜",
+              "眼底",
+              "NPDR"
+            ]
+          }
+        },
+        {
+          "name": "高风险不得泛滥",
+          "kind": "risk_high_ratio",
+          "args": {
+            "max_ratio": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "RS-002",
+      "name": "复诊 · 心内科，仅一项异常检验（P002）",
+      "agent_key": "risk",
+      "patient_id": "P002",
+      "checks": [
+        {
+          "name": "等级取自闭集",
+          "kind": "closed_set",
+          "args": {
+            "field": "level",
+            "allowed": "risk_levels",
+            "in_list": "risk_assessments"
+          }
+        },
+        {
+          "name": "条数 2–4",
+          "kind": "risk_item_count",
+          "args": {
+            "low": 2,
+            "high": 4
+          }
+        },
+        {
+          "name": "五个字段都不是空壳",
+          "kind": "risk_fields_filled",
+          "args": {}
+        },
+        {
+          "name": "依据里的数字必须来自上下文",
+          "kind": "risk_evidence_grounded",
+          "args": {}
+        },
+        {
+          "name": "至少半数风险项引用具体数值",
+          "kind": "risk_evidence_quantified",
+          "args": {}
+        },
+        {
+          "name": "不得漏掉阳性检查（心脏彩超：异常 · 舒张功能减退）",
+          "kind": "risk_must_cover",
+          "args": {
+            "keywords": [
+              "舒张功能",
+              "心脏彩超",
+              "心超"
+            ]
+          }
+        },
+        {
+          "name": "高风险不得泛滥",
+          "kind": "risk_high_ratio",
+          "args": {
+            "max_ratio": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "RS-003",
+      "name": "复诊 · 甲亢，检验方向与糖脂无关（P003）",
+      "agent_key": "risk",
+      "patient_id": "P003",
+      "checks": [
+        {
+          "name": "等级取自闭集",
+          "kind": "closed_set",
+          "args": {
+            "field": "level",
+            "allowed": "risk_levels",
+            "in_list": "risk_assessments"
+          }
+        },
+        {
+          "name": "条数 2–4",
+          "kind": "risk_item_count",
+          "args": {
+            "low": 2,
+            "high": 4
+          }
+        },
+        {
+          "name": "五个字段都不是空壳",
+          "kind": "risk_fields_filled",
+          "args": {}
+        },
+        {
+          "name": "依据里的数字必须来自上下文",
+          "kind": "risk_evidence_grounded",
+          "args": {}
+        },
+        {
+          "name": "至少半数风险项引用具体数值",
+          "kind": "risk_evidence_quantified",
+          "args": {}
+        },
+        {
+          "name": "不得漏掉阳性检查（甲状腺超声：异常 · 甲状腺肿大）",
+          "kind": "risk_must_cover",
+          "args": {
+            "keywords": [
+              "甲状腺"
+            ]
+          }
+        },
+        {
+          "name": "高风险不得泛滥",
+          "kind": "risk_high_ratio",
+          "args": {
+            "max_ratio": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "RS-004",
+      "name": "初诊 · 神经内科，高血压合并血糖异常（P004）",
+      "agent_key": "risk",
+      "patient_id": "P004",
+      "checks": [
+        {
+          "name": "等级取自闭集",
+          "kind": "closed_set",
+          "args": {
+            "field": "level",
+            "allowed": "risk_levels",
+            "in_list": "risk_assessments"
+          }
+        },
+        {
+          "name": "条数 2–4",
+          "kind": "risk_item_count",
+          "args": {
+            "low": 2,
+            "high": 4
+          }
+        },
+        {
+          "name": "五个字段都不是空壳",
+          "kind": "risk_fields_filled",
+          "args": {}
+        },
+        {
+          "name": "依据里的数字必须来自上下文",
+          "kind": "risk_evidence_grounded",
+          "args": {}
+        },
+        {
+          "name": "至少半数风险项引用具体数值",
+          "kind": "risk_evidence_quantified",
+          "args": {}
+        },
+        {
+          "name": "不得漏掉阳性检查（颈动脉超声：异常 · 颈动脉斑块）",
+          "kind": "risk_must_cover",
+          "args": {
+            "keywords": [
+              "颈动脉",
+              "斑块"
+            ]
+          }
+        },
+        {
+          "name": "高风险不得泛滥",
+          "kind": "risk_high_ratio",
+          "args": {
+            "max_ratio": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "RS-005",
+      "name": "初诊 · 新发糖尿病，既往史最薄（P005）",
+      "agent_key": "risk",
+      "patient_id": "P005",
+      "checks": [
+        {
+          "name": "等级取自闭集",
+          "kind": "closed_set",
+          "args": {
+            "field": "level",
+            "allowed": "risk_levels",
+            "in_list": "risk_assessments"
+          }
+        },
+        {
+          "name": "条数 2–4",
+          "kind": "risk_item_count",
+          "args": {
+            "low": 2,
+            "high": 4
+          }
+        },
+        {
+          "name": "五个字段都不是空壳",
+          "kind": "risk_fields_filled",
+          "args": {}
+        },
+        {
+          "name": "依据里的数字必须来自上下文",
+          "kind": "risk_evidence_grounded",
+          "args": {}
+        },
+        {
+          "name": "至少半数风险项引用具体数值",
+          "kind": "risk_evidence_quantified",
+          "args": {}
+        },
+        {
+          "name": "高风险不得泛滥",
+          "kind": "risk_high_ratio",
+          "args": {
+            "max_ratio": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "RS-006",
+      "name": "复诊 · 脑梗死二级预防，四项异常检验（P006）",
+      "agent_key": "risk",
+      "patient_id": "P006",
+      "checks": [
+        {
+          "name": "等级取自闭集",
+          "kind": "closed_set",
+          "args": {
+            "field": "level",
+            "allowed": "risk_levels",
+            "in_list": "risk_assessments"
+          }
+        },
+        {
+          "name": "条数 2–4",
+          "kind": "risk_item_count",
+          "args": {
+            "low": 2,
+            "high": 4
+          }
+        },
+        {
+          "name": "五个字段都不是空壳",
+          "kind": "risk_fields_filled",
+          "args": {}
+        },
+        {
+          "name": "依据里的数字必须来自上下文",
+          "kind": "risk_evidence_grounded",
+          "args": {}
+        },
+        {
+          "name": "至少半数风险项引用具体数值",
+          "kind": "risk_evidence_quantified",
+          "args": {}
+        },
+        {
+          "name": "不得漏掉阳性检查（头颅MRI+DWI：异常 · 急性脑梗死）",
+          "kind": "risk_must_cover",
+          "args": {
+            "keywords": [
+              "梗死",
+              "DWI",
+              "MRI"
+            ]
+          }
+        },
+        {
+          "name": "高风险不得泛滥",
+          "kind": "risk_high_ratio",
+          "args": {
+            "max_ratio": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "RS-007",
+      "name": "复诊 · 糖尿病久未随访（P007）",
+      "agent_key": "risk",
+      "patient_id": "P007",
+      "checks": [
+        {
+          "name": "等级取自闭集",
+          "kind": "closed_set",
+          "args": {
+            "field": "level",
+            "allowed": "risk_levels",
+            "in_list": "risk_assessments"
+          }
+        },
+        {
+          "name": "条数 2–4",
+          "kind": "risk_item_count",
+          "args": {
+            "low": 2,
+            "high": 4
+          }
+        },
+        {
+          "name": "五个字段都不是空壳",
+          "kind": "risk_fields_filled",
+          "args": {}
+        },
+        {
+          "name": "依据里的数字必须来自上下文",
+          "kind": "risk_evidence_grounded",
+          "args": {}
+        },
+        {
+          "name": "至少半数风险项引用具体数值",
+          "kind": "risk_evidence_quantified",
+          "args": {}
+        },
+        {
+          "name": "高风险不得泛滥",
+          "kind": "risk_high_ratio",
+          "args": {
+            "max_ratio": 0.8
+          }
+        }
+      ]
+    }
+  ]
+}
