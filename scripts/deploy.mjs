@@ -140,19 +140,45 @@ const CHECKS = [
   ['delivery', '/api/delivery/pipelines'],
   ['production', '/api/delivery/production'],
 ];
+/**
+ * 复验一个端点，最多三次、间隔 2 秒。
+ *
+ * 容器刚 `--force-recreate` 完，连接层会有几百毫秒的抖动：实测 health 刚过，
+ * 紧接着 assessment-catalog 就抛了 —— 而单独再打三次全是 200 / 0.16s。
+ * **一次抖动不该判定发布失败**：那会拦下发布记录，让一次成功的部署看着像坏的。
+ *
+ * 但重试次数要克制，且**首次失败必须留在日志里**。给到三次是因为它足够区分
+ * 「正在起来」和「真的坏了」—— 一个两秒后还不响应的端点，就是坏的。
+ * 抹掉重试痕迹的话，一个天天要重试两次的端点会一直看着很健康。
+ */
+async function probe(name, path) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const res = await fetch(`${PUBLIC}${path}`, { signal: AbortSignal.timeout(30000) });
+      if (res.status === 200) return { code: 200, attempt };
+      if (attempt === 3) return { code: res.status, attempt };
+      log.push([stamp(), `${name} 第 ${attempt} 次 HTTP ${res.status}，重试`, 'fix']);
+    } catch (err) {
+      if (attempt === 3) return { code: 0, attempt, error: err.message };
+      log.push([stamp(), `${name} 第 ${attempt} 次失败（${err.message}），重试`, 'fix']);
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return { code: 0, attempt: 3 };
+}
+
 let bad = 0;
 for (const [name, path] of CHECKS) {
-  let code = 0;
-  try {
-    const res = await fetch(`${PUBLIC}${path}`, { signal: AbortSignal.timeout(30000) });
-    code = res.status;
-  } catch (err) {
-    log.push([stamp(), `${name} ${path} 请求失败：${err.message}`, 'err']);
-  }
+  const { code, attempt, error } = await probe(name, path);
   const ok = code === 200;
-  if (!ok) bad += 1;
-  log.push([stamp(), `${name.padEnd(11)} ${code || '—'}  ${path}`, ok ? 'ok' : 'err']);
-  console.log(`  ${ok ? '✓' : '✗'} ${name.padEnd(11)} ${code || '—'}  ${path}`);
+  if (!ok) {
+    bad += 1;
+    if (error) log.push([stamp(), `${name} ${path} 请求失败：${error}`, 'err']);
+  }
+  // 重试过就把次数标出来，别让「第三次才通」看起来和「一次就通」一样
+  const retried = attempt > 1 ? `  (第 ${attempt} 次才通)` : '';
+  log.push([stamp(), `${name.padEnd(11)} ${code || '—'}  ${path}${retried}`, ok ? 'ok' : 'err']);
+  console.log(`  ${ok ? '✓' : '✗'} ${name.padEnd(11)} ${code || '—'}  ${path}${retried}`);
 }
 
 // ── 6. 不能伤到邻居 ────────────────────────────────────────────────────────
