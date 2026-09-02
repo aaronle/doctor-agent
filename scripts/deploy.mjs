@@ -27,7 +27,10 @@ const git = (...a) => {
 };
 const commit = git('rev-parse', '--short', 'HEAD') || 'nogit';
 const subject = git('log', '-1', '--pretty=%s');
-const runKey = `feature-${commit}-${git('status', '--porcelain') ? 'dirty' : 'clean'}`;
+// 与 verify.mjs 用同一条规则：key 只认提交号。两边不一致就配不上对，
+// 门禁与部署会落在两条记录上。
+const runKey = `feature-${commit}`;
+const dirtyFiles = (git('status', '--porcelain') || '').split('\n').filter(Boolean).length;
 
 const log = [];
 const stages = [];
@@ -47,7 +50,7 @@ async function report(status) {
       headers: { 'content-type': 'application/json', 'x-delivery-token': TOKEN },
       body: JSON.stringify({
         run_key: runKey, lane: 'feature',
-        title: `${commit}  ${subject}`, subtitle: `分支 ${git('rev-parse', '--abbrev-ref', 'HEAD')}`,
+        title: `${commit}  ${subject}`, subtitle: `分支 ${git('rev-parse', '--abbrev-ref', 'HEAD')}${dirtyFiles ? ` · 工作区有 ${dirtyFiles} 个未提交改动` : ''}`,
         status, stages, meta: { commit, subject, log: log.slice(-40) },
       }),
     });

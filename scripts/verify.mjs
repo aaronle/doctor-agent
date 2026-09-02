@@ -140,7 +140,11 @@ async function report(payload) {
 }
 
 const meta = gitMeta();
-const runKey = `feature-${meta.commit || 'nogit'}-${meta.dirty_files ? 'dirty' : 'clean'}`;
+// **key 只认提交号，不掺工作区状态。**
+// 早先把 clean/dirty 拼进 key，结果在 verify 与 deploy 之间随手改一个文档，
+// key 就从 clean 翻成 dirty —— 同一次交付被拆成两条记录，看板上门禁全是「未开始」，
+// 而门禁明明刚跑完全绿。工作区脏不脏是这次运行的**属性**，不是它的身份。
+const runKey = `feature-${meta.commit || 'nogit'}`;
 const results = [];
 
 /** 粗粒度阶段快照：一个阶段下所有门禁都过才算过，有一个跑挂了就算挂。 */
@@ -174,7 +178,7 @@ const payload = (status) => ({
   run_key: runKey,
   lane: 'feature',
   title: `${meta.commit}  ${meta.subject}`.trim(),
-  subtitle: `分支 ${meta.branch}`,
+  subtitle: `分支 ${meta.branch}${meta.dirty_files ? ` · 工作区有 ${meta.dirty_files} 个未提交改动` : ''}`,
   status,
   stages: stageSnapshot(),
   meta: { ...meta, gates: results },
