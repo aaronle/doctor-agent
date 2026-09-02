@@ -54,11 +54,17 @@ npm run dev
 ```env
 AI_API_KEY=            # 从 ts-it-service 同步，不要写进任何文档
 AI_BASE_URL=https://www.meatdc.com/v1
-AI_FAST_MODEL=claude-haiku-4-5-20251001
+AI_FAST_MODEL=claude-sonnet-5    # 2026-09-02 由 Haiku 4.5 换过来
+AI_TIMEOUT_MS=90000              # Sonnet 更慢，45s 会让岗位擦边超时后降级
 AI_TEST_MODE=          # 置为 rules 时全部岗位走本地规则，不调模型
 ```
 
-发布门禁 —— 一条命令跑完测试、构建、契约导出与还原度比对：
+> **换模型要同时改代码缺省与部署 env，以 `/api/health` 的实际回值为准。**
+> 上一次只改了 `app/config.py`，服务器的 `.env.runtime` 还压着 Haiku ——
+> 编排层（不读这个变量）换成了 Sonnet，产品路径六个岗位还在跑 Haiku。
+> 健康接口一直如实报着 `aiModels.fast: haiku`，只是没人去看。
+
+发布门禁 —— 一条命令跑完测试、构建、契约导出与两道界面闸：
 
 ```sh
 npm run verify
@@ -66,12 +72,22 @@ npm run verify
 
 跑 `verify` 前要先起 `npm run dev`（还原度比对需要访问运行中的前端）。
 
+配了这两个环境变量，门禁与部署的结果会上报到交付平台（`/delivery`）；
+不配就只在终端打印，行为不变：
+
+```sh
+export DELIVERY_API=https://da.aaronhealth.cn
+export DELIVERY_INGEST_TOKEN=...   # 服务器 /opt/doctor-agent/config/.env.runtime 里那一个
+```
+
 其他常用命令：
 
 ```sh
-npm run fidelity   # 只跑还原度比对（比「做了的长得对不对」）
-npm run coverage   # 类名覆盖率（比「有没有整块漏做」）——两者互补，缺一不可
-npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + CSS 拆分）
+npm run deploy        # 部署到广州并上报每个阶段（凭据在本机，平台没有）
+npm run fidelity      # 只跑还原度比对（比「做了的长得对不对」）
+npm run coverage      # 类名覆盖率（比「有没有整块漏做」）——两者互补，缺一不可
+npm run verify:legacy # 原来那串 && 的门禁链，怀疑是新 runner 自身出问题时用它对照
+npm run extract       # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + CSS 拆分）
 ```
 
 ## 2.1 改动纪律（重要）
@@ -83,7 +99,8 @@ npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + C
 | UI/UX | `docs/product/09-一期需求规划说明书.md` 对应功能段 + 该行为的测试 + 跑 `npm run fidelity` |
 | **移动端 UI/UX** | `docs/product/12-移动端需求规格说明书.md` + `apps/web/src/mobile/*.spec.ts`。移动端是另一套 IA，桌面改了它不会自动跟着改 |
 | **新增埋点** | `docs/product/13-日志与可观测性说明.md` 的埋点表；新字段若可能含正文，必须加进 `obs.py` 的 `_REDACTED` |
-| **新增界面** | 还要给 `extract-v43-dom.mjs` 加采集态、给 `compare-v43-fidelity.mjs` 加场景 —— 否则它落在门禁外 |
+| **新增界面** | 还要给 `extract-v43-dom.mjs` 加采集态、给 `compare-v43-fidelity.mjs` 加场景 —— 否则它落在门禁外。**例外**：`/admin` 与 `/delivery` 不在 V4.3 原件里，两道界面闸不比它们，靠单测守 |
+| **交付平台** | `docs/product/16-交付平台-CICD需求规格说明书.md` + `apps/web/src/views/DeliveryView.spec.ts` + `apps/api/tests/test_delivery.py` |
 | API 形状 | `docs/product/08-V4.3界面基准与后端API契约.md` + `apps/api/tests/test_api.py` + 重跑 `contracts:export` |
 | Agent 输出结构 | 规格里该岗位的输出约束 + 对应校验测试 |
 | 安全红线 | 规格第 7 节 + 一条能失败的测试（红线没有测试等于没有红线） |
@@ -92,7 +109,7 @@ npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + C
 
 ## 3. 一期范围与实现状态
 
-七个产品功能全部实现，六个岗位全部接真实 Haiku：
+七个产品功能全部实现，六个岗位全部接真实 `claude-sonnet-5`：
 
 | 功能 | 岗位 | 状态 |
 | --- | --- | --- |
@@ -104,7 +121,15 @@ npm run extract    # 重跑全部 V4.3 抽取（静态资源 + 渲染态 DOM + C
 | 风险管理 | `risk` | 硬规则纯代码实现，独立于模型；模型不得压低硬规则判定的红色风险 |
 | 共病管理 | `comorbidity` | 真实模型。推荐科室取自闭集字典；营养提醒为纯阈值规则 |
 
-明确不做：AgentScope 接入、医院 SSO、真实 HIS 写回、真实患者数据。
+医生端之外还有两个面向研发与调优的页面，**不占用 V4.3 定义的五个医生端页面**：
+
+| 路由 | 是什么 | 规格 |
+| --- | --- | --- |
+| `/admin` | Agent 配置与运行控制台 | `11-Agent控制台需求规格说明书.md` |
+| `/delivery` | 交付平台（CI/CD），功能线与智能体线并排 | `16-交付平台-CICD需求规格说明书.md` |
+
+明确不做：医院 SSO、真实 HIS 写回、真实患者数据。
+（AgentScope 已于 2026-09-02 接入，见 `15-Agent架构重构-Master-Worker-Skill.md`。）
 
 ## 4. 技术栈与目录
 
@@ -159,6 +184,7 @@ Figma：**AI 门诊工作站 · 一期设计系统**
 | 04 · 移动端 | 六屏 390×844：对话 / ＋菜单 / 分析 / 记录 / 候诊 / 患者管理 |
 | 05 · 控制台移动端 | 五屏 390×844：配置 / 岗位切换 / 回归集·数据集管理 / 回归集·结果 / 运行日志 |
 | 06 · 桌面端问诊流程 | 四态 1600×1000：进入 / 问诊中 / 问诊结束 / 跳过确认 + 状态机 |
+| 07 · CI/CD 平台 | 桌面四屏 1600×1050 + 移动三屏 390×844。规格见 `docs/product/16-交付平台-CICD需求规格说明书.md`，**尚未实现，待评审** |
 
 令牌取值**全部来自 V4.3 编译产物**（`scripts/extract-v43-assets.mjs`），不是取色器估的。
 其中 `字号/base = 12` 标了重点：那是 `--el-font-size-base`，不是 Element Plus 默认的 14px。
@@ -191,6 +217,12 @@ Figma：**AI 门诊工作站 · 一期设计系统**
 - **降级是正常路径**：网关抖动时岗位降级为确定性本地规则，界面显式标注，
   不返回伪造的成功文案。降级结果不入缓存。
 - 模型网关偶发 502。重试窗口已从 2 秒放宽到约 6 秒（4 次，退避 500/1500/4000ms）。
+- **Sonnet 5 上 `temperature` 已废弃，压不住抖动。** 同一份上下文两次生成的病历
+  会有措辞差异；复核时先想到这一条。确定性的事实（既往史、硬规则风险）
+  一律由代码兜底，不交给模型 —— 见 `agents/record.py` 的 `_archived_history`。
+- **换 Sonnet 后的耗时**：`report-summary` 19.5s → 63.2s；还原度门禁 252s → 479s；
+  编排层 Master 一次 126s。凡是有超时的地方都要按这个量级重新看一遍
+  （已修：Nginx 三条 location、Playwright 的遮罩等待）。
 
 ## 7. 当前待决策事项
 
@@ -223,6 +255,28 @@ Figma：**AI 门诊工作站 · 一期设计系统**
       两条 SSE 都是真流式（病历生成 104 块、中位间隔 8.9ms，对齐 12ms 节流；
       对话 18 块、中位间隔 291ms 为模型实时吐字）；同机 aits(3100)/site(3200) 均 200、
       nginx active、`proxy_buffering off` 仍在第 28 行；证书至 2026-11-29（剩 88 天）
+- [x] 2026-09-02 AgentScope 编排层（Master–Worker–Skill 四层）发布并公网复验：
+      `/api/orchestration/topology` 200、六个 worker 全部装配、`claude-sonnet-5`；
+      `POST /workers/risk/run` 200 · 57.1s；`POST /ask` 200 · 125.9s；
+      同机 aits/site 未受影响
+- [x] 2026-09-02 **补 Nginx `/api/orchestration/` 的 `proxy_read_timeout 320s`**。
+      这条路径原先继承 `location /` 的 60s，编排层调用一律 504 ——
+      应用侧 `CALL_TIMEOUT_S=300` 根本没机会生效。给 320s 是为了让应用先超时，
+      使用者才能拿到「编排超过 300 秒未完成，已中止」而不是 Nginx 的空白 504。
+      **换 Sonnet 5 的延迟代价第一次露头**：Haiku 时代所有调用都在 60s 内，
+      这个缺口一直在，只是没被触发过。
+      服务器上原配置已备份为 `…/da.aaronhealth.cn.bak-20260902`
+- [x] 2026-09-02 **产品路径的模型其实一直没换**。`/topology` 报 Sonnet 就以为换完了，
+      漏了 `/api/emr/*` —— 服务器 env 的 `AI_FAST_MODEL` 压着 Haiku，优先级高于代码缺省。
+      已改为 `claude-sonnet-5`，`AI_TIMEOUT_MS` 45s → 90s。
+      复验 `aiModels.fast=claude-sonnet-5`、`degraded_agents` 为空
+- [x] 2026-09-02 **换 Sonnet 把病历岗位从 10/10 打到 3~5/10**，已修回 10/10（连跑四次）。
+      提示词一直缺「每段的资料来源」这一半，被 Haiku 的习惯盖住了；
+      既往史改由代码兜底回填。详见 `15-Agent架构重构…md` §13
+- [x] 2026-09-02 交付平台上线：`/delivery` + `/api/delivery/*`，
+      门禁与部署脚本上报，控制台回归自动落智能体线
+- [x] 2026-09-02 Nginx 再补两条 location 的 320s 读超时：`/api/orchestration/`、
+      `/api/admin/`（控制台的试运行、并排对比、回归集都是模型调用）
 - [ ] 模型配额是否需要与 Ticket System 分开计（两者共用同一个网关和同一把 key）
 
 备案不阻塞：`aaronhealth.cn` 已备案（`粤ICP备2026119734号`，主体乐颖，服务器

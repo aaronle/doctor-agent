@@ -44,4 +44,32 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 180s;
     }
+
+    # 编排层：Master 串六个 worker，实测 100–200s，远超默认 60s 读超时。
+    # 这里给 320s 而不是 300s —— 应用自己的上限是 300s（CALL_TIMEOUT_S），
+    # 让它先超时，客户端才能拿到「编排超过 300 秒未完成，已中止」这句有信息量的话，
+    # 而不是 Nginx 那个什么都没说的 504 HTML。谁知道得多，谁先超时。
+    location /api/orchestration/ {
+        proxy_pass http://127.0.0.1:3400;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 320s;
+    }
+
+    # 控制台的试运行、并排对比、回归集都是模型调用，一次十条用例在 Sonnet 下
+    # 远超默认 60s。同一个道理：先让应用超时，它的报错才有信息量。
+    location /api/admin/ {
+        proxy_pass http://127.0.0.1:3400;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 320s;
+    }
 }
