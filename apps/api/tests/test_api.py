@@ -2644,3 +2644,276 @@ def test_uncollected_allergy_history_raises_a_yellow_flag_not_a_red_one(client):
 
     # 已否认的不该产出任何过敏项 —— 干净就是信息
     assert not [a for a in hard_rule_alerts(denied_ctx) if a["rule"].startswith("allergy")]
+
+
+def test_clinical_red_lines_exist_in_exactly_one_place():
+    """
+    全仓只能有**一份**安全层。
+
+    在此之前有两份：`agents/base.py`（产品路径）与
+    `orchestration/worker_factory.py`（编排路径），各 6 条、措辞不同、内容已经漂移。
+
+    两份红线是这样出事的：有人在其中一份里加固一条（比如「未问诊不写否认」），
+    另一份不报错、不告警、测试全绿，只是那条红线在另一条路径上**根本不存在**。
+    而两条路径面对的是同一个医生、同一位患者。
+
+    这条测试直接扫源码文本 —— 因为「又出现了第二份」是个**文件级**事实，
+    在任何单元测试的视野之外：两边各自 import 各自的常量，功能测试全都正常。
+    """
+    import re
+    from pathlib import Path
+
+    app_dir = Path(__file__).resolve().parents[1] / "app"
+    definers = [
+        path.relative_to(app_dir).as_posix()
+        for path in app_dir.rglob("*.py")
+        if re.search(r"^SAFETY_LAYER\s*=", path.read_text(encoding="utf-8"), re.M)
+    ]
+    assert definers == ["agents/safety.py"], f"安全层被定义在了多处：{definers}"
+
+
+def test_both_paths_use_the_same_safety_layer_object():
+    """
+    不只是「都叫 SAFETY_LAYER」，得是**同一个对象**。
+
+    各自 copy 一份字符串也能让上面那条测试过 —— 那样漂移照旧会发生，
+    只是换了个地方。判据用 `is`，拷贝立刻现形。
+    """
+    from app.agents.base import SAFETY_LAYER as product_path
+    from app.agents.safety import SAFETY_LAYER as canonical
+    from app.orchestration.worker_factory import SAFETY_LAYER as agentscope_path
+
+    assert product_path is canonical
+    assert agentscope_path is canonical
+
+
+def test_safety_layer_holds_clinical_rules_not_output_formatting():
+    """
+    安全层里只放**改了要有人签字**的东西。
+
+    「只输出 JSON 对象」「字符串内不得出现半角双引号」原先也挤在这张清单上 ——
+    它们是给手写 JSON 解析器打的补丁，和「不得自行确诊」排在一起。
+    混着放的代价是：安全层会因为格式微调而被改动，每改一次都在稀释
+    「这段文字不能随便动」这个约定。
+    """
+    from app.agents.base import OUTPUT_FORMAT
+    from app.agents.safety import SAFETY_LAYER
+
+    # **按具体指令判，不按关键词判。**
+    #
+    # 第一版写的是 `"JSON" not in SAFETY_LAYER`，立刻误伤了安全层第 7 条
+    # 「绝不输出工具原始 JSON」—— 那条讲的是**医生看到什么**，是红线；
+    # 而这里要拦的是序列化机制（怎么转义、要不要围栏）。两者只是碰巧共用一个词。
+    #
+    # 误报比没有校验更糟：这条测试会先被人加白名单，再被人删掉。
+    for mechanic in ("Markdown 围栏", "半角双引号", "不要前后缀"):
+        assert mechanic not in SAFETY_LAYER, f"序列化细节「{mechanic}」不该在安全层里"
+    # 反过来，格式块也不该混进临床判断
+    for clinical in ("确诊", "处方", "否认"):
+        assert clinical not in OUTPUT_FORMAT
+
+
+# ================================================================ 临床提示词单一事实源
+
+
+ALL_PRODUCT_AGENTS = (
+    "summary_agent", "record_agent", "record_field_agent", "diagnosis_agent",
+    "risk_agent", "comorbidity_agent", "voice_summary_agent",
+)
+
+
+def test_no_agent_carries_its_own_prompt_text():
+    """
+    `.py` 里不许再出现提示词文本。
+
+    在此之前，同一份临床知识写在两处：`agents/<role>.py` 的 `role_prompt`
+    （产品路径在跑）与 `skills/<name>/SKILL.md`（编排路径在跑）。
+    **它们已经漂了** —— 2026-09-03 给风险岗位加的两条（依据里的数字不许自己算、
+    阳性检查结论优先）只进了 .py，SKILL.md 至今没有，
+    而没有任何东西会因此报错、告警或让测试变红。
+
+    这条测试扫源码文本，因为「又长出第二份」是**文件级**事实：
+    一个类只要写一行 `role_prompt = "..."` 就能把基类的属性遮蔽掉，
+    功能测试全都照常通过。
+    """
+    import re
+    from pathlib import Path
+
+    agents_dir = Path(__file__).resolve().parents[1] / "app/agents"
+    offenders = [
+        path.name
+        for path in agents_dir.glob("*.py")
+        if path.name != "base.py"
+        and re.search(r"^\s+role_prompt\s*=", path.read_text(encoding="utf-8"), re.M)
+    ]
+    assert not offenders, f"这些岗位又把提示词写回 .py 里了：{offenders}"
+
+
+def test_every_agent_resolves_a_prompt_from_its_skill():
+    from app import agents as registry
+
+    for name in ALL_PRODUCT_AGENTS:
+        agent = getattr(registry, name)
+        assert agent.skill, f"{name} 没声明 skill"
+        prompt = agent.role_prompt          # 解析不出来会抛错
+        assert len(prompt) > 100, f"{name} 的提示词短得可疑：{len(prompt)} 字"
+
+
+def test_shared_prompt_never_mentions_tool_names():
+    """
+    共用的那部分只讲**数据**，不讲**怎么取数据**。
+
+    产品路径预先装配上下文、不调工具。把「`get_interview_dialog` 返回 found:false」
+    这种话发给它，是让模型去找一个它根本没有的工具 —— 而模型多半会顺着编。
+    工具相关的段落用 `<!--TOOLS:START-->` 圈起来，只发给编排路径。
+    """
+    from app import agents as registry
+
+    tool_names = (
+        "get_patient", "get_lab_results", "get_examinations", "get_visit_history",
+        "get_current_orders", "get_interview_dialog", "search_department",
+        "search_knowledge", "run_hard_rule_risk_scan", "get_nutrition_screening",
+    )
+    for name in ALL_PRODUCT_AGENTS:
+        prompt = getattr(registry, name).role_prompt
+        leaked = [t for t in tool_names if t in prompt]
+        assert not leaked, f"{name} 的共用提示词里出现了工具名：{leaked}"
+
+
+def test_orchestration_still_gets_the_tool_workflow():
+    """
+    反过来也要成立：编排路径拿的是**全文**，工具流程不能被一起切掉。
+
+    只测「产品路径没有工具名」的话，把整段工具流程删了它照样绿 ——
+    那时编排路径的六个 worker 会失去调用次序，而没有任何测试会发现。
+    """
+    from app.skills import load_all_skills
+
+    skills = load_all_skills()
+    assert "run_hard_rule_risk_scan" in skills["risk-management"].body
+    assert "get_interview_dialog" in skills["record-generation"].body
+    # 且全文严格长于共用部分 —— 相等就说明标记没起作用
+    for name in ("risk-management", "record-generation", "comorbidity-management"):
+        manifest = skills[name]
+        assert len(manifest.body) > len(manifest.clinical_body), f"{name} 的工具段落没被切出来"
+
+
+def test_department_closed_set_is_injected_not_hardcoded():
+    """
+    科室闭集只有一个来源：代码里的 `DEPARTMENTS`。
+
+    写死进 SKILL.md 的话，它和 `validate()` 的判据就又成了两份 ——
+    加一个科室时提示词说可以、校验说不行，模型被自己的说明书坑。
+    """
+    from app.agents import comorbidity_agent
+    from app.agents.comorbidity import DEPARTMENTS
+
+    prompt = comorbidity_agent.role_prompt
+    assert "<DEPARTMENTS>" not in prompt, "占位符没被替换"
+    for dept in DEPARTMENTS:
+        assert dept in prompt, f"闭集里的「{dept}」没进提示词"
+
+
+def test_unreplaced_placeholder_fails_loudly():
+    """
+    占位符漏配要**抛错**，不能原样发出去。
+
+    发出去的话模型会照着字面量「<DEPARTMENTS>」推荐科室，
+    而产出看起来完全正常 —— 直到有人发现推荐的科室医院里没有。
+    """
+    import pytest
+
+    from app.agents.comorbidity import ComorbidityAgent
+
+    class Broken(ComorbidityAgent):
+        prompt_placeholders: dict = {}      # 故意不配
+
+    with pytest.raises(ValueError, match="未替换的占位符"):
+        _ = Broken().role_prompt
+
+
+def test_denied_allergy_is_a_legitimate_source_for_writing_a_denial():
+    """
+    档案记着「已否认药物过敏史」时，病历里照写「否认药物过敏史」是**正确**的。
+
+    这条是 2026-09-03 的教训：把过敏史从字符串改成三态结构之后，
+    `documented_history` 取材时 `allergies: []` 一个字都贡献不了，
+    `allergy_status` 又不在它视野里 —— 于是模型的正确行为被判成伪造，
+    record 从 10/10 掉到 3/10，七条失败全是这一条。
+
+    **数据形状变了，依赖那个形状的校验必须跟着变**，否则它测的是旧世界。
+    """
+    from app.eval_cases import check_no_unasked_negation
+
+    ctx = {"allergy_status": "denied", "allergies": [], "past_history": "2型糖尿病 5 年"}
+    ok, detail = check_no_unasked_negation(
+        {"fields": {"past_history": "2型糖尿病 5 年。否认药物过敏史。"}}, ctx
+    )
+    assert ok, detail
+
+
+def test_uncollected_allergy_makes_a_written_denial_a_failure():
+    """
+    反过来必须仍然拦得住。
+
+    放宽之后如果连 `unknown` 也放行，这条校验就废了 ——
+    而 `unknown` 恰恰是最该拦的：档案里根本没有这条，
+    写「否认药物过敏史」是替患者作了一次没发生过的问答。
+    """
+    from app.eval_cases import check_no_unasked_negation
+
+    ctx = {"allergy_status": "unknown", "allergies": [], "past_history": "高血压 10 年"}
+    ok, detail = check_no_unasked_negation(
+        {"fields": {"past_history": "高血压 10 年。否认药物过敏史。"}}, ctx
+    )
+    assert not ok and "过敏" in detail
+
+
+def test_allergy_sentence_in_the_record_is_written_by_code_not_the_model():
+    """
+    既往史里那句过敏史是**确定映射**，不是判断题，所以由代码写。
+
+    三态 → 三种写法：confirmed 写出过敏原、denied 写「否认药物过敏史」、
+    unknown **留白**。
+
+    交给模型的代价实测过：P004 / P005 两位「未采集」的初诊患者，
+    模型照样写「否认药物过敏史」，十条回归里这两条稳定失败 ——
+    而病历上完全看不出异样，事实却是没有任何人问过。
+    """
+    from app.agents.record import _allergy_sentence
+
+    assert _allergy_sentence({"allergy_status": "confirmed", "allergies": ["青霉素"]}) == "青霉素过敏"
+    assert _allergy_sentence({"allergy_status": "denied", "allergies": []}) == "否认药物过敏史"
+    # 留白，而不是写「过敏史未采集」——
+    # 病历里不写关于病历本身的话，那件事由界面的黄色标记承担
+    assert _allergy_sentence({"allergy_status": "unknown", "allergies": []}) == ""
+
+
+def test_a_fabricated_denial_is_stripped_when_history_was_never_collected():
+    """
+    模型自己写了「否认药物过敏史」而档案里没有这条时，代码把它删掉。
+
+    提示词已经写明了，模型大多数时候照做 —— 但 `claude-sonnet-5` 上
+    `temperature` 已废弃，压不住剩下那部分抖动。**红线不能靠概率守。**
+    """
+    from app.agents.record import _strip_unauthorized_denial
+
+    assert _strip_unauthorized_denial(
+        "高血压 10 年。否认药物过敏史。", {"allergy_status": "unknown"}
+    ) == "高血压 10 年。"
+
+    # 整段只剩空的时候退回「未采集」，不能留空串
+    assert _strip_unauthorized_denial("否认药物过敏史。", {"allergy_status": "unknown"}) == "未采集"
+
+
+def test_a_documented_denial_is_left_alone():
+    """
+    `denied` 状态下那句话是档案里的**既有记录**，照写是对的，不许删。
+
+    分不清「问过、没有」和「没问过」正是这次改造要解决的问题本身 ——
+    在这里又合并回去，等于白改。
+    """
+    from app.agents.record import _strip_unauthorized_denial
+
+    text = "高血压 10 年。否认药物过敏史。"
+    assert _strip_unauthorized_denial(text, {"allergy_status": "denied"}) == text

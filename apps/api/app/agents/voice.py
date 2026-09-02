@@ -23,14 +23,7 @@ class VoiceSummaryAgent(Agent):
     key = "voice"
     version = "mvp-1.1.0"
     context_fields = ("primary_diagnosis", "diagnoses", "past_history")
-    role_prompt = (
-        "你负责把一次门诊问诊对话收敛成结构化小结，供医生审阅后决定是否写入病历。\n"
-        "硬性要求：\n"
-        "1. 只归纳对话中**实际出现**的内容，不补全、不推断。\n"
-        "2. chief_complaint 用患者自己的说法，不要改写成诊断名。\n"
-        "3. 对话没有涉及的方面，在 gaps 中列出还需要补问什么。\n"
-        "4. 不下诊断、不给治疗方案。"
-    )
+    skill = "voice-interview"
     output_schema = {
         "type": "object",
         "required": ["chief_complaint", "key_points", "gaps"],

@@ -1,5 +1,16 @@
 """Agent Skills 加载器：扫描 `skills/`，解析 SKILL.md。
 
+## 为什么它不在 orchestration 里（2026-09-03 从那里搬出来）
+
+SKILL.md 曾经只有编排层用，所以放在 `orchestration/skill_loader.py`。
+现在**两条路径都从它取临床提示词** —— 产品路径的六个岗位不再自带
+`role_prompt` 字符串，改读 `SkillManifest.clinical_body`。
+
+搬家不是为了好看：留在原地会形成导入环
+（`agents.base` → `orchestration` 包 → `master_agent` → `tools` → `agents.risk` → `agents.base`），
+因为 `orchestration/__init__` 会把整套编排栈一起拉起来。
+环本身是个信号 —— **被两边共用的东西不该住在其中一边**。
+
 格式沿用 agentskills.io 标准（与 `reference/patient-full-stack/patient-agents`
 同一套约定），这样两个项目的 skill 可以互相搬运，不必翻译。
 
@@ -33,11 +44,15 @@ from pathlib import Path
 
 import frontmatter
 
+#: 圈出「只有编排路径用得上」的工具调用段落。见 SkillManifest.clinical_body。
+TOOLS_START = "<!--TOOLS:START-->"
+TOOLS_END = "<!--TOOLS:END-->"
+
 NAME_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_NAME_LEN = 64
 MAX_DESC_LEN = 1024
 
-SKILLS_DIR = Path(__file__).resolve().parents[2] / "skills"
+SKILLS_DIR = Path(__file__).resolve().parents[1] / "skills"
 
 
 class SkillLoadError(Exception):
@@ -60,6 +75,38 @@ class SkillManifest:
     mcp_tools: list[str] = field(default_factory=list)
     requires_patient_context: bool = False
     worker_tool_name: str = ""
+
+    @property
+    def clinical_body(self) -> str:
+        """
+        正文里**与工具无关**的那部分 —— 两条路径共用的临床要求。
+
+        为什么要拆：同一份临床知识以前在两个地方各写一遍 ——
+        `agents/<role>.py` 的 `role_prompt`（产品路径在跑）和这里的 SKILL.md
+        （编排路径在跑）。**它们已经漂了**：2026-09-03 给风险岗位加的两条
+        （依据里的数字不许自己算、阳性检查结论优先）只进了 .py，
+        SKILL.md 至今没有 —— 没有任何东西会因此报错。
+
+        不能整份共用，是因为正文里混着工具调用流程（「先调
+        `run_hard_rule_risk_scan`」）。产品路径预先装配好上下文、不调工具，
+        把这段发给它只会让模型去找不存在的工具。
+
+        所以用 `<!--TOOLS:START-->` / `<!--TOOLS:END-->` 显式圈出工具相关段落：
+        编排路径拿全文，产品路径拿这里剩下的部分。**判据是显式标记而不是标题文字** ——
+        靠 `# 工作流程` 这种标题去猜，改个措辞就会静默地把临床要求一起吞掉。
+        """
+        out, skipping = [], False
+        for line in self.body.splitlines():
+            stripped = line.strip()
+            if stripped == TOOLS_START:
+                skipping = True
+                continue
+            if stripped == TOOLS_END:
+                skipping = False
+                continue
+            if not skipping:
+                out.append(line)
+        return "\n".join(out).strip()
 
     @property
     def all_tools(self) -> list[str]:

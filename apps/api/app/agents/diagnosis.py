@@ -44,18 +44,7 @@ class DiagnosisAgent(Agent):
         "allergies", "vitals", "lab_results", "examinations",
     )
     needs_lab_history = True
-    role_prompt = (
-        "你负责产出候选诊断及其鉴别依据。\n"
-        "硬性要求：\n"
-        "1. 每个候选必须给出 supporting（支持证据）、opposing（反对证据）、missing（还缺什么信息）三项。\n"
-        "2. **反对证据没有就写「未获得」，绝对不能留空、不能编造。**\n"
-        "3. confidence 是 0–100 的整数且必须是 5 的倍数。不要给出更精细的数字，你没有这个精度。\n"
-        "4. 全部候选按 confidence 从高到低排列，最多 5 条。\n"
-        "5. 待排的诊断就写成待排，不要表述成已确诊。\n"
-        "6. ICD 编码不确定时留空字符串，不要猜。\n"
-        "7. desc 是一句话的临床含义说明，suggestion 是一句话的下一步处置建议，两者不要写成同一句。\n"
-        "8. 不要自己排名次或标注「首选/次选」——名次由系统按 confidence 排序统一派生。"
-    )
+    skill = "differential-diagnosis"
     output_schema = {
         "type": "object",
         "required": ["suspected_diagnoses"],

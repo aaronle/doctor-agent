@@ -28,7 +28,7 @@ from agentscope.tool import Toolkit, ToolResponse
 from ..obs import event
 from .agent_loader import AgentProfile, load_all_agents
 from .settings import build_chat_model
-from .skill_loader import SkillManifest, load_all_skills
+from ..skills import SkillManifest, load_all_skills
 from .worker_factory import SAFETY_LAYER, build_worker
 
 

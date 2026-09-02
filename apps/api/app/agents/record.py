@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import re
+
 from .base import Agent, require_dict
 
 # 病历七段，顺序即界面展示与流式下发顺序
@@ -26,24 +28,67 @@ SECTION_LABELS = dict(RECORD_SECTIONS)
 UNCOLLECTED = "未采集"
 
 
-def _archived_history(ctx: dict) -> str:
+def _allergy_sentence(ctx: dict) -> str:
     """
-    主档里已记载的既往史 + 过敏史，拼成一段。
+    既往史里那句过敏史。**由代码写，不交给模型。**
 
-    过敏史这里写成「青霉素过敏」而不是「过敏史：青霉素」——
-    后者读起来像个字段名，前者才是病历里的话。**主档没记过敏就整句不写**，
-    绝不产出「否认过敏史」：那是一次没发生过的问答。
+    三种状态对应三种写法，这是确定的映射，不是判断题：
+
+    | allergy_status | 病历里写什么 |
+    | --- | --- |
+    | `confirmed` | `青霉素过敏` |
+    | `denied` | `否认药物过敏史` |
+    | `unknown` | **什么都不写** |
+
+    交给模型的代价实测过：P004 / P005 两位「未采集」患者，模型照样写了
+    「否认药物过敏史」—— 那是替患者作了一次没发生过的问答，而病历上看不出区别。
+    十条回归里这两条稳定失败。
+
+    `unknown` 留白而不是写「过敏史未采集」：病历里不写关于病历本身的话
+    （见 SKILL.md 硬性要求）。医生需要知道这件事，但那由界面的黄色标记承担，
+    不是往病历正文里塞一句自我说明。
     """
+    status = str(ctx.get("allergy_status") or "").strip().lower()
+    items = ctx.get("allergies") or []
+    if isinstance(items, str):
+        items = [items] if items.strip() else []
+    named = [str(a).strip() for a in items if str(a).strip()]
+
+    if not status:
+        status = "confirmed" if named else "unknown"
+    if status == "confirmed" and named:
+        # 写成「青霉素过敏」而不是「过敏史：青霉素」—— 后者读起来像字段名，前者才是病历里的话
+        return "、".join(named) + "过敏"
+    if status == "denied":
+        return "否认药物过敏史"
+    return ""
+
+
+_DENIAL_PATTERN = re.compile(r"[^。；;\n]*否认[^。；;\n]*过敏[^。；;\n]*[。；;]?")
+
+
+def _strip_unauthorized_denial(text: str, ctx: dict) -> str:
+    """
+    过敏史未采集时，删掉模型自己写的「否认药物过敏史」。
+
+    只在 `unknown` 时动手：`denied` 状态下那句话是**档案里的既有记录**，照写是对的。
+    分不清这两者，正是这次改造要解决的问题本身，不能在这里又合并回去。
+    """
+    if str(ctx.get("allergy_status") or "").strip().lower() != "unknown":
+        return text
+    cleaned = _DENIAL_PATTERN.sub("", text).strip()
+    return cleaned or UNCOLLECTED
+
+
+def _archived_history(ctx: dict) -> str:
+    """主档里已记载的既往史 + 过敏史，拼成一段。"""
     parts: list[str] = []
     history = str(ctx.get("past_history") or "").strip()
     if history:
         parts.append(history)
-
-    allergies = ctx.get("allergies") or []
-    named = [str(a).strip() for a in allergies if str(a).strip()]
-    if named:
-        parts.append("、".join(named) + "过敏")
-
+    allergy = _allergy_sentence(ctx)
+    if allergy:
+        parts.append(allergy)
     return "；".join(parts)
 
 
@@ -67,32 +112,7 @@ class RecordAgent(Agent):
     # 「本次问诊没问过既往史」，于是明明主档里写着「2型糖尿病 5 年」也填「未采集」——
     # 十条用例掉到三到五条。
     #
-    # 这不是 Sonnet 变差，是**这条提示词一直缺一半，只是被上一个模型的习惯盖住了**。
-    # 判据要写在提示词里，不能指望模型替你补。
-    role_prompt = (
-        "你负责根据问诊与检查资料起草门诊病历。\n"
-        "硬性要求：\n"
-        f"1. 严格输出七段：{'、'.join(SECTION_LABELS.values())}。不增段、不减段、不改名。\n"
-        "2. **每一段的资料来源是固定的，先认准来源再决定写什么：**\n"
-        "   - 主诉、现病史：本次主诉与问诊对话。\n"
-        "   - 既往史：**主档记载的既往史与过敏史**。主档里有就照写，"
-        "不要因为本次问诊没问到就写「未采集」—— 那是既有档案，不是本次问出来的。\n"
-        "   - 体格检查：只写上下文中已记录的体征，不生成未经证实的项。\n"
-        "   - 辅助检查：只写上下文中已有的检验值与检查结论，**每一句都要带上是哪一项检查**。"
-        "「未见异常」「大致正常」这类没有主语的话一律不许出现 —— "
-        "写「心电图未见明显 ST-T 改变」可以，光写「未见异常」不行，"
-        "因为没人知道你指的是哪一项、也无从核对。\n"
-        f"3. **只有该段的来源里确实没有资料，才写「{UNCOLLECTED}」**，"
-        f"且整段就是这三个字，不要拼在别的话前后（「否认药物过敏史{UNCOLLECTED}」这类是错的）。\n"
-        "4. **本次问诊没有涉及的症状或病史，整句略过不写**（既往史里主档已记载的除外）。"
-        "不要用「否认…」「无…」「未见…」去补位 —— 那意味着医生问过而患者否认，"
-        "凭空写出来就是伪造问诊记录。少写一句是留白，编一句是造假。\n"
-        "5. **病历里只写患者的事实，不写关于这份病历本身的话。**"
-        "「否认表述均未采集」「本段无相关记录」这类自我说明不是病历内容，一律不要出现；"
-        "该留白就按第 3 条写「未采集」三个字。\n"
-        "6. 初步诊断中待排的写「待排」，不要表述成确诊。\n"
-        "7. 每段是连贯的中文段落，不用列表符号。"
-    )
+    skill = "record-generation"
     output_schema = {
         "type": "object",
         "required": ["fields"],
@@ -134,6 +154,14 @@ class RecordAgent(Agent):
             archived = _archived_history(ctx)
             if archived:
                 cleaned["past_history"] = archived
+        else:
+            # 模型写了既往史时，兜底不触发 —— 但那句过敏史仍然要管。
+            #
+            # 实测 P004 / P005（两位「过敏史未采集」的初诊患者）：模型照样写
+            # 「否认药物过敏史」。病历上看不出任何异样，而事实是**没有人问过**。
+            # 提示词里已经写明了，模型大多数时候照做；这个模型上 temperature 已废弃，
+            # 压不住剩下那部分抖动。红线不能靠概率守。
+            cleaned["past_history"] = _strip_unauthorized_denial(cleaned["past_history"], ctx)
 
         return {"fields": cleaned}
 
@@ -181,17 +209,7 @@ class RecordFieldAgent(Agent):
         "vitals", "lab_results", "examinations", "dialog_script",
     )
     needs_exam_detail = False
-    role_prompt = (
-        "你负责在医生已录入内容的基础上，续写门诊病历的**指定一段**。\n"
-        "硬性要求：\n"
-        "1. 保留医生原文的全部信息，只在其后补充或整理，不得删改原意。\n"
-        "2. 上下文没有依据的内容不要补。宁可只回原文，也不要编造。\n"
-        "3. **体格检查段只能写上下文中已记录的体征数值（如血压、心率、体温、BMI）。**"
-        "绝对不允许补写「心肺听诊未闻异常」「腹软无压痛」「双下肢无浮肿」这类查体所见 —— "
-        "这些体征只有医生真正查过才存在，凭空写出来就是伪造查体记录。\n"
-        "4. 同理，未经问诊的「否认」「无」也不得出现。\n"
-        "5. 只输出这一段的文本，不要写段名，不要写其他段。"
-    )
+    skill = "record-field-continuation"
     output_schema = {
         "type": "object",
         "required": ["generated_text"],

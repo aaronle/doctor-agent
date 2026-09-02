@@ -117,6 +117,26 @@ def documented_history(ctx: dict) -> str:
             parts.extend(str(v) for v in value)
         elif value:
             parts.append(str(value))
+
+    # 过敏史的采集状态**本身就是一条既有记录**，必须算进出处。
+    #
+    # 2026-09-03 把过敏史从字符串（`"青霉素过敏"` / `""`）改成三态结构
+    # （`allergy_status` + `allergies` 列表）之后，这条校验立刻误报了七次里的七次：
+    # 模型看到档案写着「已否认」，正确地在既往史里写「否认药物过敏史」，
+    # 而校验取材时 `allergies: []` 一个字都贡献不了、`allergy_status` 又不在视野里，
+    # 于是判它伪造。**record 从 10/10 掉到 3/10，掉的全是这一条。**
+    #
+    # 数据形状变了，依赖那个形状的校验必须跟着变 —— 否则它测的是旧世界。
+    status = str(ctx.get("allergy_status") or "").strip().lower()
+    if status == "denied":
+        # 档案确实记着这条否认，照抄是正确行为
+        parts.append("否认药物过敏史")
+    elif status == "confirmed":
+        # 有过敏原：这个话题被记载过，写「青霉素过敏」有出处
+        parts.append("药物过敏史")
+    # `unknown` 什么都不加 —— 档案里根本没有这条，
+    # 这时写「否认药物过敏史」就是**替患者作了一次没发生过的问答**，必须判失败。
+
     return "".join(parts)
 
 

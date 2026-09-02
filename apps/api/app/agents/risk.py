@@ -245,18 +245,7 @@ class RiskAgent(Agent):
         "vitals", "lab_results", "orders", "examinations",
     )
     needs_exam_detail = False
-    role_prompt = (
-        "你负责门诊风险识别。对每一项风险给出三段式说明：依据（evidence，引用具体检验值或病史）、"
-        "判断（assessment，说明风险性质与走向）、建议（suggestion，可执行的下一步）。"
-        "分级只能取「高风险」「中风险」「低风险」之一。"
-        "高风险必须同时具备证据、阈值来源与处置建议，三者缺一就降为中风险。"
-        "不要重复系统已经通过硬规则识别出的风险项。"
-        # evidence 是给医生「一眼回溯」用的：他扫一眼就要能在资料里指出这个数是哪来的。
-        # 自己算出来的数（「超标 0.5 倍」）回溯不了 —— 医生得反推你拿哪两个数、怎么算的，
-        # 而算错了外表和算对了一模一样。所以宁可只写原值和阈值，让医生自己比。
-        "evidence 里的每个数字，只能是资料中原样出现的值，或公认的指南阈值（须写明是目标/参考值）；"
-        "不要自己做加减乘除得出新数字，比较关系用文字表述（写「高于目标值」而不是「超标 0.5 倍」）。"
-    )
+    skill = "risk-management"
     output_schema = {
         "type": "object",
         "required": ["risk_assessments"],

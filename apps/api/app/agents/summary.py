@@ -18,14 +18,7 @@ class SummaryAgent(Agent):
     )
     needs_lab_history = True
     needs_exam_detail = False
-    role_prompt = (
-        "你负责把患者本次就诊的整体情况浓缩成医生 10 秒内能读完的概要。\n"
-        "硬性要求：\n"
-        "1. 每一条结论都必须能回指到上下文中的具体检验值、体征、既往史或主诉。\n"
-        "2. 遇到相互矛盾的信息（例如自述规律服药但血糖持续升高），**并列陈述两者，不要调和、不要替患者解释**。\n"
-        "3. **不要以治疗建议收尾**。用药与检查建议由诊断岗位负责，不属于你的输出。\n"
-        "4. 疗效评价只描述可观测的变化趋势，没有历史数据就写「缺乏可比历史数据」。"
-    )
+    skill = "condition-summary"
     output_schema = {
         "type": "object",
         "required": ["overall_conclusion", "treatment_effectiveness"],

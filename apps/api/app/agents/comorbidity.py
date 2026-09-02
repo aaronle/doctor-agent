@@ -25,15 +25,9 @@ class ComorbidityAgent(Agent):
         "orders", "nutrition_screening_score",
     )
     needs_exam_detail = False
-    role_prompt = (
-        "你负责识别患者的共病组合并给出协同管理建议。\n"
-        "硬性要求：\n"
-        "1. 只把上下文中有依据的疾病列为共病；analysis 里必须写清依据来自哪条病史或检验值。\n"
-        f"2. recommended_dept 只能从以下科室中选一个：{'、'.join(DEPARTMENTS)}。不在列表里的一律不要写。\n"
-        "3. risk_level 只能取「高危」「中危」「低危」。\n"
-        "4. 说明共病之间的相互影响，而不是把几个病各写一段。\n"
-        "5. 没有识别到共病时，detected 返回 false，conditions 返回空数组。"
-    )
+    skill = "comorbidity-management"
+    #: 科室闭集在代码里（DEPARTMENTS），SKILL.md 只留占位符 —— 值只有一个来源
+    prompt_placeholders = {"<DEPARTMENTS>": lambda: "、".join(DEPARTMENTS)}
     output_schema = {
         "type": "object",
         "required": ["detected", "conditions"],
