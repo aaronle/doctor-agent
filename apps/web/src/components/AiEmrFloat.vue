@@ -2010,28 +2010,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         </div>
       </div>
 
-      <!--
-        AI 助手抽屉把手。
-
-        它是面板的**兄弟节点**，不在面板里面：.assistant-panel 带 overflow:hidden
-        （用来裁子元素的圆角），放进去的话把手会被裁掉。做成 flex 行里独立的一列，
-        既不用绝对定位，也不会被任何祖先裁剪。
-
-        取代了原来那张占三行的大卡片 —— 那张卡把「一个开关」做成了首屏最大的一块，
-        医生每次进来先读三行说明，读完才发现它只是个展开按钮。
-      -->
-      <button
-          class="assistant-handle"
-          :class="{ expanded: tipsOpen, attention: justAutoExpanded }"
-          type="button"
-          :title="tipsOpen ? '收起 AI 助手' : '展开 AI 助手（病历、鉴别诊断、风险、共病）'"
-          :aria-label="tipsOpen ? '收起 AI 助手' : '展开 AI 助手'"
-          :aria-expanded="tipsOpen"
-          @click="tipsOpen = !tipsOpen; justAutoExpanded = false"
-      >
-        <span class="ah-chevron">{{ tipsOpen ? '›' : '‹' }}</span>
-      </button>
-
       <!-- ======================= 医生智能体 ======================= -->
       <div v-if="panelOpen" class="assistant-panel connected-left">
         <div class="panel-header">
@@ -2040,6 +2018,31 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             <el-button text size="small" class="panel-action-btn panel-close" @click="panelOpen = false">×</el-button>
           </div>
         </div>
+
+        <!--
+          AI 助手抽屉把手 —— **贴在本面板的左内壁**。
+
+          它在面板**内部**（`position:absolute; left:0`），左边直角、右边圆角：
+          读起来像从框壁上伸出的一个小舌片，明确属于医生智能体。
+
+          之前它是面板的兄弟节点、flex 行里独立一列 —— 那样会在两块之间
+          撑出一道空隙，看着像浮在中间、不属于任何一边。
+
+          放进面板要满足一个约束：`.assistant-panel` 带 `overflow:hidden`（裁圆角），
+          所以把手**不能探出左边线**，只能整个待在里面。正文因此让出 26px 左内距
+          （`.chat-area`），不让它压住患者气泡。
+        -->
+        <button
+          class="assistant-handle"
+          :class="{ expanded: tipsOpen, attention: justAutoExpanded }"
+          type="button"
+          :title="tipsOpen ? '收起 AI 助手' : '展开 AI 助手（病历、鉴别诊断、风险、共病）'"
+          :aria-label="tipsOpen ? '收起 AI 助手' : '展开 AI 助手'"
+          :aria-expanded="tipsOpen"
+          @click="tipsOpen = !tipsOpen; justAutoExpanded = false"
+        >
+          <span class="ah-chevron">{{ tipsOpen ? '›' : '‹' }}</span>
+        </button>
 
         <!--
           AI 助手的展开开关。**做成一整块带说明的卡片，不是一个小箭头** ——

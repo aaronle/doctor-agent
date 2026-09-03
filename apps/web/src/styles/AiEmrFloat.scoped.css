@@ -883,19 +883,25 @@
 
    把手跨在面板左边线上（左右各露 11px），垂直居中。这是抽屉把手的通用形态：
    位置本身就在说「这边能拉开」，不需要文字解释。 */
-/* flex 行里的独立一列，不是绝对定位 —— 见组件里那段注释：
-   放进 .assistant-panel 会被它的 overflow:hidden 裁掉。
-   align-self:center 让它落在面板高度的正中间，这是「边线中间」那个要求的实现。 */
-.assistant-handle{flex:0 0 22px;align-self:center;width:22px;height:56px;padding:0;
-  margin:0 -1px 0 2px;border-radius:8px;border:1px solid #e2e8f0;
-  background:#fff;box-shadow:-2px 2px 6px #0000001a;cursor:pointer;z-index:3;
-  display:flex;align-items:center;justify-content:center;
+/* 贴在 .assistant-panel 的**左内壁**：左边直角、右边圆角，
+   读起来像从框壁上伸出的一个小舌片，明确属于医生智能体。
+
+   之前是 flex 行里独立一列 —— 那样会在抽屉与面板之间撑出一道空隙，
+   看着像浮在中间、不属于任何一边。
+
+   **不能探出左边线**：.assistant-panel 带 overflow:hidden（裁圆角），
+   探出去的部分会被切掉。所以 left:0 整个待在里面，
+   由正文让出左内距来避让（见下面 .copilot-tab-bar / .chat-messages 等）。 */
+.assistant-handle{position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:18px;height:52px;padding:0;border:1px solid #e2e8f0;border-left:none;
+  border-radius:0 8px 8px 0;background:#f2f5f8;box-shadow:2px 0 5px #00000014;
+  cursor:pointer;z-index:4;display:flex;align-items:center;justify-content:center;
   transition:border-color .15s,background .15s,color .15s}
-.assistant-handle:hover{border-color:#1677ff}
+.assistant-handle:hover{border-color:#1677ff;background:#eaf3ff}
 .assistant-handle:hover .ah-chevron{color:#1677ff}
 .assistant-handle.expanded{border-color:#1677ff}
 .assistant-handle.expanded .ah-chevron{color:#1677ff}
-.ah-chevron{font-size:17px;font-weight:500;color:#8a9099;line-height:1;transition:color .15s}
+.ah-chevron{font-size:15px;font-weight:500;color:#8a9099;line-height:1;transition:color .15s}
 
 /* 问诊结束自动展开的那一刻闪一次。
    取代原来那句「刚刚自动展开」的文字徽标 —— 同样看得见，但不占版面。 */
@@ -916,3 +922,15 @@
 .allergy-badge.danger{background:#fee2e2;color:#dc2626;border-color:#fca5a5}
 /* 黄色不是「轻一点的红」，是另一件事：红=有过敏，黄=没人问过。 */
 .allergy-badge.warn{background:#fef3cd;color:#b7791f;border-color:#fbd38d;font-weight:600}
+
+/* **只有对话区需要让位。**
+   把手是垂直居中的（top:50%，高 52px），只压住面板中部那一小段 ——
+   顶部的患者信息行、底部的操作区与输入框根本碰不到它。
+
+   第一版给这四处都加了 26px，结果把患者信息行整体右推、
+   右边的过敏标记被裁掉半个字（「⚠ 青霉素过敏」→「⚠ 青霉素过」）。
+   那一行本来就紧：姓名 + 性别年龄出生年月就诊号 + 过敏标记，
+   凭空少 26px 就装不下了。
+
+   避让要按**实际遮挡范围**来，不是「整块内容都退后」。 */
+.assistant-panel .chat-messages{padding-left:26px}
