@@ -84,7 +84,7 @@ const activeTab = ref<Tab>('智慧诊疗')
  * 问诊前先把结论摆出来，会让医生把「模型基于旧资料的猜测」当成本次判断 ——
  * 那正是问诊门禁存在的理由，界面不该反过来把门禁的结论提前展示。
  *
- * 「结束问诊」后自动展开（见 finishAndGenerate），医生也可以随时手动开合。
+ * 点「生成」后自动展开（见 generateNow），医生也可以随时手动开合。
  */
 const tipsOpen = ref(false)
 const panelOpen = ref(true)
@@ -928,29 +928,89 @@ watch(() => [voice.messages.value.length, chatMessages.value.length], scrollToBo
 const finishing = ref(false)
 const actionStep = ref('')
 
+/* ===================== 问诊提示浮框 ===================== */
+
 /**
- * 「结束问诊」：一次做完收尾与全部下游生成。
+ * 「问诊提示」：把问诊小结里的**待补问**浮在面板上给医生看一眼。
  *
- * 病情概况、鉴别诊断、风险、共病都是**打开工作站时**算好的，也就是在问诊
- * 之前。不在这里回灌一次，医生问出来的新信息就进不了那些面板，这一场问诊
- * 等于白做。病历同理。
+ * ## 这个功能撤过一次
+ *
+ * 2026-09-02 撤掉「AI 追问提示」，理由是「一期没有临床知识库，追问做不准，
+ * 对医生是干扰」。**那条理由没有失效** —— 变的是形态：
+ *
+ * | 当初 | 现在 |
+ * | --- | --- |
+ * | 常驻，问诊一开始就挂一列 | 只在医生点「生成」或「暂停」时弹 |
+ * | 关不掉 | 可缩小、可关闭，关了本轮不再自动弹 |
+ * | 没内容也占位 | **空则完全不显示** |
+ *
+ * 数据直接用 `interview_agent` 的 `gaps`（问诊小结的「待补问」），
+ * 不新造 Agent —— 两个模型对同一件事各说一遍必然会不一致。
+ */
+const hintOpen = ref(false)
+const hintMinimized = ref(false)
+/** 医生按过「✕」。本轮不再自动弹 —— 他已经明确说过不需要。 */
+const hintDismissed = ref(false)
+
+/** 有内容才可能显示。空数组一律不弹，绝不弹空框。 */
+const hasHints = computed(() => voice.hints.value.length > 0)
+
+/**
+ * 在「生成」与「暂停」之后尝试弹出。
+ *
+ * 三道闸：医生关过就不弹、没有条目就不弹、已经开着就不重复弹。
+ * 少任何一道，它就会变成当初被撤掉的那种东西。
+ */
+function offerHints() {
+  if (hintDismissed.value || !hasHints.value) return
+  hintOpen.value = true
+  hintMinimized.value = false
+}
+
+function closeHints() {
+  hintOpen.value = false
+  hintDismissed.value = true
+}
+
+/**
+ * 暂停时顺带给提示 —— 医生停下来，通常就是在想「还该问什么」。
+ *
+ * 只在**暂停**那一下给，继续时不给：正在问的时候弹东西是打断。
+ */
+function onToggleCapture() {
+  const wasPlaying = voice.state.value === 'playing'
+  voice.toggleCapture()
+  if (wasPlaying) offerHints()
+}
+
+/**
+ * 「生成」：用**此刻已有的问诊内容**重算全部下游产出。
+ *
+ * 病情概况、鉴别诊断、风险、共病都是打开工作站时算好的，也就是在问诊之前。
+ * 不回灌一次，医生问出来的新信息就进不了那些面板，这一场问诊等于白做。病历同理。
  *
  * 顺序：落库问诊记录 → 重算聚合分析 → 重新起草病历。
  * 落库必须在最前 —— 下游上下文（latest_dialog）读的是持久化后的记录。
+ *
+ * ## 为什么它不再结束问诊
+ *
+ * 原来这个按钮叫「结束问诊」，红色，点下去 `finish()` 把状态置为 ended。
+ * 那把两件事绑死了：**想看看 AI 怎么说** 和 **我问完了**。
+ * 医生问了三句想瞄一眼分析，就得先把问诊终结掉，要接着问还得再点「继续」。
+ *
+ * 现在只 `persist()` 不 `finish()` —— 生成多少次都行，问诊状态一动不动。
+ * 「结束」这件事本身交给医生关掉浮窗或接诊下一位，不需要一个专门的红色按钮。
  */
-async function finishAndGenerate() {
+async function generateNow() {
   if (!ws.patientId || finishing.value) return
   finishing.value = true
   try {
-    // **无条件调 finish()。** 它负责的是「收尾」：停定时器、置 ended、收起浮层。
-    // 落库那一步自己会判空（persist 里 `!messages.length` 直接返回），
-    // 所以这里不必也不该再判一次 —— 早先在外面判，医生在没录到内容时点结束，
-    // 状态机就停在 awaiting：分析已经解锁了，界面却还是一副问诊没结束的样子。
-    actionStep.value = voice.messages.value.length ? '落库问诊记录…' : '收尾…'
-    await voice.finish()
+    // 落库自己会判空（persist 里 `!messages.length` 直接返回），这里不必再判。
+    actionStep.value = voice.messages.value.length ? '落库问诊记录…' : '准备…'
+    await voice.persist()
 
     actionStep.value = '重新分析病情、诊断与风险…'
-    // 走状态机：voice/complete 已在服务端把这一场标为「问诊解锁」，
+    // 走状态机：interview/complete 已在服务端把这一场标为「问诊解锁」，
     // 这里重拉状态再算，八个标签页随之解锁。
     await ws.unlockAndAnalyse('interview')
     if (ws.summaryError) throw new Error(ws.summaryError)
@@ -958,12 +1018,12 @@ async function finishAndGenerate() {
     actionStep.value = '起草病历…'
     await generateRecord()
 
-    // 结束问诊后自动展开 AI 助手：这一刻医生要看的正是刚算出来的东西，
-    // 让他再去点一下开关是多余的一步。标上「刚刚自动展开」，
-    // 免得界面自己变了而医生不知道是什么触发的。
+    // 生成完自动展开 AI 助手：这一刻医生要看的正是刚算出来的东西。
+    // 标上「刚刚自动展开」，免得界面自己变了而医生不知道是什么触发的。
     tipsOpen.value = true
     justAutoExpanded.value = true
-    ElMessage.success('问诊已结束，病历与分析已按本次内容生成')
+    offerHints()
+    ElMessage.success('已按当前问诊内容生成')
   } catch (error) {
     ElMessage.error(`生成失败：${(error as Error).message}`)
   } finally {
@@ -1035,55 +1095,11 @@ function goPatientManage() {
   router.push('/outpatient/manage')
 }
 
-/* ===================== 技能管理 ===================== */
 
-type Skill = { id: string; name: string; desc: string; prompt: string; icon: string; enabled: boolean }
-
-const SKILL_ICONS = ['⚡', '🩸', '💊', '🔍', '📋', '❤️', '🧠', '🦴', '📈', '✅']
-
-const skillDialogOpen = ref(false)
-const skills = ref<Skill[]>([])
-const skillFormOpen = ref(false)
-const editingId = ref<string | null>(null)
-const skillForm = ref<Omit<Skill, 'id' | 'enabled'>>({ name: '', desc: '', prompt: '', icon: '⚡' })
-
-function openSkillManage() {
-  closePlusMenu()
-  skillDialogOpen.value = true
-}
-
-function newSkill() {
-  editingId.value = null
-  skillForm.value = { name: '', desc: '', prompt: '', icon: '⚡' }
-  skillFormOpen.value = true
-}
-
-function editSkill(skill: Skill) {
-  editingId.value = skill.id
-  skillForm.value = { name: skill.name, desc: skill.desc, prompt: skill.prompt, icon: skill.icon }
-  skillFormOpen.value = true
-}
-
-function saveSkill() {
-  const form = skillForm.value
-  if (!form.name.trim()) {
-    ElMessage.warning('技能名称必填')
-    return
-  }
-  if (editingId.value) {
-    const target = skills.value.find((s) => s.id === editingId.value)
-    if (target) Object.assign(target, form)
-  } else {
-    skills.value.push({ id: `skill-${skills.value.length + 1}`, ...form, enabled: true })
-  }
-  skillFormOpen.value = false
-  editingId.value = null
-}
-
-function removeSkill(id: string) {
-  skills.value = skills.value.filter((s) => s.id !== id)
-}
-
+/**
+ * 接诊下一位：按候诊队列顺序切到下一个患者，走到队尾回候诊列表。
+ * 与 V4.3 的同名按钮一致，是问诊结束后的主要去向。
+ */
 function nextPatient() {
   const queue = ws.queue
   const index = queue.findIndex((p) => p.id === ws.patientId)
@@ -1172,22 +1188,17 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         那是整个页面最大的一块，空着会让人以为「页面没加载完」。
         放一张说明卡：讲清为什么现在没有结论，以及两条出路。
       -->
-      <div v-if="!tipsOpen" class="assistant-placeholder">
-        <div class="ap-card">
-          <div class="ap-icon">⌘</div>
-          <div class="ap-title">AI 助手待问诊后展开</div>
-          <p class="ap-desc">
-            病历、鉴别诊断、风险与共病都由这一场问诊推导。问诊前先给结论，
-            会让医生把「模型基于旧资料的猜测」当成本次判断 —— 那是这道门禁存在的理由。
-          </p>
-          <div class="ap-actions">
-            <el-button type="primary" size="small" @click="startInterviewFromPlaceholder">● 开始问诊</el-button>
-            <el-button size="small" @click="tipsOpen = true">仅查看已有资料</el-button>
-          </div>
-          <p class="ap-hint">硬规则红色风险不受此门禁 —— 它是纯代码判定，任何时候都在场。</p>
-        </div>
-      </div>
+      <!--
+        这里原本是「AI 助手待问诊后展开」的说明卡（.assistant-placeholder / .ap-card）。
+        **2026-09-03 整块删除。**
 
+        它占着 AI 助手收起后腾出的一整片区域，讲的是「为什么现在还没有结论」——
+        而那件事界面已经说过两遍了：八个标签页上挂着 🔒，医生智能体里有门禁说明卡。
+        同一个道理讲三遍，第三遍就只是挡住底下的 HIS。
+
+        （做 HIS 门面时还发现它 `flex:1` 且吃点击，把底下的医嘱页签全挡死了 ——
+        当时是给它加 `pointer-events:none` 放行的。现在整块没了，那条补丁也随之作废。）
+      -->
       <div v-if="tipsOpen" class="tips-drawer connected-right">
         <div class="tips-header">
           <span class="tips-title"><span class="panel-ai-dot" />AI 助手</span>
@@ -1414,7 +1425,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                       link
                       title="按本次问诊重新起草病历七段"
                       :loading="generating"
-                      @click="finishAndGenerate"
+                      @click="generateNow"
                     >
                       AI 生成
                     </el-button>
@@ -2052,6 +2063,39 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           收起态是虚线灰框（看着「还没打开」），展开态是实线蓝框加蓝底
           （看着「正开着」）。两种状态的差别要一眼可辨，否则等于没有状态。
         -->
+        <!--
+          问诊提示浮框。浮在患者信息行下方、面板右侧 —— **不挡患者身份**，
+          那一行是核对身份用的，最不该被遮。
+
+          三态：展开 / 缩小成胶囊 / 关闭。空内容时整个不渲染（v-if 的 hasHints）。
+        -->
+        <div v-if="hintOpen && hasHints" class="hint-float" :class="{ mini: hintMinimized }">
+          <template v-if="!hintMinimized">
+            <div class="hf-head">
+              <span class="hf-icon">💡</span>
+              <span class="hf-title">问诊提示</span>
+              <span class="hf-spacer" />
+              <button class="hf-btn" title="缩小" @click="hintMinimized = true">—</button>
+              <button class="hf-btn" title="关闭（本轮不再自动弹）" @click="closeHints">✕</button>
+            </div>
+            <div class="hf-body">
+              <div v-for="(q, i) in voice.hints.value" :key="i" class="hf-item">
+                <span class="hf-dot">💡</span><span class="hf-text">{{ q }}</span>
+              </div>
+              <!--
+                这一句是刻意的。这个功能撤过一次，理由是「做不准是干扰」——
+                措辞压住，它才是提示而不是清单。
+              -->
+              <div class="hf-foot">供参考，不是必须问的项</div>
+            </div>
+          </template>
+
+          <button v-else class="hf-pill" title="展开问诊提示" @click="hintMinimized = false">
+            <span class="hf-icon">💡</span>问诊提示
+            <span class="hf-count">{{ voice.hints.value.length }}</span>
+          </button>
+        </div>
+
         <div class="copilot-tab-bar">
           <div class="ctab active">
             <span class="patient-tab-name">{{ patient?.name }}</span>
@@ -2127,30 +2171,51 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             </el-button>
 
             <!--
-              问诊中只有两个按钮，构成一个可重复的循环：
-                继续问诊 → 继续录入（跟患者对话，或医生自己补充）
-                结束问诊 → 落库 + 生成病历 + 更新概况/诊断/风险/共病
-              还要补就再点继续。医生不需要判断该点哪个。
+              问诊中两个按钮，各管一件互不相干的事：
+
+              **继续 / 暂停** 是同一个按钮的两态。原先是「继续问诊」在进行中被
+              禁用 —— 那等于医生想停一下时没有出路，只能等它播完，
+              或者点那个红色的「结束问诊」把整场终结掉。
+              「我想停一下」和「我问完了」是完全不同的两个意图。
+
+              文字只留「继续 / 暂停」，不带「问诊」二字：它就长在问诊面板里，
+              上下文已经说明了对象，重复一遍只是把两个字的按钮撑成四个字。
+              和右边的「生成」也就对齐成了两字对两字。
+
+              **生成** 随时可点、可重复点，只落库不结束问诊。
+              医生问了三句想瞄一眼 AI 怎么说，不该为此把问诊终结掉。
+              也因此它不是红色 —— 红色在本产品里是「危险/不可逆」，
+              而这个动作既不危险也可以再来一次。
             -->
             <template v-else>
+              <!--
+                主次分明（2026-09-03 定的方案 B）：
+                「继续/暂停」是**过程控制**，做成描边次级按钮；
+                「生成」是这一屏真正的产出动作，独占实心蓝。
+
+                原先两个都是实心、还是不同色系（蓝 + 绿），视觉权重一样重 ——
+                医生要挨个读才知道该点哪个。主操作只能有一个。
+              -->
               <el-button
-                type="primary"
+                class="ib-secondary"
+                :class="{ paused: voice.state.value !== 'playing' }"
                 size="small"
-                :disabled="voice.state.value === 'playing'"
-                :title="voice.state.value === 'playing' ? '问诊进行中' : '继续记录，或补充患者所述'"
-                @click="voice.resumeCapture()"
+                plain
+                :title="voice.state.value === 'playing' ? '暂停（已录内容保留）' : '继续记录，或补充患者所述'"
+                @click="onToggleCapture"
               >
-                {{ voice.state.value === 'playing' ? '● 问诊进行中' : '▶ 继续问诊' }}
+                {{ voice.state.value === 'playing' ? '暂停' : '继续' }}
               </el-button>
 
               <el-button
-                type="danger"
+                class="ib-primary"
+                type="primary"
                 size="small"
                 :loading="finishing"
-                title="结束问诊，并按本次内容生成病历与全部分析"
-                @click="finishAndGenerate"
+                title="按此刻已有的问诊内容生成病历与全部分析。可以随时点，也可以再点一次重算。"
+                @click="generateNow"
               >
-                ■ 结束问诊
+                生成
               </el-button>
             </template>
           </div>
@@ -2173,45 +2238,22 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               </div>
             </div>
             <div class="chat-toolbar">
-              <div class="tb-left">
-                <button class="tb-plus-btn" title="上传/提示词" @click.stop="togglePlusMenu">＋</button>
-                <span class="tb-hint" />
-
-                <transition name="plus-menu-slide">
-                  <div v-if="plusMenuOpen" class="plus-menu" @click.stop>
-                    <div class="pm-item" @click="chooseUpload('file')">
-                      <span>📎</span> 上传文件
-                    </div>
-                    <div class="pm-item" @click="chooseUpload('image')">
-                      <span>🖼</span> 上传图片
-                    </div>
-                    <div class="pm-item pm-submenu-trigger" @click="promptsOpen = !promptsOpen">
-                      <span>💬</span> 常用提示词 ›
-                    </div>
-                    <div v-if="promptsOpen" class="pm-prompts">
-                      <div
-                        v-for="preset in PROMPT_PRESETS"
-                        :key="preset"
-                        class="pm-prompt-item"
-                        @click="pickPrompt(preset)"
-                      >{{ preset }}</div>
-                    </div>
-                    <div class="pm-item" @click="goPatientManage">
-                      <span>👥</span> 患者管理
-                    </div>
-                    <div class="pm-item" @click="openSkillManage">
-                      <span>⚡</span> 技能管理
-                    </div>
-                  </div>
-                </transition>
-
-                <input ref="fileInputRef" type="file" style="display: none" @change="onFilePicked($event, '上传文件')" />
-                <input ref="imageInputRef" type="file" accept="image/*" style="display: none" @change="onFilePicked($event, '上传图片')" />
-              </div>
+              <!--
+                这里原本是 .tb-left，里面是「＋」菜单：上传文件 / 上传图片 /
+                常用提示词 / 患者管理 / 技能管理。**一期整块撤掉**（2026-09-03）——
+                五项没有一项是这一期要交付的能力，留着只会让医生点进去发现每条都不通。
+                患者管理与技能管理在别处有正经入口。
+              -->
               <div class="tb-actions">
                 <button class="tb-action-btn" @click="nextPatient">接诊下一位</button>
-                <button class="tb-action-btn" @click="sendChat('请解读本次检查检验的异常结果')">报告解读</button>
-                <button class="tb-action-btn" @click="activeTab = '智慧诊疗'">鉴别诊断</button>
+                <!--
+                  「报告解读」2026-09-03 撤掉：一期不做。
+                  「鉴别诊断」改名「科室看板」—— **内容待定**，所以它现在
+                  只切到智慧诊疗页，不假装已经有一个看板。
+                  等看板定义清楚再接上去；在那之前，一个点了跳到别处的按钮
+                  比一个点了弹「敬请期待」的按钮诚实。
+                -->
+                <button class="tb-action-btn" @click="activeTab = '智慧诊疗'">科室看板</button>
               </div>
             </div>
           </div>
@@ -2220,73 +2262,12 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
 
     </div>
 
-    <!-- 技能管理 -->
-    <el-dialog
-      v-model="skillDialogOpen"
-      title="技能管理"
-      width="720px"
-      class="skill-manage-dialog"
-      destroy-on-close
-      append-to-body
-    >
-      <div class="sm-body">
-        <div class="sm-toolbar">
-          <div class="sm-hint">维护个性化 Skills，启用后可在侧栏与 Copilot「/」菜单中使用</div>
-          <el-button type="primary" size="small" @click="newSkill">新建技能</el-button>
-        </div>
-
-        <div v-if="skillFormOpen" class="sm-form-card">
-          <div class="sm-form-title">{{ editingId ? '编辑技能' : '新建技能' }}</div>
-          <el-form label-width="88px" size="default" class="sm-form">
-            <el-form-item label="名称" required>
-              <el-input v-model="skillForm.name" maxlength="30" show-word-limit placeholder="如：糖尿病足筛查" />
-            </el-form-item>
-            <el-form-item label="说明">
-              <el-input v-model="skillForm.desc" maxlength="60" show-word-limit />
-            </el-form-item>
-            <el-form-item label="提示词">
-              <el-input v-model="skillForm.prompt" type="textarea" :rows="3" />
-            </el-form-item>
-            <el-form-item label="图标">
-              <div class="sm-icon-picker">
-                <button
-                  v-for="icon in SKILL_ICONS"
-                  :key="icon"
-                  class="sm-icon-btn"
-                  :class="{ active: skillForm.icon === icon }"
-                  @click.prevent="skillForm.icon = icon"
-                >{{ icon }}</button>
-              </div>
-            </el-form-item>
-          </el-form>
-          <div class="sm-form-actions">
-            <el-button size="small" @click="skillFormOpen = false">取消</el-button>
-            <el-button type="primary" size="small" @click="saveSkill">保存</el-button>
-          </div>
-        </div>
-
-        <div class="sm-list">
-          <div v-for="skill in skills" :key="skill.id" class="sm-item" :class="{ disabled: !skill.enabled }">
-            <div class="sm-item-icon">{{ skill.icon }}</div>
-            <div class="sm-item-main">
-              <div class="sm-item-name">{{ skill.name }}</div>
-              <div class="sm-item-desc">{{ skill.desc || skill.prompt }}</div>
-            </div>
-            <div class="sm-item-actions">
-              <el-switch v-model="skill.enabled" size="small" />
-              <el-button link size="small" @click="editSkill(skill)">编辑</el-button>
-              <el-button link size="small" type="danger" @click="removeSkill(skill.id)">删除</el-button>
-            </div>
-          </div>
-          <div v-if="!skills.length" class="sm-hint">还没有自定义技能。</div>
-        </div>
-      </div>
-
-      <template #footer>
-        <el-button @click="skillDialogOpen = false">关闭</el-button>
-      </template>
-    </el-dialog>
-
+    <!--
+      技能管理对话框 2026-09-03 删除：它唯一的入口是「＋」菜单，
+      而「＋」按一期范围整块撤掉了 —— 留着就是**打不开的死代码**。
+      （撤「＋」时我先写了句「技能管理在别处有正经入口」，
+      查了一遍发现那是错的：全仓只有那一个入口。写注释前得先验证。）
+    -->
     <!-- 临床知识库词条 -->
     <el-dialog v-model="kbDialogOpen" :title="kbEntry?.title ?? '临床知识库'" width="680px" class="kb-dialog" append-to-body>
       <div v-if="kbLoading" class="kb-loading">加载中…</div>

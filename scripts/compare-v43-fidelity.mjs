@@ -150,16 +150,6 @@ async function ensureAiFloat(page) {
   await page.locator('.tips-drawer').first().waitFor({ state: 'visible', timeout: 8000 });
 }
 
-async function openPlusMenu(page) {
-  await ensureAiFloat(page);
-  if (await page.locator('.plus-menu').first().isVisible().catch(() => false)) {
-    await page.locator('.tb-plus-btn').first().click();
-    await page.waitForTimeout(250);
-  }
-  await page.locator('.tb-plus-btn').first().click();
-  await page.locator('.plus-menu').first().waitFor({ state: 'visible', timeout: 8000 });
-  await page.waitForTimeout(300);
-}
 
 const PAGES = [
   {
@@ -337,39 +327,23 @@ const PAGES = [
     selectors: ['.rc-qc-detail', '.qc-icon', '.qc-body', '.qc-field'],
   },
 
-  {
-    name: '＋ 菜单展开',
-    hash: '#/outpatient/P001',
-    path: '/outpatient/P001',
-    prepare: openPlusMenu,
-    selectors: ['.plus-menu', '.pm-item', '.pm-submenu-trigger'],
-  },
-
-  {
-    name: '技能管理对话框',
-    hash: '#/outpatient/P001',
-    path: '/outpatient/P001',
-    prepare: async (page) => {
-      await openPlusMenu(page);
-      // 「技能管理」是 ＋ 菜单最后一项
-      await page.locator('.plus-menu .pm-item').last().click();
-      await page.locator('.skill-manage-dialog').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
-      await page.waitForTimeout(400);
-    },
-    selectors: ['.skill-manage-dialog', '.sm-body', '.sm-toolbar', '.sm-hint'],
-  },
+  /*
+   * 「＋ 菜单展开」与「技能管理对话框」两个场景 2026-09-03 移除。
+   *
+   * 一期把「＋」整块撤掉了（上传文件/上传图片/常用提示词/患者管理/技能管理，
+   * 五项没有一项是这一期交付的能力），技能管理的对话框也随之删除 ——
+   * 它唯一的入口就在那个菜单里。
+   *
+   * 这是**有意偏离原件**，和 `.mode-badge`（红色的「语」）同一类：
+   * 留在清单里只会每次卡在 `.tb-plus-btn` 的 30 秒超时上，
+   * 而「缺失」的含义应该是「漏做了」，不是「有意没做」。
+   */
 
   {
     name: '浮层全关的唤回钮',
     hash: '#/outpatient/P001',
     path: '/outpatient/P001',
     prepare: async (page) => {
-      // 上一场景留下的技能管理对话框会盖住关闭按钮，先收干净
-      const close = page.locator('.skill-manage-dialog .el-dialog__headerbtn').first();
-      if (await close.isVisible().catch(() => false)) {
-        await close.click();
-        await page.waitForTimeout(400);
-      }
       for (const sel of ['.tips-close', '.panel-close']) {
         const btn = page.locator(sel).first();
         if (await btn.isVisible().catch(() => false)) {

@@ -19,6 +19,12 @@ const PLUS_ITEMS = [
   ['⚡', '技能管理'],
 ]
 
+/*
+ * 「＋ 菜单」与「技能管理」两组测试 2026-09-03 删除 —— 功能已按一期范围整块撤掉。
+ *
+ * **功能下线要连着测试一起删。** 留着的话它们会一直红，然后被人加 skip，
+ * 而一个 skip 掉的测试和没有测试是一回事，只是更容易骗过「全绿」这个印象。
+ */
 /** 常用提示词五条原文，逐字取自 V4.3，不可改写 */
 const PROMPTS = [
   '请根据检查结果给出初步诊断',
@@ -181,135 +187,6 @@ describe('浮层重新唤出', () => {
     expect(wrapper.find('.tips-drawer').exists()).toBe(true)
     // 唤回后按钮自己让位
     expect(wrapper.find('.ai-float-btn').exists()).toBe(false)
-  })
-})
-
-describe('＋ 菜单', () => {
-  it('默认收起，点 ＋ 才展开', async () => {
-    const wrapper = await renderFloat()
-    expect(wrapper.find('.plus-menu').exists()).toBe(false)
-
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    expect(wrapper.find('.plus-menu').exists()).toBe(true)
-  })
-
-  it('五项的顺序、文案与图标都按原件', async () => {
-    const wrapper = await renderFloat()
-    await wrapper.find('.tb-plus-btn').trigger('click')
-
-    const items = wrapper.findAll('.plus-menu .pm-item')
-    expect(items).toHaveLength(PLUS_ITEMS.length)
-    PLUS_ITEMS.forEach(([icon, label], i) => {
-      expect(items[i].text()).toContain(icon)
-      expect(items[i].text()).toContain(label)
-    })
-  })
-
-  it('二级菜单要点一下才出来，五条提示词逐字对齐原件', async () => {
-    const wrapper = await renderFloat()
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    expect(wrapper.find('.pm-prompts').exists()).toBe(false)
-
-    await wrapper.find('.pm-submenu-trigger').trigger('click')
-    const prompts = wrapper.findAll('.pm-prompt-item')
-    expect(prompts.map((p) => p.text())).toEqual(PROMPTS)
-  })
-
-  it('再点一次收起二级菜单', async () => {
-    const wrapper = await renderFloat()
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    await wrapper.find('.pm-submenu-trigger').trigger('click')
-    expect(wrapper.find('.pm-prompts').exists()).toBe(true)
-
-    await wrapper.find('.pm-submenu-trigger').trigger('click')
-    expect(wrapper.find('.pm-prompts').exists()).toBe(false)
-  })
-
-  it('选中提示词后菜单关闭，文本进入输入框', async () => {
-    const wrapper = await renderFloat()
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    await wrapper.find('.pm-submenu-trigger').trigger('click')
-    await wrapper.findAll('.pm-prompt-item')[1].trigger('click')
-
-    expect(wrapper.find('.plus-menu').exists()).toBe(false)
-    expect((wrapper.find('.chat-textarea-wrap textarea').element as HTMLTextAreaElement).value)
-      .toBe('请分析患者的用药风险')
-  })
-
-  it('「患者管理」跳路由而不是在浮层里开页面', async () => {
-    const wrapper = await renderFloat()
-    const push = vi.spyOn(router, 'push')
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    await wrapper.findAll('.plus-menu .pm-item')[3].trigger('click')
-
-    expect(push).toHaveBeenCalledWith('/outpatient/manage')
-  })
-
-  it('上传只回显不落存储 —— 一期不接收真实患者文件', async () => {
-    const wrapper = await renderFloat()
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    await wrapper.findAll('.plus-menu .pm-item')[0].trigger('click')
-
-    // 不得因为「上传」向后端发任何请求
-    const calls = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls
-    expect(calls.every((c) => !String(c[0]).includes('upload'))).toBe(true)
-  })
-
-  it('点页面别处收起菜单，点菜单自身不收起', async () => {
-    const wrapper = await renderFloat()
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    expect(wrapper.find('.plus-menu').exists()).toBe(true)
-
-    // 点菜单内部不该把自己关掉 —— 否则二级菜单永远展不开
-    await wrapper.find('.plus-menu').trigger('click')
-    expect(wrapper.find('.plus-menu').exists()).toBe(true)
-
-    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('.plus-menu').exists()).toBe(false)
-  })
-
-  it('重开菜单时二级菜单回到收起态', async () => {
-    const wrapper = await renderFloat()
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    await wrapper.find('.pm-submenu-trigger').trigger('click')
-    expect(wrapper.find('.pm-prompts').exists()).toBe(true)
-
-    await wrapper.find('.tb-plus-btn').trigger('click')   // 收起
-    await wrapper.find('.tb-plus-btn').trigger('click')   // 再展开
-    expect(wrapper.find('.plus-menu').exists()).toBe(true)
-    expect(wrapper.find('.pm-prompts').exists()).toBe(false)
-  })
-})
-
-describe('技能管理', () => {
-  it('从 ＋ 菜单打开，带原件的说明文案', async () => {
-    const wrapper = await renderFloat()
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    await wrapper.findAll('.plus-menu .pm-item')[4].trigger('click')
-    await vi.waitFor(() => expect(document.querySelector('.skill-manage-dialog')).toBeTruthy())
-
-    const dialog = document.querySelector('.skill-manage-dialog')!
-    expect(dialog.querySelector('.sm-hint')!.textContent).toContain(
-      '维护个性化 Skills，启用后可在侧栏与 Copilot「/」菜单中使用',
-    )
-  })
-
-  it('新建技能才展开表单，名称是必填', async () => {
-    const wrapper = await renderFloat()
-    await wrapper.find('.tb-plus-btn').trigger('click')
-    await wrapper.findAll('.plus-menu .pm-item')[4].trigger('click')
-    await vi.waitFor(() => expect(document.querySelector('.skill-manage-dialog')).toBeTruthy())
-
-    expect(document.querySelector('.sm-form-card')).toBeFalsy()
-
-    const newBtn = [...document.querySelectorAll('.sm-toolbar button')]
-      .find((b) => b.textContent?.includes('新建技能')) as HTMLButtonElement
-    newBtn.click()
-    await vi.waitFor(() => expect(document.querySelector('.sm-form-card')).toBeTruthy())
-
-    expect(document.querySelector('.sm-form-title')!.textContent).toContain('新建技能')
-    expect(document.querySelector('.sm-form input')!.getAttribute('placeholder')).toBe('如：糖尿病足筛查')
   })
 })
 
@@ -884,36 +761,12 @@ describe('风险名按等级着色', () => {
   })
 })
 
-describe('AI 助手收起时的空状态', () => {
-  /**
-   * HIS 门面撤掉之后，AI 助手收起时它原来占的位置是整个页面最大的一块。
-   * 空着会让人以为「页面没加载完」—— 而那正是这次改动最容易造成的观感事故。
-   */
-  it('收起时给一张说明卡，不是一片空白', async () => {
-    stubFetch()
-    const wrapper = mount(AiEmrFloat, {
-      global: { plugins: [createPinia(), router, ElementPlus] },
-      attachTo: document.body,
-    })
-    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
-
-    const holder = wrapper.find('.assistant-placeholder')
-    expect(holder.exists()).toBe(true)
-    // 讲清「为什么现在没有结论」，而不只是一句「暂无数据」
-    expect(holder.text()).toContain('由这一场问诊推导')
-    // 两条出路都在
-    const actions = holder.findAll('button').map((b) => b.text()).join('|')
-    expect(actions).toContain('开始问诊')
-    // 红线不受门禁这件事要说出来，否则医生会以为什么都没有
-    expect(holder.text()).toContain('硬规则红色风险不受此门禁')
-  })
-
-  it('展开后空状态让位给抽屉 —— 两者互斥，不叠在一起', async () => {
-    const wrapper = await renderFloat()
-    expect(wrapper.find('.tips-drawer').exists()).toBe(true)
-    expect(wrapper.find('.assistant-placeholder').exists()).toBe(false)
-  })
-})
+/*
+ * 「AI 助手收起时的空状态」一组测试 2026-09-03 删除 —— 那张说明卡整块撤了。
+ *
+ * 它讲的是「为什么现在还没有结论」，而八个标签页上的 🔒 与医生智能体里的
+ * 门禁说明卡已经说过同一件事。同一个道理讲三遍，第三遍只是挡住底下的 HIS。
+ */
 
 // ================================================================ 患者信息行与过敏标记
 
@@ -999,5 +852,102 @@ describe('过敏标记', () => {
     const wrapper = await renderWithPatient({ status: 'denied', items: [] })
     expect(wrapper.find('.mode-badge.voice').exists()).toBe(false)
     expect(wrapper.find('.copilot-tab-bar').text()).not.toContain('语')
+  })
+})
+
+// ================================================================ 问诊按钮与提示浮框
+
+describe('问诊按钮组', () => {
+  it('继续与暂停是同一个按钮的两态，不是两个按钮', async () => {
+    // 原先「继续问诊」在进行中被**禁用** —— 医生想停一下时没有出路，
+    // 只能等它播完，或者点那个红色的「结束问诊」把整场终结掉。
+    // 「我想停一下」和「我问完了」是完全不同的两个意图。
+    const wrapper = await renderFloat()
+    const bar = wrapper.find('.action-bar')
+    expect(bar.exists()).toBe(true)
+    // 任何时候都只有一个「继续/暂停」按钮，且从不禁用
+    const toggles = bar.findAll('.ib-secondary')
+    expect(toggles.length).toBeLessThanOrEqual(1)
+    toggles.forEach((b) => expect(b.attributes('disabled')).toBeUndefined())
+  })
+
+  it('主操作只有一个：生成是实心，继续/暂停是描边', async () => {
+    // 两个都实心、还不同色系（蓝 + 绿）时视觉权重一样重，
+    // 医生要挨个读才知道该点哪个。
+    const wrapper = await renderFloat()
+    const bar = wrapper.find('.action-bar')
+    if (!bar.findAll('.ib-primary').length) return   // 未进入问诊态时没有这组按钮
+    expect(bar.find('.ib-primary').text()).toBe('生成')
+    expect(bar.find('.ib-primary').classes()).toContain('el-button--primary')
+  })
+})
+
+describe('工具栏（一期范围）', () => {
+  it('「＋」整块撤掉 —— 里面五项没有一项是这一期交付的', async () => {
+    const wrapper = await renderFloat()
+    expect(wrapper.find('.tb-plus-btn').exists()).toBe(false)
+    expect(wrapper.find('.plus-menu').exists()).toBe(false)
+  })
+
+  it('「报告解读」撤掉，「鉴别诊断」改名「科室看板」', async () => {
+    const wrapper = await renderFloat()
+    const labels = wrapper.findAll('.tb-action-btn').map((b) => b.text())
+    expect(labels).not.toContain('报告解读')
+    expect(labels).not.toContain('鉴别诊断')
+    expect(labels).toContain('科室看板')
+  })
+
+  it('技能管理对话框一并删除 —— 它唯一的入口在「＋」里', async () => {
+    // 撤「＋」时我先写了句「技能管理在别处有正经入口」，查了一遍发现那是错的：
+    // 全仓只有那一个入口。留着就是打不开的死代码。
+    const wrapper = await renderFloat()
+    expect(wrapper.find('.skill-manage-dialog').exists()).toBe(false)
+  })
+})
+
+describe('问诊提示浮框', () => {
+  it('没有条目时一条都不显示 —— 绝不弹空框', async () => {
+    // 这个功能 2026-09-02 撤过一次，理由是「一期没有临床知识库，做不准，
+    // 对医生是干扰」。那条理由没有失效，所以「空则不弹」是它能回来的前提。
+    const wrapper = await renderFloat()
+    expect(wrapper.find('.hint-float').exists()).toBe(false)
+  })
+
+  it('措辞必须压住：是提示，不是必须问的清单', async () => {
+    // 条目用问号结尾的问句、底部写明「供参考」——
+    // 一个做不准的建议，语气越肯定伤害越大。
+    const src = AiEmrFloat as unknown as { render?: unknown }
+    expect(src).toBeTruthy()
+    const wrapper = await renderFloat()
+    // 浮框未显示时不该有任何祈使式文案残留在 DOM 里
+    expect(wrapper.text()).not.toContain('必须追问')
+  })
+})
+
+describe('降级不得伪装成建议', () => {
+  it('问诊小结降级时，兜底文案不能当作追问提示弹出来', async () => {
+    // 实跑抓到的：interview/complete 降级时 gaps 是本地规则写死的一句
+    // 「模型通道不可用，本次问诊未生成结构化小结，请人工整理」——
+    // 那是**错误信息**，不是追问建议。不拦的话医生会看到一条 💡 图标的提示
+    // 写着「模型通道不可用」，比不给提示糟得多：它把一次故障伪装成了临床建议。
+    const { useInterview } = await import('../composables/useInterview')
+    const { api } = await import('../api')
+
+    const spy = vi.spyOn(api, 'interviewComplete').mockResolvedValue({
+      ok: true,
+      degraded: true,
+      analysis_gaps: ['模型通道不可用，本次问诊未生成结构化小结，请人工整理。'],
+    } as never)
+
+    const iv = useInterview(() => 'P001')
+    iv.messages.value = [{ role: 'doctor', text: '最近怎么样？' }]
+    await iv.persist()
+    expect(iv.hints.value).toEqual([])
+
+    // 反过来：没降级时正常收下
+    spy.mockResolvedValue({ ok: true, degraded: false, analysis_gaps: ['夜尿次数有增多吗？'] } as never)
+    await iv.persist()
+    expect(iv.hints.value).toEqual(['夜尿次数有增多吗？'])
+    spy.mockRestore()
   })
 })

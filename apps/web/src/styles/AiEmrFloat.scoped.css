@@ -883,32 +883,7 @@
    而且医生第一次用时得看得出那里可以点。收起态虚线灰框、展开态实线蓝框，
    两态差别要一眼可辨，否则等于没有状态。 */
 
-/* AI 助手收起时占位。HIS 门面撤掉后那是页面最大的一块，
-   空着会让人以为「没加载完」。这张卡讲清「为什么现在没有结论」与两条出路。 */
-/* 占位区**本身不吃点击**，只有中间那张卡吃。
-   
-   它 flex:1 铺满了 AI 助手收起后腾出的整片区域 —— 而底下是 HIS 门面。
-   不放行的话，医生点 HIS 的医嘱页签、病历栏全部点不到：
-   界面看着能操作，实际被一层透明的东西盖死，
-   而那层还是「已经收起来的」AI 助手。**看不见的东西不该拦住看得见的东西。** */
-.assistant-placeholder{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
-  padding:24px;pointer-events:none}
-.assistant-placeholder .ap-card{pointer-events:auto}
-.ap-card{max-width:520px;background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:26px 28px;text-align:center;box-shadow:0 4px 20px #0000000f}
-.ap-icon{font-size:26px;font-weight:700;color:#b0b5bd;line-height:1}
-.ap-title{margin-top:10px;font-size:15px;font-weight:700;color:#1f2329}
-.ap-desc{margin:10px 0 0;font-size:12px;line-height:1.75;color:#8a9099}
-.ap-actions{margin-top:18px;display:flex;gap:8px;justify-content:center}
-.ap-hint{margin:16px 0 0;font-size:11px;color:#b0b5bd;line-height:1.6}
-
-/* ---------------------------------------------------------------- AI 助手抽屉把手
-
-   取代原来那张占三行的大卡片（.assistant-toggle）。那张卡片的问题不是不好看，
-   是它把「一个开关」做成了首屏最大的一块内容 —— 医生每次进来先读三行说明，
-   读完才发现它只是个展开按钮。
-
-   把手跨在面板左边线上（左右各露 11px），垂直居中。这是抽屉把手的通用形态：
-   位置本身就在说「这边能拉开」，不需要文字解释。 */
+/* ---------------------------------------------------------------- AI 助手抽屉把手 */
 /* 贴在 .assistant-panel 的**左内壁**：左边直角、右边圆角，
    读起来像从框壁上伸出的一个小舌片，明确属于医生智能体。
 
@@ -968,3 +943,47 @@
    现在把手纯粹**浮在**面板左边缘上（absolute，不参与布局）。
    它 18px 宽、垂直居中，压住的只是气泡左侧的内边距区域 ——
    气泡自己有 9px padding，文字起点在把手之外，读不受影响。 */
+
+/* ---------------------------------------------------------------- 问诊提示浮框
+
+   浮在患者信息行下方、面板右侧。**不挡患者身份行** —— 那一行是核对身份用的。
+   用的是产品自己的语言（#1677ff、8–10px 圆角、12px 字号），
+   不是参考截图里那套紫调大圆角：和现有界面不搭。 */
+.hint-float{position:absolute;right:10px;top:78px;z-index:6;width:224px}
+.hint-float.mini{width:auto}
+
+.hf-head{display:flex;align-items:center;gap:5px;height:30px;padding:0 8px 0 10px;
+  background:#eff6ff;border:1px solid #c7dcff;border-bottom:none;border-radius:10px 10px 0 0}
+.hf-icon{font-size:11px;line-height:1}
+.hf-title{font-size:12px;font-weight:700;color:#1677ff}
+.hf-spacer{flex:1}
+.hf-btn{border:none;background:transparent;color:#8a9099;cursor:pointer;
+  font-size:12px;line-height:1;padding:2px 4px;border-radius:3px}
+.hf-btn:hover{background:#dbeafe;color:#1677ff}
+
+.hf-body{background:#fff;border:1px solid #c7dcff;border-top:none;border-radius:0 0 10px 10px;
+  padding:8px 10px 7px;display:flex;flex-direction:column;gap:6px;
+  box-shadow:0 4px 14px #1454991f;max-height:230px;overflow-y:auto}
+.hf-item{display:flex;gap:6px;align-items:flex-start;padding:6px 8px;border-radius:6px;
+  background:#f9fbff;border:1px solid #e5eefc}
+.hf-text{font-size:10.5px;line-height:1.5;color:#1f2937}
+.hf-dot{font-size:10px;line-height:1.5;flex-shrink:0}
+.hf-foot{font-size:9px;color:#8a9099;padding-top:1px}
+
+/* 缩小态：一个小胶囊 + 条数角标 */
+.hf-pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;
+  background:#fff;border:1px solid #c7dcff;color:#1677ff;font-size:11px;font-weight:600;
+  cursor:pointer;box-shadow:0 2px 8px #14549924}
+.hf-pill:hover{background:#f0f6ff}
+.hf-count{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;
+  padding:0 4px;border-radius:8px;background:#e5484d;color:#fff;font-size:9px;font-weight:700}
+
+/* 底部两个按钮：次级描边 + 主操作实心（方案 B）。
+   「继续/暂停」是过程控制，「生成」是产出动作 —— 权重本就不该相同。 */
+.action-bar .ib-secondary{min-width:64px}
+.action-bar .ib-primary{min-width:76px;font-weight:600}
+
+/* `.assistant-placeholder` / `.ap-*` 的样式 2026-09-03 随组件一起删除。
+   那张「AI 助手待问诊后展开」的说明卡讲的是「为什么现在还没有结论」，
+   而八个标签页上的 🔒 与门禁说明卡已经说过同一件事 ——
+   第三遍就只是挡住底下的 HIS。 */

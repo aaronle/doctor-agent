@@ -141,6 +141,25 @@ export function useInterview(getPatientId: () => string) {
     state.value = 'awaiting'
   }
 
+  /** 暂停：停在当前这句，不清空已录内容。再点继续从这里接着走。 */
+  function pauseCapture() {
+    stopTimer()
+    if (state.value === 'playing') state.value = 'awaiting'
+  }
+
+  /**
+   * 一个按钮管继续与暂停。
+   *
+   * 原先是两件事：一个「继续问诊」按钮，进行中时**禁用**它。
+   * 那等于医生想停下来的时候没有任何出路 —— 只能等它自己播完，
+   * 或者点那个红色的「结束问诊」把整场问诊终结掉。
+   * 而「我想停一下看看」和「我问完了」是完全不同的两个意图。
+   */
+  function toggleCapture() {
+    if (state.value === 'playing') pauseCapture()
+    else resumeCapture()
+  }
+
   /** 手动补问会让问诊从已结束回到进行中，但不重启播放 */
   function ensureOpen() {
     if (state.value === 'ended') state.value = 'awaiting'
@@ -166,6 +185,19 @@ export function useInterview(getPatientId: () => string) {
   const finishing = ref(false)
 
   /**
+   * 问诊小结里的「待补问」，直接拿来当追问提示。
+   *
+   * **不为此新增 Agent 或端点** —— `interview_agent` 的 `gaps` 字段本来就是
+   * 「对话没有涉及、还需要补问的方面」，服务端一直在 `analysis_gaps` 里回它，
+   * 只是前端从来没接。再造一个「追问 Agent」等于让两个模型对同一件事各说一遍，
+   * 而且它们会不一致。
+   *
+   * 空数组就是空数组：给不出有依据的条目时不填充、不凑数 ——
+   * 界面据此决定不弹框（见 AiEmrFloat 的 hintOpen）。
+   */
+  const hints = ref<string[]>([])
+
+  /**
    * 把当前问诊记录落库，**不改变状态**。
    *
    * 「生成」「更新」都需要先落库（下游上下文读的是持久化后的问诊记录），
@@ -176,20 +208,34 @@ export function useInterview(getPatientId: () => string) {
     const patientId = getPatientId()
     if (!patientId || !messages.value.length) return
     try {
-      await api.interviewComplete({
+      const res = await api.interviewComplete({
         patient_id: patientId,
         conversation_summary: messages.value
           .map((m) => `${m.role === 'doctor' ? '医生' : '患者'}：${m.text}`)
           .join('\n'),
         messages: messages.value,
       })
+      // **降级时一条都不给。**
+      //
+      // 兜底的 gaps 是本地规则写死的一句「模型通道不可用，本次问诊未生成
+      // 结构化小结，请人工整理」—— 它是**错误信息**，不是追问建议。
+      // 不拦的话医生会看到一条 💡 图标的提示写着「模型通道不可用」，
+      // 那比不给提示糟得多：它把一次故障伪装成了一条临床建议。
+      const r = res as { analysis_gaps?: unknown; degraded?: boolean }
+      const gaps = r?.degraded ? [] : r?.analysis_gaps
+      hints.value = Array.isArray(gaps) ? gaps.map(String).filter((x) => x.trim()) : []
     } catch (exc) {
       error.value = `问诊记录落库失败：${(exc as Error).message}`
       throw exc
     }
   }
 
-  /** 医生点「结束问诊」：落库 + 收尾。这是唯一的结束入口。 */
+  /**
+   * 医生点「结束问诊」：落库 + 收尾。这是唯一的结束入口。
+   *
+   * 注意它和 `persist()` 的分工：**「生成」不走这里**。
+   * 医生可以在问诊进行中随时生成，那时问诊不该被结束掉 —— 只落库。
+   */
   async function finish() {
     stopTimer()
     finishing.value = true
@@ -210,11 +256,14 @@ export function useInterview(getPatientId: () => string) {
     state,
     active,
     messages,
+    hints,
     finishing,
     error,
     degraded,
     start,
     resumeCapture,
+    pauseCapture,
+    toggleCapture,
     persist,
     finish,
     recordPatientUtterance,
