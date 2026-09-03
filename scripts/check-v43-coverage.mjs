@@ -133,10 +133,17 @@ async function settle(page, timeout = 150000) {
 /** 确保 AI 浮层开着 —— 关掉的话一个标签页都点不到 */
 async function ensureFloat(page) {
   await settle(page);
-  const round = page.locator('.ai-float-btn').first();
-  if (await round.isVisible().catch(() => false)) {
-    await round.click();
-    await page.waitForTimeout(400);
+  // 唤回入口两边不同名：**原件**是 52px 的「AI」圆钮 `.ai-float-btn`，
+  // **重建版** 2026-09-03 换成了 D1 卡通 `.mascot`（位置与职责没变）。
+  // 这个辅助函数两边都要跑，所以两个都试一下 —— 只写一个的话，
+  // 另一边会静默地停在收起态，然后整页被报成「全缺」。
+  for (const sel of ['.ai-float-btn', '.mascot']) {
+    const round = page.locator(sel).first();
+    if (await round.isVisible().catch(() => false)) {
+      await round.click();
+      await page.waitForTimeout(400);
+      break;
+    }
   }
   // AI 助手 2026-09-02 起**默认收起**（问诊前不该先把结论摆出来）。
   // 采类名之前必须先展开，否则整个抽屉都不在 DOM 里，

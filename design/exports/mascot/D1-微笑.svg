@@ -1,0 +1,41 @@
+<!--
+  医生智能体桌面卡通形象 · 方案 D1「微笑」
+
+  D1 = 方案 D + 一条上扬的嘴。结构一个字没动。
+
+  两条不能改的：
+  1. **眼睛保持圆点，不做眯眼笑。** 缩到 40px 时眯眼会糊成一条线，
+     读起来像闭眼睡着了 —— 那是完全相反的意思。
+  2. **嘴是唯一为「笑」付出的像素。** 它也是缩小时最先要保的细节，
+     其余（听诊器、天线）在 40px 下可以省掉。
+
+  颜色只用一支蓝 #1677ff（产品主色）。橙色 #ff7a00 仅用于「有待补问」角标，
+  数字与问诊提示浮框的条数是同一个 —— 两处对不上会让医生不知道该信哪个。
+-->
+<svg width="220" height="260" viewBox="0 0 220 260" xmlns="http://www.w3.org/2000/svg"
+     role="img" aria-label="医生智能体卡通形象 D1 微笑版">
+  <title>医生智能体 · D1 微笑</title>
+
+  <!-- 天线 -->
+  <line x1="110" y1="30" x2="110" y2="52" stroke="#1677ff" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="110" cy="26" r="7" fill="#1677ff"/>
+
+  <!-- 圆顶头 -->
+  <path d="M40 118 A70 70 0 0 1 180 118 L180 168 A16 16 0 0 1 164 184 L56 184 A16 16 0 0 1 40 168 Z"
+        fill="#1677ff"/>
+
+  <!-- 面屏 -->
+  <rect x="56" y="86" width="108" height="84" rx="26" fill="#ffffff"/>
+
+  <!-- 眼睛 -->
+  <circle cx="88" cy="116" r="9" fill="#1677ff"/>
+  <circle cx="132" cy="116" r="9" fill="#1677ff"/>
+
+  <!-- 微笑：D1 与 D 的唯一区别 -->
+  <path d="M92 140 Q110 156 128 140" stroke="#1677ff" stroke-width="6"
+        stroke-linecap="round" fill="none"/>
+
+  <!-- 听诊器：点明「医生」。40px 以下可省 -->
+  <path d="M62 184 Q58 214 84 220" stroke="#1677ff" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <circle cx="92" cy="222" r="10" fill="#ffffff" stroke="#1677ff" stroke-width="5"/>
+</svg>

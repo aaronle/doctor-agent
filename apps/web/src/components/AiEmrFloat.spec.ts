@@ -113,7 +113,7 @@ afterEach(() => {
 describe('浮层重新唤出', () => {
   it('抽屉开着时不显示任何唤出按钮', async () => {
     const wrapper = await renderFloat()
-    expect(wrapper.find('.ai-float-btn').exists()).toBe(false)
+    expect(wrapper.find('.mascot').exists()).toBe(false)
     expect(wrapper.find('.solo-tips-open-btn').exists()).toBe(false)
   })
 
@@ -121,8 +121,8 @@ describe('浮层重新唤出', () => {
     const wrapper = await renderFloat()
     await wrapper.find('.tips-close').trigger('click')
 
-    // 面板里的开关卡片已经能唤回抽屉，这时再挂一个浮动按钮属于凭空加 UI。
-    expect(wrapper.find('.ai-float-btn').exists()).toBe(false)
+    // 面板里的把手已经能唤回抽屉，这时再挂一个浮动入口属于凭空加 UI。
+    expect(wrapper.find('.mascot').exists()).toBe(false)
     expect(wrapper.find('.solo-tips-open-btn').exists()).toBe(false)
 
     // 2026-09-03：开关从整块卡片改成面板左边线中间的抽屉把手。
@@ -159,28 +159,34 @@ describe('浮层重新唤出', () => {
     expect(toggle.text()).toContain('‹')
   })
 
-  it('抽屉和面板都关 → 显示圆形 AI 钮', async () => {
+  it('抽屉和面板都关 → 缩成 D1 卡通（2026-09-03 替掉「AI」圆钮）', async () => {
     const wrapper = await renderFloat()
     await wrapper.find('.tips-close').trigger('click')
     await wrapper.find('.panel-close').trigger('click')
 
-    const round = wrapper.find('.ai-float-btn')
-    expect(round.exists()).toBe(true)
-    expect(round.find('.float-icon').text()).toBe('AI')
-    expect(round.find('.float-ready-dot').exists()).toBe(true)
+    const mascot = wrapper.find('.mascot')
+    expect(mascot.exists()).toBe(true)
+    // 换掉的是长相不是职责：位置沿用原件圆钮的 right:24 / bottom:32
+    expect(mascot.findAll('.mascot-eye')).toHaveLength(2)
+    expect(wrapper.find('.ai-float-btn').exists()).toBe(false)
     expect(wrapper.find('.solo-tips-open-btn').exists()).toBe(false)
   })
 
-  it('点唤出按钮能把抽屉找回来 —— 否则关掉就是死路', async () => {
+  it('点卡通把**医生智能体面板**找回来，不是打开 AI 助手', async () => {
+    // 原件那个圆钮点下去只开抽屉。照搬会留一条死路：
+    // 面板关着、把手长在面板内壁上，抽屉开起来之后**面板再也回不来**。
+    // 缩起来的是面板，点开就该还面板。
     const wrapper = await renderFloat()
     await wrapper.find('.tips-close').trigger('click')
     await wrapper.find('.panel-close').trigger('click')
-    expect(wrapper.find('.tips-drawer').exists()).toBe(false)
+    expect(wrapper.find('.assistant-panel').exists()).toBe(false)
 
-    await wrapper.find('.ai-float-btn').trigger('click')
-    expect(wrapper.find('.tips-drawer').exists()).toBe(true)
-    // 唤回后按钮自己让位
-    expect(wrapper.find('.ai-float-btn').exists()).toBe(false)
+    await wrapper.find('.mascot').trigger('click')
+    expect(wrapper.find('.assistant-panel').exists()).toBe(true)
+    // 面板回来了，把手也跟着回来 —— 抽屉从此有路可走
+    expect(wrapper.find('.assistant-handle').exists()).toBe(true)
+    // 卡通自己让位
+    expect(wrapper.find('.mascot').exists()).toBe(false)
   })
 })
 

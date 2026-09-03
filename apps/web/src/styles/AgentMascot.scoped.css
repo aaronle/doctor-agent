@@ -1,0 +1,39 @@
+/* 医生智能体桌面卡通 D1「微笑」。
+   替掉原件的 52px「AI」圆钮，**位置沿用**：right:24px / bottom:32px。
+   医生上一版在哪找它，这一版还在哪。 */
+
+.mascot{
+  position:fixed;right:24px;bottom:32px;z-index:2000;
+  color:#1677ff;                    /* SVG 全部用 currentColor，改这一处就换肤 */
+  cursor:grab;
+  /* 拖动时别把 SVG 当图片拖走，也别选中周围文字 */
+  user-select:none;-webkit-user-drag:none;touch-action:none;
+  filter:drop-shadow(0 4px 10px rgb(22 119 255 / .28));
+  transition:transform .18s ease;
+}
+.mascot:hover{transform:translateY(-2px) scale(1.06)}
+.mascot:active{cursor:grabbing;transform:scale(1.02)}
+.mascot:focus-visible{outline:2px solid #1677ff;outline-offset:4px;border-radius:10px}
+
+.mascot svg{display:block}
+
+/* 分析中：天线呼吸。**不做旋转** —— 分析要跑 20–30 秒，
+   一个转半分钟的东西是持续的余光干扰，而它就浮在医生桌面上。 */
+.mascot.thinking{cursor:progress}
+.mascot.thinking .mascot-antenna{animation:mascot-breathe 1.6s ease-in-out infinite}
+@keyframes mascot-breathe{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* 待补问角标。橙色而非红色：红色在本产品是临床风险语义，
+   「还有几条没问」不是风险。 */
+.mascot-badge{
+  position:absolute;top:-2px;right:-4px;min-width:19px;height:19px;padding:0 5px;
+  display:inline-flex;align-items:center;justify-content:center;
+  border-radius:10px;background:#ff7a00;border:2px solid #fff;
+  color:#fff;font-size:11px;font-weight:700;line-height:1;
+  box-shadow:0 2px 6px rgb(255 122 0 / .4);
+}
+
+/* 医生把动画关了就别硬播 */
+@media (prefers-reduced-motion:reduce){
+  .mascot,.mascot.thinking .mascot-antenna{transition:none;animation:none}
+}

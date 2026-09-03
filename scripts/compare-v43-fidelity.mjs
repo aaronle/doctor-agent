@@ -132,10 +132,17 @@ async function settle(page, timeout = 150000) {
 async function ensureAiFloat(page) {
   // 每个 prepare 都从这里进来，遮罩的等待放在最前面，各处不必各写一遍
   await settle(page);
-  const round = page.locator('.ai-float-btn').first();
-  if (await round.isVisible().catch(() => false)) {
-    await round.click();
-    await page.waitForTimeout(400);
+  // 唤回入口两边不同名：**原件**是 52px 的「AI」圆钮 `.ai-float-btn`，
+  // **重建版** 2026-09-03 换成了 D1 卡通 `.mascot`（位置与职责没变）。
+  // 这个辅助函数两边都要跑，所以两个都试一下 —— 只写一个的话，
+  // 另一边会静默地停在收起态，然后整页被报成「全缺」。
+  for (const sel of ['.ai-float-btn', '.mascot']) {
+    const round = page.locator(sel).first();
+    if (await round.isVisible().catch(() => false)) {
+      await round.click();
+      await page.waitForTimeout(400);
+      break;
+    }
   }
   // AI 助手 2026-09-02 起**默认收起**（问诊前不该先把结论摆出来），
   // 且唤回入口从 ‹ › 小箭头换成了医生智能体里的整块开关卡片。
@@ -352,22 +359,22 @@ const PAGES = [
    * 而「缺失」的含义应该是「漏做了」，不是「有意没做」。
    */
 
-  {
-    name: '浮层全关的唤回钮',
-    hash: '#/outpatient/P001',
-    path: '/outpatient/P001',
-    prepare: async (page) => {
-      for (const sel of ['.tips-close', '.panel-close']) {
-        const btn = page.locator(sel).first();
-        if (await btn.isVisible().catch(() => false)) {
-          await btn.click();
-          await page.waitForTimeout(400);
-        }
-      }
-      await page.locator('.ai-float-btn').first().waitFor({ state: 'visible', timeout: 8000 });
-    },
-    selectors: ['.ai-float-btn', '.float-icon', '.float-ready-dot'],
-  },
+  /*
+   * 「浮层全关的唤回钮」场景 2026-09-03 移除。
+   *
+   * 唤回入口从原件那个 52px 的「AI」圆钮换成了 D1 卡通（`AgentMascot.vue`）。
+   * 位置沿用（right:24 / bottom:32）、职责一个字没变，但**长相是有意不同的** ——
+   * 原件那两个字母是个标签，而这一格要说的是「医生智能体待命中」。
+   *
+   * 于是它没法留在这张表里：这张表比的是「同名 class 的计算样式」，
+   * 而 `.mascot` / `.mascot-eye` / `.mascot-mouth` 在原件里根本不存在，
+   * 三个选择器会全部落进「原件中不存在，跳过」—— **一个什么都不比的场景，
+   * 比没有场景更糟**：它在输出里占一行 ■，看起来像是有人在管。
+   *
+   * 改由单测把守，覆盖比这里更细：
+   *   - `AgentMascot.spec.ts` 12 条：形状、点击唤回、拖拽与防误点、边界钳制、三态
+   *   - `AiEmrFloat.spec.ts`「抽屉和面板都关 → 缩成 D1 卡通」「点卡通把面板找回来」
+   */
 ];
 
 function readStyles(selectors, props) {

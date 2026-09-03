@@ -11,11 +11,9 @@
 .ai-emr-root.fullpage .assistant-panel.connected-left{border-radius:0}
 .ai-emr-root.fullpage .tips-header{border-radius:0;padding:8px 14px}
 .ai-emr-root.fullpage .panel-header{border-radius:0}
-.ai-float-btn{position:fixed;right:24px;bottom:32px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#1677ff,#0958d9);box-shadow:0 4px 16px #1677ff66;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2000;transition:transform .2s,box-shadow .2s}
-.ai-float-btn:hover{transform:scale(1.08);box-shadow:0 6px 20px #1677ff8c}
-.float-icon{color:#fff;font-size:16px;font-weight:700;letter-spacing:1px}
-.float-icon.small{font-size:12px}
-.float-ready-dot{position:absolute;top:4px;right:4px;width:10px;height:10px;border-radius:50%;background:#52c41a;border:2px solid #fff;animation:pulse 2s infinite}
+/* `.ai-float-btn` / `.float-icon` / `.float-ready-dot` 2026-09-03 删除 ——
+   唤回入口换成了 D1 卡通（AgentMascot.vue + AgentMascot.scoped.css）。
+   `pulse` 关键帧留着：.panel-ai-dot 与 .voice-recording-dot 还在用。 */
 @keyframes pulse{0%,to{opacity:1}50%{opacity:.4}}
 .solo-tips-open-btn{position:fixed;right:24px;bottom:32px;padding:6px 14px;border-radius:20px;background:linear-gradient(135deg,#0f2b54,#1a3a6a);color:#e8f0fe;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 4px 16px #1677ff59;z-index:2000;transition:box-shadow .2s}
 .solo-tips-open-btn:hover{box-shadow:0 6px 20px #1677ff80}

@@ -8,6 +8,7 @@ import { RECORD_SECTIONS, useWorkstation } from '../stores/workstation'
 import { useCopilotChat } from '../composables/useCopilotChat'
 import { useInterview } from '../composables/useInterview'
 import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '../composables/diagnosisCommands'
+import AgentMascot from './AgentMascot.vue'
 
 const ws = useWorkstation()
 
@@ -103,12 +104,17 @@ function startInterviewFromPlaceholder() {
 }
 
 /**
- * 浮层全关后的重新唤出入口。
+ * 医生智能体收起后的桌面卡通（`AgentMascot`，方案 D1）。
  *
- * 只在「抽屉与面板都关」时出现 —— 面板还开着时，抽屉由面板里的
- * .assistant-toggle 卡片唤回，不需要浮动按钮。
+ * 只在「抽屉与面板都关」时出现 —— 面板还开着时，抽屉由面板左内壁上的
+ * 把手唤回，不需要浮动入口。
  *
  * 缺了它，医生把两个 × 都点掉就只能刷新页面。
+ *
+ * **2026-09-03：它替掉了原件那个 52px 的「AI」圆钮**（`.ai-float-btn` /
+ * `.float-icon` / `.float-ready-dot`）。位置沿用（right:24 bottom:32），
+ * 职责一个字没变，换的只是长相 —— 圆钮上的「AI」是个标签，
+ * 而这一格真正要说的是「医生智能体待命中」。一张脸能表达状态，两个字母不能。
  *
  * 注：原件里还有个 .solo-tips-open-btn（✦ 医护Copilot），显示条件为
  * `c && !r`，但在该 build 中未发现可达路径 —— 实测关抽屉、关面板两种组合
@@ -116,8 +122,17 @@ function startInterviewFromPlaceholder() {
  */
 const showRoundEntry = computed(() => !tipsOpen.value && !panelOpen.value)
 
-function reopenTips() {
-  tipsOpen.value = true
+/**
+ * 点卡通 → **把医生智能体面板找回来**，不是打开 AI 助手。
+ *
+ * 原件那个圆钮点下去只 `tipsOpen = true`。照搬会留一条死路：
+ * 面板关着、把手长在面板内壁上，于是抽屉开起来之后**面板再也回不来**了。
+ * 缩起来的是面板，点开就该还面板 —— 这也正是「缩小为一个卡通」的字面意思。
+ *
+ * 抽屉保持医生离开时的样子，不替他做主。
+ */
+function restoreAgentPanel() {
+  panelOpen.value = true
 }
 
 /**
@@ -1174,13 +1189,19 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
 <template>
   <div class="ai-emr-root">
     <!--
-      浮层重新唤出。两态互斥：都关时是圆形 AI 钮，只关抽屉时是「医护Copilot」胶囊。
-      同一个处理器，同一个位置（right:24px bottom:32px）。
+      医生智能体收起后的桌面卡通（D1「微笑」）。位置沿用原件圆钮的
+      right:24px / bottom:32px —— 医生上一版在哪找它，这一版还在哪。
+
+      三个入参都是**透传**，卡通自己不算任何数：
+      - hint-count 与问诊提示浮框同源，两处对不上医生不知道该信哪个
+      - thinking 跟着分析走，让它在忙的时候看起来在忙
     -->
-    <div v-if="showRoundEntry" class="ai-float-btn" @click="reopenTips">
-      <div class="float-icon">AI</div>
-      <span class="float-ready-dot" />
-    </div>
+    <AgentMascot
+      v-if="showRoundEntry"
+      :hint-count="voice.hints.value.length"
+      :thinking="ws.loadingSummary || finishing"
+      @open="restoreAgentPanel"
+    />
     <div class="ai-float-wrapper">
       <!-- ======================= AI 助手 ======================= -->
       <!--
