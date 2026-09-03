@@ -130,7 +130,12 @@ export const useWorkstation = defineStore('workstation', () => {
     await time('workstation', 'load_summary', () => loadSummary(true), { patient: patientId.value, reason })
   }
 
-  const degradedAgents = computed(() => summary.value?._meta.degraded_agents ?? [])
+  // 两个 `?.` 都要有。`summary.value` 是接口原样落下来的（loadSummary 里
+  // `summary.value = result`），只要哪次 200 回来的 body 里没有 `_meta`，
+  // 这里就是一次真抛错 —— 而它在 computed 里，抛出去是**整个工作站白屏**，
+  // 不是某一块降级。服务端当前每条路径都带 `_meta`，但这个断言的代价是白屏，
+  // 不值得省一个问号。
+  const degradedAgents = computed(() => summary.value?._meta?.degraded_agents ?? [])
   const isDegraded = computed(() => degradedAgents.value.length > 0)
 
   /**

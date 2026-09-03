@@ -10,29 +10,15 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AiEmrFloat from './AiEmrFloat.vue'
 import { useWorkstation } from '../stores/workstation'
 
-/** ＋ 菜单五项的原文与图标，顺序即 V4.3 顺序，不可改 */
-const PLUS_ITEMS = [
-  ['📎', '上传文件'],
-  ['🖼', '上传图片'],
-  ['💬', '常用提示词'],
-  ['👥', '患者管理'],
-  ['⚡', '技能管理'],
-]
-
 /*
  * 「＋ 菜单」与「技能管理」两组测试 2026-09-03 删除 —— 功能已按一期范围整块撤掉。
  *
  * **功能下线要连着测试一起删。** 留着的话它们会一直红，然后被人加 skip，
  * 而一个 skip 掉的测试和没有测试是一回事，只是更容易骗过「全绿」这个印象。
+ *
+ * 连带删掉的还有只服务于这两组的 `PLUS_ITEMS` / `PROMPTS` 两个常量 ——
+ * 一份「五项文案不可改」的清单，在没有任何用例读它之后，就只是看起来还有人管。
  */
-/** 常用提示词五条原文，逐字取自 V4.3，不可改写 */
-const PROMPTS = [
-  '请根据检查结果给出初步诊断',
-  '请分析患者的用药风险',
-  '请评估该患者的并发症风险',
-  '请生成门诊随访计划',
-  '请解读最近一次血糖报告',
-]
 
 const router = createRouter({
   history: createWebHistory(),
@@ -73,6 +59,14 @@ function stubFetch(quality?: unknown) {
       }
       if (String(url).includes('assessment')) {
         return new Response(JSON.stringify({ categories: [] }), { status: 200 })
+      }
+      // 点「生成」会走 report-summary。**桩必须带 `_meta`** —— 真接口每条路径都带，
+      // 回一个 `{}` 等于在测一个线上不存在的形状，反倒把真问题盖住。
+      if (String(url).includes('report-summary')) {
+        return new Response(
+          JSON.stringify({ patient_id: 'P001', _meta: { degraded_agents: [] } }),
+          { status: 200 },
+        )
       }
       if (String(url).includes('record/quality')) {
         return new Response(
@@ -949,5 +943,157 @@ describe('降级不得伪装成建议', () => {
     await iv.persist()
     expect(iv.hints.value).toEqual(['夜尿次数有增多吗？'])
     spy.mockRestore()
+  })
+})
+// ================================================ 问诊按钮组与提示浮框（走真实产品路径）
+
+/**
+ * 起一场问诊：桩掉 `interviewInit` 给两句脚本，点「开始问诊」。
+ *
+ * **不直接改 `voice.state`。** 组件里的 `useInterview` 是它自己 setup 时建的那一份，
+ * 测试里再 `useInterview()` 一次拿到的是另一组 ref，改了组件根本看不见 ——
+ * 何况「点开始问诊真的能进入 playing」本身就是这批用例要保证的东西之一。
+ */
+async function mountWithPatient() {
+  stubFetch()
+  const pinia = createPinia()
+  const wrapper = mount(AiEmrFloat, {
+    global: { plugins: [pinia, router, ElementPlus] },
+    attachTo: document.body,
+  })
+  // `renderFloat()` 不设 patientId，而 `voice.start()` 没有患者直接 return ——
+  // 用它起问诊会一路静默失败，测出来的是个空壳。
+  useWorkstation(pinia).visit = UNLOCKED_VISIT as never
+  useWorkstation(pinia).patientId = 'P001'
+  await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+  await expandAssistant(wrapper)
+  return wrapper
+}
+
+async function startInterview(wrapper: VueWrapper, gaps: string[] = []) {
+  const { api } = await import('../api')
+  vi.spyOn(api, 'interviewInit').mockResolvedValue({
+    degraded: false,
+    dialog: [
+      { role: 'doctor', text: '最近哪里不舒服？' },
+      { role: 'patient', text: '这两天胸口发闷。' },
+    ],
+  } as never)
+  vi.spyOn(api, 'interviewComplete').mockResolvedValue({
+    ok: true, degraded: false, analysis_gaps: gaps,
+  } as never)
+
+  await wrapper.find('.action-bar .el-button').trigger('click')
+  await vi.waitFor(() => expect(wrapper.find('.action-bar .ib-primary').exists()).toBe(true))
+  return wrapper
+}
+
+describe('问诊按钮组 · 生成不结束问诊', () => {
+  it('点生成之后问诊还在跑 —— 医生可以边问边看，不必为看一眼把问诊终结掉', async () => {
+    // 改动前这个按钮叫「结束问诊」，把两件事绑死了：**想看看 AI 怎么说**
+    // 和 **我问完了**。医生问三句想瞄一眼分析，就得先把问诊终结掉，
+    // 要接着问还得再点一次「继续」。
+    //
+    // 判据取「暂停」这两个字：`finish()` 会把 state 置为 ended，
+    // 那时按钮会变成「继续」。所以按钮还写着「暂停」= 问诊没被收掉。
+    // 断言按钮**存在**是不够的 —— ended 态下它照样在。
+    const wrapper = await mountWithPatient()
+    await startInterview(wrapper)
+    expect(wrapper.find('.action-bar .ib-secondary').text()).toBe('暂停')
+
+    await wrapper.find('.action-bar .ib-primary').trigger('click')
+    await vi.waitFor(() =>
+      expect((wrapper.vm as unknown as { finishing: boolean }).finishing).toBe(false),
+    )
+    expect(wrapper.find('.action-bar .ib-secondary').text()).toBe('暂停')
+  })
+
+  it('暂停与继续是同一个按钮来回切，且从不禁用', async () => {
+    const wrapper = await mountWithPatient()
+    await startInterview(wrapper)
+    const btn = () => wrapper.find('.action-bar .ib-secondary')
+
+    expect(btn().text()).toBe('暂停')
+    expect(btn().attributes('disabled')).toBeUndefined()
+    await btn().trigger('click')
+    expect(btn().text()).toBe('继续')
+    await btn().trigger('click')
+    expect(btn().text()).toBe('暂停')
+    expect(btn().attributes('disabled')).toBeUndefined()
+  })
+})
+
+describe('问诊提示浮框 · 三态', () => {
+  const THREE = ['夜尿次数有增多吗？', '胸闷与活动有关吗？', '家族里有心脏病史吗？']
+
+  /** 起一场问诊并点「暂停」—— 暂停是浮框的两个弹出时机之一 */
+  async function withHints(gaps: string[]) {
+    const wrapper = await mountWithPatient()
+    await startInterview(wrapper, gaps)
+    await wrapper.find('.action-bar .ib-primary').trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('.hint-float').exists()).toBe(true))
+    return wrapper
+  }
+
+  it('缩小成胶囊后仍带条数 —— 缩小是「先放一边」，不是「看不见了」', async () => {
+    const wrapper = await withHints(THREE)
+    await wrapper.find('.hf-btn[title="缩小"]').trigger('click')
+
+    expect(wrapper.find('.hint-float.mini').exists()).toBe(true)
+    expect(wrapper.find('.hf-body').exists()).toBe(false)
+    expect(wrapper.find('.hf-count').text()).toBe('3')
+  })
+
+  it('胶囊点一下弹回展开态', async () => {
+    const wrapper = await withHints(THREE)
+    await wrapper.find('.hf-btn[title="缩小"]').trigger('click')
+    await wrapper.find('.hf-pill').trigger('click')
+
+    expect(wrapper.find('.hint-float.mini').exists()).toBe(false)
+    expect(wrapper.findAll('.hf-item')).toHaveLength(3)
+  })
+
+  it('关掉之后本轮不再自动弹 —— 否则每点一次生成就弹回来，等于关不掉', async () => {
+    const wrapper = await withHints(THREE)
+    await wrapper.find('.hf-btn[title^="关闭"]').trigger('click')
+    expect(wrapper.find('.hint-float').exists()).toBe(false)
+
+    // 再走一次产品路径（点生成），它必须保持关着
+    await wrapper.find('.action-bar .ib-primary').trigger('click')
+    await vi.waitFor(() =>
+      expect((wrapper.vm as unknown as { finishing: boolean }).finishing).toBe(false),
+    )
+    expect(wrapper.find('.hint-float').exists()).toBe(false)
+  })
+
+  it('模型给 9 条也只显示 4 条 —— 条目一多医生整个跳过，和一条不给一样', async () => {
+    const wrapper = await withHints(Array.from({ length: 9 }, (_, i) => `待补问 ${i + 1}？`))
+    const items = wrapper.findAll('.hf-item')
+
+    expect(items).toHaveLength(4)
+    expect(items[0].text()).toContain('待补问 1？')
+  })
+
+  it('措辞压住：底部写明「供参考」，不是一份必须问的清单', async () => {
+    // 这个功能撤过一次，理由是「一期没有临床知识库，做不准，对医生是干扰」。
+    // 那条理由没有失效 —— 一个做不准的建议，语气越肯定伤害越大。
+    const wrapper = await withHints(THREE)
+    expect(wrapper.find('.hf-foot').text()).toContain('供参考')
+    expect(wrapper.find('.hint-float').text()).not.toContain('必须追问')
+  })
+})
+
+describe('AI 助手收起时不挡 HIS', () => {
+  it('「待问诊后展开」占位卡必须没有 —— 它 flex:1 铺满整列，把 HIS 盖死了', async () => {
+    // 这条不是审美问题：那张卡是实体块，医生点底下的 HIS 点不动。
+    // 断言用类名而不是文案 —— 文案改一个字就漏过去了。
+    const wrapper = await renderFloat()
+    const handle = wrapper.find('.assistant-handle')
+    if (handle.exists() && wrapper.find('.tips-drawer').exists()) {
+      await handle.trigger('click')
+      await wrapper.vm.$nextTick()
+    }
+    expect(wrapper.find('.assistant-placeholder').exists()).toBe(false)
+    expect(wrapper.find('.assistant-toggle').exists()).toBe(false)
   })
 })
