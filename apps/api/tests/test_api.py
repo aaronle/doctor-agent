@@ -2705,12 +2705,19 @@ def test_safety_layer_holds_clinical_rules_not_output_formatting():
     for mechanic in ("Markdown 围栏", "半角双引号", "不要前后缀"):
         assert mechanic not in SAFETY_LAYER, f"序列化细节「{mechanic}」不该在安全层里"
 
-    # 而且这类话现在**整条链路上都不该有**：输出形状由工具调用的参数 schema
-    # 保证（runtime.py），不再靠提示词恳求模型配合。
-    # 2026-09-03 之前 base.py 里有个 OUTPUT_FORMAT 块专管这件事，已随之删除。
+    # 序列化机制（要不要围栏、只输出 JSON）确实不该再出现在提示词里 ——
+    # 输出形状由工具调用的参数 schema 保证。
     system, _user = risk_agent.build_prompt({"id": "P001", "dept": "内分泌科"})
-    for mechanic in ("Markdown 围栏", "半角双引号", "只输出 JSON"):
+    for mechanic in ("Markdown 围栏", "只输出 JSON", "不要前后缀"):
         assert mechanic not in system, f"提示词里还在交代序列化细节：「{mechanic}」"
+
+    # **但引号约定必须留着，这一条我删过一次、当天就被打脸。**
+    #
+    # 当时的理由是「协议保证形状，不必再恳求模型配合」——**那只对外层成立**。
+    # 模型有时会把嵌套对象再序列化成一个字符串塞进字段，那一层内部的转义
+    # 完全是它自由发挥：它按中文习惯写 `"病历近似偶服"`，半角引号当场截断字符串。
+    # 实测 P001 的病情概况 8 次里 2 次因此解析失败、岗位静默降级。
+    assert "「」" in system, "引用原文的引号约定不能省 —— 省过一次，当天线上就降级了"
 
 
 # ================================================================ 临床提示词单一事实源
@@ -3091,3 +3098,57 @@ def test_nothing_in_the_backend_claims_to_do_speech_recognition():
             offenders.append(f"{path.name}:{lineno} {stripped[:80]}")
 
     assert not offenders, "后端还有「语音」命名：\n" + "\n".join(offenders)
+
+
+def test_schema_failures_are_retried_but_gateway_failures_are_not():
+    """
+    内容不合 schema → 重试；网关错误 → 不重试。
+
+    两者必须分开：
+    - 内容问题重跑一次多半就好（模型换个说法）。实测 P001 病情概况 8 次里 2 次
+      因未转义引号解析失败 —— 不重试就是医生看到一段「模型通道不可用」的兜底文本。
+    - 网关超时/鉴权失败 openai SDK 已经重试过了，这里再重只是把一次失败拖成三倍时长，
+      而医生在页面上多等两分钟只为了拿到同一个错误。
+    """
+    import asyncio
+
+    import pytest
+
+    from app.agents import runtime
+    from app.agents.runtime import GenerationError, generate
+    from app.agents.schemas import RecordFieldOut
+
+    calls = {"n": 0}
+
+    class Flaky:
+        """前两次给不合 schema 的内容，第三次给对的。"""
+
+        async def __call__(self, *_a, **_k):
+            calls["n"] += 1
+            payload = {"generated_text": "补充：血压 142/88 mmHg。"} if calls["n"] > 2 else {"wrong_field": 1}
+            return type("R", (), {
+                "content": [{"type": "tool_use", "input": payload}],
+                "usage": type("U", (), {"input_tokens": 10, "output_tokens": 5})(),
+            })()
+
+    original = runtime.build_chat_model
+    runtime.build_chat_model = lambda **_k: Flaky()
+    try:
+        got = asyncio.run(generate(system="s", user="u", output_model=RecordFieldOut, model_name="m"))
+        assert got.data["generated_text"].startswith("补充")
+        assert calls["n"] == 3, f"应重试到第三次才成功，实际调用 {calls['n']} 次"
+
+        # 网关错误：只调一次
+        calls["n"] = 0
+
+        class Down:
+            async def __call__(self, *_a, **_k):
+                calls["n"] += 1
+                raise RuntimeError("Request timed out.")
+
+        runtime.build_chat_model = lambda **_k: Down()
+        with pytest.raises(GenerationError):
+            asyncio.run(generate(system="s", user="u", output_model=RecordFieldOut, model_name="m"))
+        assert calls["n"] == 1, f"网关错误不该重试，实际 {calls['n']} 次"
+    finally:
+        runtime.build_chat_model = original

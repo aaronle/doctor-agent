@@ -42,6 +42,7 @@ from agentscope.message import Msg
 from pydantic import BaseModel, ValidationError
 
 from ..model_gateway import build_chat_model
+from ..obs import event
 
 #: 提交结果的工具名。模型只会调这一个，名字对使用者不可见。
 SUBMIT_TOOL = "submit_result"
@@ -50,8 +51,12 @@ SUBMIT_TOOL = "submit_result"
 class GenerationError(RuntimeError):
     """一次结构化生成失败。调用方据此降级到本地规则。"""
 
-    def __init__(self, message: str, *, raw_excerpt: str = "") -> None:
+    def __init__(self, message: str, *, raw_excerpt: str = "", retryable: bool = False) -> None:
         super().__init__(message)
+        #: 重跑一次有没有意义。
+        #: 内容不合 schema → 有（模型换个说法就好了）；
+        #: 网关超时/鉴权失败 → 没有（SDK 已经重试过，再重只是把失败拖成三倍时长）。
+        self.retryable = retryable
         #: 失败时留一段模型原文，便于定位「它到底说了什么」。
         #: 成功的输出不留 —— 那会让日志变成病历副本。
         self.raw_excerpt = raw_excerpt
@@ -86,6 +91,22 @@ def _tool_schema(output_model: type[BaseModel]) -> dict:
     }
 
 
+#: 内容不合 schema 时重试几次。
+#:
+#: **和网络重试是两回事，openai SDK 管不了这个** —— 它只重试 HTTP 层错误
+#: （429、5xx、超时），而这里失败的是「HTTP 200，但模型填的内容装不进 schema」。
+#:
+#: 为什么会失败：模型有时把嵌套对象**再序列化成一个字符串**塞进字段，
+#: 那一层内部的转义是它自由发挥的，它会照中文习惯写 `"病历近似偶服"`——
+#: 未转义的半角引号当场截断 JSON。实测 P001 的病情概况 8 次里错 2 次。
+#:
+#: 提示词里已经交代了用中文引号（`QUOTE_CONVENTION`），但 `claude-sonnet-5`
+#: 上 `temperature` 已废弃，压不住剩下那部分抖动 —— **红线不能靠概率守**。
+#: 重一次约 94% 好，重两次约 98%，而代价只是偶尔多花十几秒；
+#: 不重的话代价是医生看到一段「模型通道不可用」的兜底文本。
+SCHEMA_RETRIES = 2
+
+
 async def generate(
     *,
     system: str,
@@ -93,7 +114,31 @@ async def generate(
     output_model: type[BaseModel],
     model_name: str,
 ) -> Generation:
-    """跑一次结构化生成。失败一律抛 `GenerationError`。"""
+    """跑一次结构化生成，内容不合 schema 时重试。失败一律抛 `GenerationError`。"""
+    last: GenerationError | None = None
+    for attempt in range(SCHEMA_RETRIES + 1):
+        try:
+            return await _generate_once(
+                system=system, user=user, output_model=output_model, model_name=model_name
+            )
+        except GenerationError as exc:
+            last = exc
+            # 网关层的错误（超时、鉴权、限流）SDK 已经重试过了，这里再重没有意义，
+            # 只会把一次失败拖成三倍时长。只重「内容不合 schema」这一类。
+            if not exc.retryable:
+                raise
+            event("generation_retry", model=model_name, attempt=attempt + 1,
+                  schema=output_model.__name__, reason=str(exc)[:120])
+    raise last  # type: ignore[misc]
+
+
+async def _generate_once(
+    *,
+    system: str,
+    user: str,
+    output_model: type[BaseModel],
+    model_name: str,
+) -> Generation:
     model = build_chat_model(model_name=model_name)
     formatter = OpenAIChatFormatter()
     messages = await formatter.format(
@@ -118,11 +163,11 @@ async def generate(
         text = "".join(
             str(b.get("text") or "") for b in (response.content or []) if b.get("type") == "text"
         )
-        raise GenerationError("模型未按结构化格式作答", raw_excerpt=text[:500])
+        raise GenerationError("模型未按结构化格式作答", raw_excerpt=text[:500], retryable=True)
 
     payload: Any = calls[0].get("input")
     if not isinstance(payload, dict):
-        raise GenerationError(f"工具入参不是对象：{type(payload).__name__}", raw_excerpt=str(payload)[:500])
+        raise GenerationError(f"工具入参不是对象：{type(payload).__name__}", raw_excerpt=str(payload)[:500], retryable=True)
 
     try:
         # **用 Pydantic 再校验一次。** schema 约束的是模型「应该」怎么填，
@@ -130,7 +175,7 @@ async def generate(
         # 在进入业务代码之前拦下来，异常信息也直接指出是哪个字段。
         validated = output_model.model_validate(payload)
     except ValidationError as exc:
-        raise GenerationError(f"结构化输出不合 schema：{exc}", raw_excerpt=str(payload)[:500]) from exc
+        raise GenerationError(f"结构化输出不合 schema：{exc}", raw_excerpt=str(payload)[:500], retryable=True) from exc
 
     usage = response.usage
     return Generation(

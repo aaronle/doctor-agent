@@ -27,7 +27,20 @@ from ..obs import event
 
 PROMPT_BUNDLE_VERSION = "pb-1.0.0"
 
-#: 输出形状不再靠提示词恳求，由工具调用的参数 schema 保证 —— 见 runtime.py。
+#: 引用原文时的引号约定。**这一条不能省，而且我省过一次、当天就被打脸。**
+#:
+#: 重构时我删掉了它，理由是「输出形状由工具调用的参数 schema 保证，
+#: 不必再恳求模型配合」。**那个理由只对外层成立。**
+#: 协议保证的是工具参数整体是合法 JSON；而模型有时会把嵌套对象
+#: **再序列化成一个字符串**塞进字段，那一层内部的转义完全是它自由发挥 ——
+#: 它会照着中文习惯写 `"病历近似偶服"`，半角引号当场把字符串截断。
+#:
+#: 实测 P001 的病情概况：8 次里 2 次因此解析失败、岗位静默降级。
+QUOTE_CONVENTION = """【引用原文时】
+需要引用病历原文、患者原话时一律用中文引号「」，**不要用半角双引号 `"`**——
+它会截断字符串，导致这一段无法解析。"""
+
+#: 输出形状本身由工具调用的参数 schema 保证 —— 见 runtime.py。
 #:
 #: 这里原先有一段 OUTPUT_FORMAT（「只输出 JSON 对象」「字符串内不得出现半角双引号」），
 #: 是给 `llm.extract_json_object` 打的补丁。那个函数从模型自由文本里抠 JSON，
@@ -153,6 +166,7 @@ class Agent:
                 SAFETY_LAYER,
                 f"【岗位职责】\n{role_prompt or self.role_prompt}",
                 f"【专科背景】\n{self.specialty_prompt(ctx)}",
+                QUOTE_CONVENTION,
             ]
         )
         user = "\n\n".join(
