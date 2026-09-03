@@ -112,7 +112,10 @@ afterEach(() => {
 
 describe('浮层重新唤出', () => {
   it('抽屉开着时不显示任何唤出按钮', async () => {
+    // 判据是**面板开着**（卡通是面板的收起态），不是「抽屉开着」——
+    // 后者是原件圆钮的条件，那个钮还的是抽屉。
     const wrapper = await renderFloat()
+    expect(wrapper.find('.assistant-panel').exists()).toBe(true)
     expect(wrapper.find('.mascot').exists()).toBe(false)
     expect(wrapper.find('.solo-tips-open-btn').exists()).toBe(false)
   })
@@ -170,6 +173,35 @@ describe('浮层重新唤出', () => {
     expect(mascot.findAll('.mascot-eye')).toHaveLength(2)
     expect(wrapper.find('.ai-float-btn').exists()).toBe(false)
     expect(wrapper.find('.solo-tips-open-btn').exists()).toBe(false)
+  })
+
+  it('**AI 助手开着时关面板，卡通照样出来** —— 否则面板就回不来了', async () => {
+    // 实测过的一条死路：抽屉展开着关面板 —— 面板没了、卡通不出（原件的条件是
+    // 「抽屉与面板都关」）、把手又长在面板内壁上跟着一起没了，
+    // 页面上没有任何东西能把面板点回来。
+    //
+    // 根因是照抄了原件的显示条件：原件那个圆钮还的是**抽屉**，抽屉开着时
+    // 它确实没事可做；而这只卡通还的是**面板**，条件必须跟着「它还什么」走。
+    const wrapper = await renderFloat()
+    expect(wrapper.find('.tips-drawer').exists()).toBe(true)
+
+    await wrapper.find('.panel-close').trigger('click')
+
+    expect(wrapper.find('.assistant-panel').exists()).toBe(false)
+    expect(wrapper.find('.mascot').exists()).toBe(true)
+
+    // 而且点了真能回来
+    await wrapper.find('.mascot').trigger('click')
+    expect(wrapper.find('.assistant-panel').exists()).toBe(true)
+  })
+
+  it('那个 × 要说清自己是「缩成卡通」，不是「关掉」', async () => {
+    // 提这个功能的人自己没找到入口 —— 一个光秃秃的 × 读起来是「关闭」，
+    // 而它其实是「最小化」，缩起来的东西一直在右下角待着。
+    const wrapper = await renderFloat()
+    const close = wrapper.find('.panel-close')
+    expect(close.attributes('title')).toContain('卡通')
+    expect(close.attributes('aria-label')).toContain('卡通')
   })
 
   it('点卡通把**医生智能体面板**找回来，不是打开 AI 助手', async () => {

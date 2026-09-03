@@ -106,10 +106,16 @@ function startInterviewFromPlaceholder() {
 /**
  * 医生智能体收起后的桌面卡通（`AgentMascot`，方案 D1）。
  *
- * 只在「抽屉与面板都关」时出现 —— 面板还开着时，抽屉由面板左内壁上的
- * 把手唤回，不需要浮动入口。
+ * **只要面板关着就出现**，与 AI 助手抽屉开不开无关。
  *
- * 缺了它，医生把两个 × 都点掉就只能刷新页面。
+ * 原件的条件是「抽屉与面板都关」，因为原件那个圆钮还的是**抽屉** ——
+ * 抽屉开着时它确实没事可做。而这只卡通还的是**面板**，条件必须跟着
+ * 「它还什么」走，不能照抄。
+ *
+ * 照抄的后果实测过，是一条死路：AI 助手展开着的时候关面板 ——
+ * 面板没了、卡通不出（因为抽屉开着）、把手又长在面板内壁上跟着一起没了，
+ * **页面上没有任何东西能把面板点回来**，只能先关掉 AI 助手才冒出卡通。
+ * 这正是本文件反复防的那类问题：唤回入口必须永远够得着。
  *
  * **2026-09-03：它替掉了原件那个 52px 的「AI」圆钮**（`.ai-float-btn` /
  * `.float-icon` / `.float-ready-dot`）。位置沿用（right:24 bottom:32），
@@ -120,7 +126,7 @@ function startInterviewFromPlaceholder() {
  * `c && !r`，但在该 build 中未发现可达路径 —— 实测关抽屉、关面板两种组合
  * 都不触发。判定为死代码，不实现，以免显示原件从不显示的按钮。
  */
-const showRoundEntry = computed(() => !tipsOpen.value && !panelOpen.value)
+const showRoundEntry = computed(() => !panelOpen.value)
 
 /**
  * 点卡通 → **把医生智能体面板找回来**，不是打开 AI 助手。
@@ -2047,7 +2053,19 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         <div class="panel-header">
           <span class="panel-title"><span class="panel-ai-dot" />医生智能体</span>
           <div class="panel-header-actions">
-            <el-button text size="small" class="panel-action-btn panel-close" @click="panelOpen = false">×</el-button>
+            <!--
+              这个 × 不是「关掉」，是「缩成卡通」—— 缩起来的东西一直在右下角待着。
+              光凭一个 × 看不出来（提这个功能的人自己没找到入口），
+              所以文案由 title / aria-label 承担；图形保持原件的 ×。
+            -->
+            <el-button
+              text
+              size="small"
+              class="panel-action-btn panel-close"
+              title="缩成卡通（收到右下角，点它可还原）"
+              aria-label="缩成卡通，收到右下角"
+              @click="panelOpen = false"
+            >×</el-button>
           </div>
         </div>
 
