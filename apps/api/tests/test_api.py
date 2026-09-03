@@ -3152,3 +3152,121 @@ def test_schema_failures_are_retried_but_gateway_failures_are_not():
         assert calls["n"] == 1, f"网关错误不该重试，实际 {calls['n']} 次"
     finally:
         runtime.build_chat_model = original
+
+
+# ================================================================ 种子数据同步
+
+
+def test_changed_fixtures_actually_reach_the_database(tmp_path, monkeypatch):
+    """
+    fixture 改了必须真的进库。
+
+    **2026-09-03 演示前一小时的事故。** 原判据是「库里有患者就跳过导入」，
+    于是改了出生年月、身份证、过敏三态之后：单测全绿、部署脚本报「公网复验全绿」，
+    而线上数据库是几天前的旧数据 —— 界面上出生年月空白、过敏三态全落在「未采集」。
+    是逐个患者查数据才发现的，没有任何一处会报错。
+
+    判据换成 fixture 内容指纹。这条测试盯着「改了就生效」这个不变量。
+    """
+    import json
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app import seed as seed_mod
+    from app.models import Base, Patient
+
+    src = seed_mod.FIXTURE_DIR
+    work = tmp_path / "fixtures"
+    work.mkdir()
+    for f in src.glob("*.json"):
+        (work / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(seed_mod, "FIXTURE_DIR", work)
+
+    engine = create_engine(f"sqlite:///{tmp_path}/t.db")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+
+    with Session() as s:
+        assert seed_mod.seed_database(s).get("reseeded") == 1
+    with Session() as s:
+        assert seed_mod.seed_database(s).get("skipped") == 1, "内容没变时应跳过"
+
+    # 改 fixture → 必须重导且新值可见
+    pf = work / "patients.json"
+    data = json.loads(pf.read_text(encoding="utf-8"))
+    data[0]["name"] = "★改过的名字★"
+    pf.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    with Session() as s:
+        assert seed_mod.seed_database(s).get("reseeded") == 1, "fixture 变了却跳过了导入"
+    with Session() as s:
+        assert s.get(Patient, data[0]["id"]).name == "★改过的名字★"
+
+
+def test_reseeding_keeps_the_visit_unlock_state(tmp_path, monkeypatch):
+    """
+    重导种子不能把「这一场就诊已解锁」冲掉。
+
+    `session.merge` 整体覆盖 payload，而 `analysis_unlock` 住在里面 ——
+    它不是种子内容，是就诊状态。医生正问着诊，容器重启一下分析就锁回去，
+    那是事故不是刷新。
+    """
+    import json
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from app import seed as seed_mod
+    from app.models import Base, Patient
+
+    work = tmp_path / "fx"
+    work.mkdir()
+    for f in seed_mod.FIXTURE_DIR.glob("*.json"):
+        (work / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(seed_mod, "FIXTURE_DIR", work)
+
+    engine = create_engine(f"sqlite:///{tmp_path}/u.db")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    with Session() as s:
+        seed_mod.seed_database(s)
+
+    with Session() as s:
+        p = s.get(Patient, "P001")
+        p.payload = {**(p.payload or {}), "analysis_unlock": {"reason": "interview", "at": "now"}}
+        flag_modified(p, "payload")
+        s.commit()
+
+    pf = work / "patients.json"
+    d = json.loads(pf.read_text(encoding="utf-8"))
+    d[0]["chief_complaint"] = "改一下触发重导"
+    pf.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+    with Session() as s:
+        assert seed_mod.seed_database(s).get("reseeded") == 1
+    with Session() as s:
+        assert s.get(Patient, "P001").payload.get("analysis_unlock", {}).get("reason") == "interview"
+
+
+def test_every_seeded_patient_has_a_complete_record(client):
+    """
+    每位患者的病历七段都要齐、都不能是空串。
+
+    种子里真的缺过两处：P002 的 `auxiliary_exam` 是空串、P007 整个不在
+    `record-content.json` 里 —— 界面上一个空段落，医生分不清是「没采集到」
+    还是「系统丢了」。规格要求没资料就写「未采集」三个字。
+    """
+    from app.agents.record import SECTION_KEYS
+    from app.database import SessionLocal
+    from app.models import Patient
+    from app.routers.emr import _normalized_record
+    from app.agents.context import seed_payload
+
+    with SessionLocal() as session:
+        for patient in session.scalars(__import__("sqlalchemy").select(Patient)).all():
+            content = _normalized_record(seed_payload(session, "record_content", patient.id))
+            assert set(content) == set(SECTION_KEYS), f"{patient.id} 病历段数不对"
+            for key, value in content.items():
+                assert str(value).strip(), f"{patient.id} 的 {key} 是空的"

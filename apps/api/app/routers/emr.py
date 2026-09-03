@@ -35,6 +35,8 @@ from ..agents import (
     interview_agent,
 )
 from .. import cache
+# 与 RecordAgent 用的是同一个常量 —— 两条路径各写一个字面量就白防了
+from ..agents.record import UNCOLLECTED as UNCOLLECTED_TEXT
 from ..agents.context import build_context, has_interview, latest_dialog, seed_items, seed_payload
 from ..audit import next_id, record_audit
 from ..schemas import StrictIn
@@ -62,6 +64,27 @@ def _patient_or_404(session: Session, patient_id: str) -> Patient:
     if patient is None:
         raise HTTPException(status_code=404, detail="患者不存在")
     return patient
+
+
+def _normalized_record(content: dict) -> dict:
+    """
+    病历七段规范化：段必须齐、内容不能是空串。
+
+    规格写着「该段没有资料才写『未采集』，且整段就是这三个字」——
+    **空串不满足它**：界面上是一个什么都没有的段落，医生看不出是「没采集到」
+    还是「系统丢了」。
+
+    这不是假想的防御。种子数据里真的有两处：
+      - P002 的 `auxiliary_exam` 是空串（而它明明有心电图、心脏彩超、心肌酶谱）
+      - P007 整个不在 `record-content.json` 里，七段全缺
+
+    模型生成那条路径上 `RecordAgent.validate()` 已经做了同样的兜底；
+    而这里下发的是**种子**病历，走的是另一条路 —— 于是漏了。
+    同一个不变量在两条路径上都要成立。
+    """
+    if not content:
+        return {key: UNCOLLECTED_TEXT for key in SECTION_KEYS}
+    return {key: (str(content.get(key) or "").strip() or UNCOLLECTED_TEXT) for key in SECTION_KEYS}
 
 
 async def _run_isolated(agent, ctx: dict, **kwargs):
@@ -312,7 +335,7 @@ async def report_summary(
     risks, alerts, conflicts = merge_risks(hard_alerts, risk_data.get("risk_assessments", []))
 
     seeded = seed_payload(session, "assessment", patient_id)
-    record_content = seed_payload(session, "record_content", patient_id)
+    record_content = _normalized_record(seed_payload(session, "record_content", patient_id))
 
     payload = {
         "overall_conclusion": summary_data.get("overall_conclusion") or {},

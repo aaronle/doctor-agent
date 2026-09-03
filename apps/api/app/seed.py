@@ -5,6 +5,7 @@
 导入是幂等的：按主键覆盖，可重复执行；不会删除运行时写入的表。
 """
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -84,34 +85,80 @@ def _patient_columns(raw: dict) -> dict:
     return out
 
 
+#: 运行时写进 `patients.payload` 的键。重导种子时**必须原样保留** ——
+#: 它们不是种子内容，是这一场就诊的状态。
+RUNTIME_PAYLOAD_KEYS = ("analysis_unlock",)
+
+
+def fixture_digest() -> str:
+    """全部 fixture 文件内容的指纹。"""
+    h = hashlib.sha256()
+    for path in sorted(FIXTURE_DIR.glob("*.json")):
+        h.update(path.name.encode())
+        h.update(path.read_bytes())
+    return h.hexdigest()[:16]
+
+
 def seed_database(session: Session, *, force: bool = False) -> dict[str, int]:
     """
-    导入种子。已存在患者数据时默认跳过，force=True 强制重导。
+    导入种子。
 
-    返回各类记录数，便于启动日志与测试断言。
+    ## 为什么不能只判「库里有没有患者」
+
+    原来的判据是 `if already is not None and not force: return {"skipped": 1}` ——
+    **fixture 改了永远不会生效，而且没有任何告警。**
+
+    2026-09-03 真的中招了：改了出生年月、身份证、过敏三态，跑测试全绿、
+    部署脚本报「公网复验全绿」，而线上数据库是几天前的旧数据。
+    界面上患者的出生年月是空的、过敏三态全落在「未采集」——
+    直到演示前逐个患者查数据才发现。
+
+    判据换成 **fixture 内容的指纹**：内容变了就重导，没变就跳过。
+    「跳过」这个优化本来要防的是每次启动重复写库，那个目的用指纹一样能达到。
+
+    ## 重导时保留运行时状态
+
+    `session.merge` 会整体覆盖 payload，包括 `analysis_unlock` ——
+    那是「这一场就诊解锁没解锁」，不是种子内容。医生正问着诊，
+    容器重启一下分析就锁回去了，那是事故不是刷新。
     """
     already = session.scalar(select(Patient).limit(1))
-    if already is not None and not force:
-        return {"skipped": 1}
+    digest = fixture_digest()
+    stored = session.scalar(select(SeedDocument).where(SeedDocument.kind == "_fixture_digest"))
+
+    if already is not None and not force and stored is not None and stored.payload.get("sha") == digest:
+        return {"skipped": 1, "digest": digest}
 
     counts: dict[str, int] = {}
+
+    # 先把运行时状态抄出来，merge 之后再贴回去
+    preserved = {
+        p.id: {k: v for k, v in (p.payload or {}).items() if k in RUNTIME_PAYLOAD_KEYS}
+        for p in session.scalars(select(Patient)).all()
+    }
 
     patients = _load("patients.json")
     for raw in patients:
         payload = {k: v for k, v in raw.items() if k not in PATIENT_COLUMNS}
+        payload.update(preserved.get(raw["id"], {}))
         session.merge(Patient(**_patient_columns(raw), payload=payload))
     counts["patients"] = len(patients)
+    counts["reseeded"] = 1
 
     drugs = _load("drugs.json")
     for raw in drugs:
         session.merge(Drug(id=raw["id"], name=raw.get("name", ""), payload=raw))
     counts["drugs"] = len(drugs)
 
-    # 重导前清掉旧的按患者种子，避免 kind+patient_id 重复堆积
-    if force:
-        for doc in session.scalars(select(SeedDocument)).all():
-            session.delete(doc)
-        session.flush()
+    # 重导前清掉旧的按患者种子。
+    #
+    # **不能只在 force 时清。** 指纹变化触发的重导走的是同一段代码，
+    # 不清的话新行是 `add` 进去的，旧行还在 —— 而 `seed_payload` 取的是
+    # `select(...)` 的第一条，也就是**先插入的那条旧数据**。
+    # 那样「重导」变成纯粹的堆积，数据一个字都没更新，而日志显示 reseeded=1。
+    for doc in session.scalars(select(SeedDocument)).all():
+        session.delete(doc)
+    session.flush()
 
     for filename, kind in PATIENT_SCOPED.items():
         data = _load(filename)
@@ -121,5 +168,19 @@ def seed_database(session: Session, *, force: bool = False) -> dict[str, int]:
             session.add(SeedDocument(kind=kind, patient_id=patient_id, payload=body))
         counts[kind] = len(data)
 
+    # 记下这批 fixture 的指纹。下次启动比对它，内容没变才跳过。
+    session.merge(SeedDocument(id=_digest_row_id(session), kind="_fixture_digest",
+                               patient_id="", payload={"sha": digest}))
+    counts["digest"] = digest
+
     session.commit()
     return counts
+
+
+def _digest_row_id(session: Session) -> int:
+    """指纹行复用同一个主键，避免每次重导多留一行。"""
+    row = session.scalar(select(SeedDocument).where(SeedDocument.kind == "_fixture_digest"))
+    if row is not None:
+        return row.id
+    largest = session.scalar(select(SeedDocument.id).order_by(SeedDocument.id.desc()).limit(1))
+    return (largest or 0) + 1
