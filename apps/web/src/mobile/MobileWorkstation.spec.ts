@@ -187,7 +187,7 @@ describe('移动端工作站 · 快捷动作', () => {
   it('四条快捷动作都在，且能横向滚动不被裁掉', async () => {
     const wrapper = await render()
     const chips = wrapper.findAll('.m-qa-chip').map((c) => c.text())
-    expect(chips).toEqual(['🎙语音问诊', '📄报告解读', '🔍鉴别诊断', '➡️接诊下一位'])
+    expect(chips).toEqual(['💬问诊记录', '📄报告解读', '🔍鉴别诊断', '➡️接诊下一位'])
   })
 
   it('「接诊下一位」按队列顺序切换患者', async () => {
@@ -280,7 +280,7 @@ describe('移动端问诊门禁', () => {
     expect(card!.text()).toContain('锚定')
 
     const actions = card!.findAll('.m-cbtn').map((b) => b.text())
-    expect(actions.some((a) => a.includes('开始语音问诊'))).toBe(true)
+    expect(actions.some((a) => a.includes('开始问诊'))).toBe(true)
     expect(actions.some((a) => a.includes('跳过问诊'))).toBe(true)
   })
 

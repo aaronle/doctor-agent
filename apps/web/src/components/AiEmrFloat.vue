@@ -532,8 +532,8 @@ async function writeBackAllOrders() {
 // ---------------------------------------------------------------- 智能笔记检索
 
 /**
- * 智能笔记的「检」按钮：按关键词检索本次语音问诊内容。
- * 原件 title 就是「检索语音就诊内容」—— 它不是重新生成病历。
+ * 智能笔记的「检」按钮：按关键词检索本次问诊内容。
+ * 原件 title 是「检索语音就诊内容」（本版改为「检索本次问诊内容」）—— 它不是重新生成病历。
  */
 const noteHits = ref<{ role: string; text: string }[]>([])
 
@@ -1238,7 +1238,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               </p>
               <div class="gate-actions">
                 <el-button type="primary" size="small" :loading="voice.state.value === 'playing'" @click="voice.start()">
-                  ● 开始语音问诊
+                  ● 开始问诊
                 </el-button>
                 <el-button size="small" :loading="unlocking" @click="skipInterview">跳过问诊，直接分析</el-button>
               </div>
@@ -1425,11 +1425,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                     <div class="rc-row smart-note-row">
                       <span class="rc-label">智能笔记</span>
                       <div class="rc-field smart-note-field">
-                        <textarea v-model="smartNote" placeholder="输入关键词，点击“检”检索语音就诊内容" />
+                        <textarea v-model="smartNote" placeholder="输入关键词，点击“检”检索本次问诊内容" />
                       </div>
                       <button
                         class="rc-writeback-icon smart-note-search"
-                        title="检索语音就诊内容"
+                        title="检索本次问诊内容"
                         @click="searchVoiceContent"
                       >
                         检
@@ -2120,7 +2120,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
 
           <div class="action-bar">
             <el-button v-if="voice.state.value === 'idle'" type="primary" size="small" @click="voice.start()">
-              ● 语音问诊
+              ● 开始问诊
             </el-button>
 
             <!--
@@ -2134,7 +2134,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                 type="primary"
                 size="small"
                 :disabled="voice.state.value === 'playing'"
-                :title="voice.state.value === 'playing' ? '问诊进行中' : '继续语音录入，或补充内容'"
+                :title="voice.state.value === 'playing' ? '问诊进行中' : '继续记录，或补充患者所述'"
                 @click="voice.resumeCapture()"
               >
                 {{ voice.state.value === 'playing' ? '● 问诊进行中' : '▶ 继续问诊' }}
@@ -2163,7 +2163,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                 @keyup.enter.exact="submitInput"
               />
               <div class="chat-float-actions">
-                <button class="float-voice-btn" title="语音问诊" @click="voice.resumeCapture()">
+                <button class="float-voice-btn" title="继续记录问诊内容" @click="voice.resumeCapture()">
                   🎤
                 </button>
                 <button class="float-send-btn" :disabled="chatting" @click="submitInput">↑</button>

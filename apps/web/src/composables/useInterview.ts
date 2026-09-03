@@ -3,10 +3,10 @@ import { computed, getCurrentInstance, onUnmounted, ref } from 'vue'
 import { api } from '../api'
 
 /**
- * 语音问诊（F01）。
+ * 问诊记录（F01）。
  *
  * 状态机：idle → playing → awaiting ⇄（继续问诊）→ ended →（继续问诊）→ awaiting
- *   - idle     ：显示「● 语音问诊」
+ *   - idle     ：显示「● 开始问诊」
  *   - playing  ：逐条推进医患对话
  *   - awaiting ：**内容播完，但问诊还没结束** —— 可继续录入，或点「结束问诊」
  *   - ended    ：医生已结束并生成全部内容；点「继续问诊」可回到 awaiting 接着录
@@ -122,7 +122,7 @@ export function useInterview(getPatientId: () => string) {
   }
 
   /**
-   * 「继续问诊」：继续启动语音录入。
+   * 「继续问诊」：继续记录患者所述。
    *
    * 脚本还没播完就接着播；已经播完（或已结束）就切回可录入状态，
    * 医生可以继续跟患者对话，或自己补充内容。

@@ -192,7 +192,7 @@ const PROMPT_PRESETS = [
 ]
 
 const QUICK_ACTIONS: { icon: string; label: string; run: () => void }[] = [
-  { icon: '🎙', label: '语音问诊', run: openVoice },
+  { icon: '💬', label: '问诊记录', run: openVoice },
   { icon: '📄', label: '报告解读', run: () => void sendChat('请解读这位患者最近一次检查与检验报告，指出异常项及其临床意义。') },
   { icon: '🔍', label: '鉴别诊断', run: () => goAnalysis('鉴别诊断') },
   { icon: '➡️', label: '接诊下一位', run: nextPatient },
@@ -297,7 +297,7 @@ function showDegraded() {
                 检查检验、健康档案、时间轴与硬规则红线不受影响，「记录」页现在就能看。
               </p>
               <div class="m-card-actions">
-                <button class="m-cbtn" type="button" @click="openVoice">● 开始语音问诊</button>
+                <button class="m-cbtn" type="button" @click="openVoice">● 开始问诊</button>
                 <button class="m-cbtn" type="button" :disabled="unlocking" @click="skipInterview">
                   {{ unlocking ? '生成中…' : '跳过问诊，直接分析' }}
                 </button>
@@ -315,7 +315,7 @@ function showDegraded() {
               </div>
               <p class="m-card-line">这份分析没有听过患者本次陈述。可随时开始问诊，问完重算一次。</p>
               <div class="m-card-actions">
-                <button class="m-cbtn" type="button" @click="openVoice">● 开始语音问诊</button>
+                <button class="m-cbtn" type="button" @click="openVoice">● 开始问诊</button>
               </div>
             </div>
           </div>

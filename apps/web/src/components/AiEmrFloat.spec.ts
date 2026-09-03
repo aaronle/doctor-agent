@@ -789,7 +789,10 @@ describe('问诊门禁', () => {
     expect(text).toContain('基于本次问诊')
     expect(text).toContain('锚定')
     const labels = wrapper.find('.gate-actions').findAll('button').map((b) => b.text())
-    expect(labels.some((l) => l.includes('开始语音问诊'))).toBe(true)
+    // 2026-09-03 文案改为「开始问诊」：一期没有语音识别，写「语音」会让医生
+    // 以为要对着说话。实际形态是文本框（系统语音输入法或直接打字）。
+    expect(labels.some((l) => l.includes('开始问诊'))).toBe(true)
+    expect(labels.some((l) => l.includes('语音'))).toBe(false)
     expect(labels.some((l) => l.includes('跳过问诊'))).toBe(true)
   })
 

@@ -188,7 +188,11 @@ const PAGES = [
       '.rc-label', '.skill-chip',
       // 鉴别诊断与风险提示：首轮重建做成了自拟结构，与原件差得最远的两块
       '.dd-card', '.dd-header', '.dd-title', '.dd-confirm-btn', '.dd-rec-item', '.dd-card-top',
-      '.dd-primary-tag', '.dd-primary-name', '.dd-icd', '.dd-reason', '.dd-diff-label', '.dd-diff-count',
+      '.dd-primary-tag', '.dd-primary-name', '.dd-reason', '.dd-diff-label', '.dd-diff-count',
+      // `.dd-icd` 不在清单里：它是 `v-if="item.icd"` 条件渲染，而 ICD 由模型给 ——
+      // 拿不准时按规格就该留空。留在清单里，一次「模型这轮没给编码」
+      // 会被报成「重建版缺失该元素」，而那是内容差异不是还原度差异。
+      // 与 `.ra-card-name` 的颜色豁免同一类原因。
       '.risk-alert-section', '.ra-title', '.ra-card', '.ra-card-name', '.ra-card-suggestion', '.ra-view-btn',
     ],
   },
@@ -268,7 +272,7 @@ const PAGES = [
   })),
 
   {
-    name: '语音问诊播放中',
+    name: '问诊播放中',
     hash: '#/outpatient/P006',
     path: '/outpatient/P006',
     // 点「语音问诊」后 2.5 秒内采集：对话脚本约 7 秒播完就转 ended，浮层随之消失
@@ -276,7 +280,14 @@ const PAGES = [
     // 调用返回，所以等浮层出现而不是死等固定时长。
     prepare: async (page) => {
       await ensureAiFloat(page);
-      await page.locator('.action-bar button', { hasText: '语音问诊' }).first().click();
+      // **两边的按钮文案不一样，判据必须同时容得下。**
+      //
+      // 原件写「语音问诊」；重建版 2026-09-03 改成「开始问诊」——
+      // 一期没有任何语音识别，写「语音」会让医生以为要对着说话。
+      // 门禁里的选择器和产品文案是同一份契约，改文案必须一起改，
+      // 否则失败信息是「点不到元素」，看起来像界面坏了。
+      await page.locator('.action-bar button')
+        .filter({ hasText: /语音问诊|开始问诊/ }).first().click();
       // 原来等 .pending-float（AI 追问提示）—— 那一块一期已撤，等它只会白等 30 秒。
       // 现在等第一条对话气泡出现，那才是这个场景真正要比的东西。
       await page.locator('.msg-bubble').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});

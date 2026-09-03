@@ -6,7 +6,7 @@ import { useWorkstation } from '../stores/workstation'
 import type { useInterview } from '../composables/useInterview'
 
 /**
- * 语音问诊底部面板。
+ * 问诊记录底部面板。
  *
  * 复用桌面端同一个 useInterview —— 状态机、追问清单的语义覆盖判定、
  * 全都是同一份实现。手机上只是换了呈现：
@@ -57,7 +57,7 @@ async function finish() {
     <div class="m-sheet">
       <div class="m-grab" />
       <div class="m-sheet-head">
-        <span class="m-sheet-title">🎙 语音问诊</span>
+        <span class="m-sheet-title">💬 问诊记录</span>
         <span class="m-row-sub">{{ voice.state.value }}</span>
         <span class="m-spacer" />
         <button class="m-btn link" type="button" @click="emit('close')">收起</button>

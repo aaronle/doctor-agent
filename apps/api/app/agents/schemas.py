@@ -145,7 +145,15 @@ class RecordOut(ToolCallModel):
 class SuspectedDiagnosis(ToolCallModel):
     name: str
     confidence: int = Field(ge=0, le=100, description="0–100，且必须是 5 的倍数")
-    icd: str = Field(default="", description="不确定时留空，不要猜")
+    #: 原来写的是「不确定时留空，不要猜」—— 防编造的本意是对的，
+    #: 但**结果是全部留空**：实测 P006 五条诊断（脑梗死、高血压、2型糖尿病、
+    #: 高脂血症、颈动脉粥样硬化）一个编码都没给，而这些的 ICD-10 是确定的。
+    #: 过度保守和编造一样，都是没把该给的信息给医生。
+    icd: str = Field(
+        default="",
+        description="ICD-10 编码。常见诊断请给出（如 2型糖尿病 E11.9、原发性高血压 I10、"
+                    "脑梗死 I63.9）；罕见诊断或亚型拿不准时留空，**不要猜一个近似的**",
+    )
     desc: str = Field(description="一句话说明该诊断的临床含义")
     suggestion: str = Field(default="", description="针对该诊断的下一步建议，一句话，不要与 desc 重复")
     supporting: list[str] = Field(description="支持证据")

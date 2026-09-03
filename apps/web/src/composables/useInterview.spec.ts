@@ -52,7 +52,7 @@ async function play(voice: ReturnType<typeof useInterview>, turns: number) {
   for (let i = 1; i < turns; i += 1) await vi.advanceTimersByTimeAsync(1400)
 }
 
-describe('语音问诊', () => {
+describe('问诊记录', () => {
   it('按脚本逐条播放，不是一次性刷出全部对话', async () => {
     stubInit()
     const voice = useInterview(() => 'P006')
