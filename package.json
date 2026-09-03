@@ -23,7 +23,10 @@
     "verify:legacy": "npm run test:all && npm run build && npm run contracts:export && npm run fidelity && npm run coverage",
     "deploy": "node scripts/deploy.mjs",
     "logo": "node design/logo/build-assets.mjs",
-    "smoke": "node scripts/smoke-prod.mjs"
+    "smoke": "node scripts/smoke-prod.mjs",
+    "demo:reset": "node scripts/demo-reset.mjs",
+    "demo:check": "node scripts/demo-check.mjs",
+    "demo:walk": "node scripts/demo-walk.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
