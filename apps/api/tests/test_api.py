@@ -31,7 +31,9 @@ def test_health_reports_fingerprint(client):
     assert body["ok"] is True
     assert body["database"] == "ready"
     assert body["data_classification"] == "MOCK_ONLY_NO_REAL_PATIENT_DATA"
-    assert len(body["agents"]) == 6
+    from app.agents import AGENT_REGISTRY
+
+    assert len(body["agents"]) == len(AGENT_REGISTRY)
 
 
 def test_health_never_leaks_api_key(client):
@@ -587,12 +589,33 @@ def test_quality_endpoint_uses_the_real_interview_for_negation_check(client):
 # ------------------------------------------------------------------ Agent 控制台
 
 
-def test_console_lists_six_agents_with_model_tiers(client):
+def test_console_lists_every_agent_with_model_tiers(client):
+    from app.agents import AGENT_REGISTRY
+
     body = client.get("/api/admin/agents").json()
-    assert len(body["agents"]) == 6
+    # 不写死条数：加岗位是常事，而一个只会因为「数字变了」而红的测试
+    # 只会被人顺手改掉，钉不住任何东西
+    assert len(body["agents"]) == len(AGENT_REGISTRY)
     assert {t["tier"] for t in body["model_tiers"]} == {"clinical_fast", "clinical_reasoning", "clinical_safety"}
     # 未配置时应回落代码默认值，而不是报错或空白
     assert all(a["config_source"] == "code-default" for a in body["agents"])
+
+
+def test_console_maps_cover_every_registered_agent():
+    """三张表必须同步：注册表、实例表、功能表。
+
+    加岗位时要手工改三处，而**没有任何东西拦着漏改**。实测漏掉后果：
+    `/api/admin/agents` 直接 KeyError 500，整个控制台总览打不开 ——
+    而单元测试里没有一条会红，因为它们各自只碰其中一张表。
+    """
+    from app.agents import AGENT_REGISTRY
+    from app.routers.admin import AGENTS, AGENT_TASKS
+
+    registered = {key for key, _n, _v in AGENT_REGISTRY}
+    assert registered == set(AGENTS), f"实例表与注册表不一致：{registered ^ set(AGENTS)}"
+    assert registered == set(AGENT_TASKS), f"功能表与注册表不一致：{registered ^ set(AGENT_TASKS)}"
+    # 每个岗位都要挂在至少一个产品功能上，否则控制台里它是一行没有归属的孤儿
+    assert all(AGENT_TASKS[k] for k in registered)
 
 
 def test_safety_layer_is_exposed_but_not_editable(client):

@@ -947,34 +947,10 @@
    浮在患者信息行下方、面板右侧。**不挡患者身份行** —— 那一行是核对身份用的。
    用的是产品自己的语言（#1677ff、8–10px 圆角、12px 字号），
    不是参考截图里那套紫调大圆角：和现有界面不搭。 */
-.hint-float{position:absolute;right:10px;top:78px;z-index:6;width:224px}
-.hint-float.mini{width:auto}
-
-.hf-head{display:flex;align-items:center;gap:5px;height:30px;padding:0 8px 0 10px;
-  background:#eff6ff;border:1px solid #c7dcff;border-bottom:none;border-radius:10px 10px 0 0}
-.hf-icon{font-size:11px;line-height:1}
-.hf-title{font-size:12px;font-weight:700;color:#1677ff}
-.hf-spacer{flex:1}
-.hf-btn{border:none;background:transparent;color:#8a9099;cursor:pointer;
-  font-size:12px;line-height:1;padding:2px 4px;border-radius:3px}
-.hf-btn:hover{background:#dbeafe;color:#1677ff}
-
-.hf-body{background:#fff;border:1px solid #c7dcff;border-top:none;border-radius:0 0 10px 10px;
-  padding:8px 10px 7px;display:flex;flex-direction:column;gap:6px;
-  box-shadow:0 4px 14px #1454991f;max-height:230px;overflow-y:auto}
-.hf-item{display:flex;gap:6px;align-items:flex-start;padding:6px 8px;border-radius:6px;
-  background:#f9fbff;border:1px solid #e5eefc}
-.hf-text{font-size:10.5px;line-height:1.5;color:#1f2937}
-.hf-dot{font-size:10px;line-height:1.5;flex-shrink:0}
-.hf-foot{font-size:9px;color:#8a9099;padding-top:1px}
-
-/* 缩小态：一个小胶囊 + 条数角标 */
-.hf-pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;
-  background:#fff;border:1px solid #c7dcff;color:#1677ff;font-size:11px;font-weight:600;
-  cursor:pointer;box-shadow:0 2px 8px #14549924}
-.hf-pill:hover{background:#f0f6ff}
-.hf-count{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;
-  padding:0 4px;border-radius:8px;background:#e5484d;color:#fff;font-size:9px;font-weight:700}
+/* 问诊提示浮框的样式（`.hint-float` / `.hf-*`）2026-09-04 迁走 ——
+   它现在是独立组件 `FollowUpHints.vue`，样式在 `FollowUpHints.scoped.css`。
+   scoped CSS 不会跨组件生效，留在这里就是一份**永远不会被应用**的死样式，
+   而它长得和真样式一模一样，改错地方查半天看不出问题。 */
 
 /* 底部两个按钮：次级描边 + 主操作实心（方案 B）。
    「继续/暂停」是过程控制，「生成」是产出动作 —— 权重本就不该相同。 */

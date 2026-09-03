@@ -25,7 +25,9 @@
  * 这里一个数都不自己算：它和问诊提示浮框必须是同一个数，
  * 两处对不上时医生不知道该信哪个。
  */
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+
+import { useDraggable } from '../composables/useDraggable'
 
 const props = withDefaults(defineProps<{
   /** 待补问条数。0 = 不出角标 */
@@ -40,73 +42,18 @@ const W = 56
 const H = 66
 
 /**
- * 落点。默认贴右下角，和原件圆钮同一个位置（right:24 bottom:32）——
- * 医生上一版在哪找它，这一版还在哪。
+ * 拖过就不算点击、拖出屏幕要钳回来 —— 两条都在 `useDraggable` 里，
+ * 追问提示浮框用的是同一套（抄第二遍必然漏掉其中一个）。
  */
-const pos = ref<{ left: number; top: number } | null>(null)
+const { style, onPointerDown, withClickGuard } = useDraggable({
+  width: W,
+  height: H,
+  // 没拖过时贴右下角，和原件圆钮同一个位置（right:24 bottom:32）——
+  // 医生上一版在哪找它，这一版还在哪
+  initial: () => ({ left: window.innerWidth - W - 24, top: window.innerHeight - H - 32 }),
+})
 
-const style = computed(() =>
-  pos.value
-    ? { left: `${pos.value.left}px`, top: `${pos.value.top}px`, right: 'auto', bottom: 'auto' }
-    : {},
-)
-
-/**
- * 拖过就不算点击。
- *
- * pointerup 之后浏览器照样派发 click —— 不拦的话「把它挪开」这个动作
- * 永远伴随一次误开面板，医生会得出「这东西不能拖」的结论。
- *
- * 阈值 4px：低于这个距离是手抖，不是拖拽意图。
- */
-const DRAG_THRESHOLD = 4
-let origin: { x: number; y: number; left: number; top: number } | null = null
-const dragged = ref(false)
-
-function clamp(left: number, top: number) {
-  // 拖出屏幕就再也点不着了 —— 那是「两个 × 都关掉就回不来」的同一类死路。
-  // 唤回入口必须永远够得着，所以钳在可视区内。
-  const maxLeft = Math.max(0, window.innerWidth - W)
-  const maxTop = Math.max(0, window.innerHeight - H)
-  return { left: Math.min(Math.max(0, left), maxLeft), top: Math.min(Math.max(0, top), maxTop) }
-}
-
-function onPointerDown(e: PointerEvent) {
-  const el = e.currentTarget as HTMLElement
-  const box = el.getBoundingClientRect()
-  // jsdom 下 getBoundingClientRect 全是 0，退回默认右下角坐标，
-  // 免得测试里每次都从 (0,0) 起跳。
-  const left = box.width ? box.left : window.innerWidth - W - 24
-  const top = box.height ? box.top : window.innerHeight - H - 32
-  origin = { x: e.clientX, y: e.clientY, left, top }
-  dragged.value = false
-  el.setPointerCapture?.(e.pointerId)
-  window.addEventListener('pointermove', onPointerMove)
-  window.addEventListener('pointerup', onPointerUp, { once: true })
-}
-
-function onPointerMove(e: PointerEvent) {
-  if (!origin) return
-  const dx = e.clientX - origin.x
-  const dy = e.clientY - origin.y
-  if (!dragged.value && Math.hypot(dx, dy) < DRAG_THRESHOLD) return
-  dragged.value = true
-  pos.value = clamp(origin.left + dx, origin.top + dy)
-}
-
-function onPointerUp() {
-  origin = null
-  window.removeEventListener('pointermove', onPointerMove)
-}
-
-function onClick() {
-  // 刚拖完的那一下吞掉，并把标记清掉 —— 只吞一次，下一次点击照常生效
-  if (dragged.value) {
-    dragged.value = false
-    return
-  }
-  emit('open')
-}
+const onClick = withClickGuard(() => emit('open'))
 
 const label = computed(() =>
   props.hintCount > 0

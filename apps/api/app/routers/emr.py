@@ -33,6 +33,8 @@ from ..agents import (
     risk_agent,
     summary_agent,
     interview_agent,
+    followup_plan_agent,
+    followup_coverage_agent,
 )
 from .. import cache
 # 与 RecordAgent 用的是同一个常量 —— 两条路径各写一个字面量就白防了
@@ -774,16 +776,16 @@ async def interview_init(patient_id: str, session: Session = Depends(get_session
     """
     问诊开场包。一次返回播放一整场问诊所需的全部内容。
 
-    **不再调模型**（2026-09-02）。原先这里会跑 `interview_agent` 生成
-    「AI 追问提示」与「补充观察」两份清单 —— 那两块一期已撤（没有临床知识库
-    支撑时，建议错一条的代价大于不给建议），产出没有任何消费方。
+    **这个接口不调模型**，是纯数据组装。「开始问诊」是医生点下去要立刻有反应的
+    动作，不能挂在一次 5–7 秒的模型调用上。
 
-    留着那次调用等于每点一次「开始问诊」就白花 7.3 秒和一次真实模型费用，
-    换来一份直接丢掉的输出。所以整个拿掉，这个接口现在是纯数据组装。
+    「AI 追问提示」2026-09-04 恢复（见下面两个 followup 接口），但它**不在这里**：
+    清单由 `GET /interview/followup/{patient_id}` 单独取，前端点完开始之后
+    并行去拿，回来了再浮出。这样开场是瞬时的，清单晚一两秒到也不影响 ——
+    浮框本来就要攒够几条对话才展开。
 
     `questions` / `observations` 两个字段仍在返回体里，恒为空数组：
-    前端已经不消费它们，保留字段只是为了老前端拿到的形状不变。
-    等临床知识库就位、这个功能重新开启时，把 agent 调用加回来即可。
+    形状不变，但**不要往里填** —— 它们是老前端的兼容位，真正的清单走新接口。
     """
     patient = _patient_or_404(session, patient_id)
 
@@ -835,6 +837,79 @@ async def interview_complete(body: InterviewCompleteIn, session: Session = Depen
         "analysis_chief_complaint": outcome.data.get("chief_complaint", ""),
         "analysis_key_points": outcome.data.get("key_points", []),
         "analysis_gaps": outcome.data.get("gaps", []),
+        "provider": outcome.provider,
+        "degraded": outcome.degraded,
+    }
+
+
+class FollowUpCoverageIn(StrictIn):
+    patient_id: str
+    #: **还开着的**问题。单调性靠这个保证：已划掉的前端不再发上来，
+    #: 服务端也就没有把它「取消划掉」的机会。
+    pending: list[str] = Field(default_factory=list)
+    #: 到目前为止的对话。前端每攒几条发一次，是增量推进不是全量重算。
+    messages: list = Field(default_factory=list)
+
+
+def _conversation_text(messages: list) -> str:
+    """把对话消息拼成模型看的那段文本。
+
+    覆盖判定要摘录**患者原话**，所以角色标签必须在 —— 少了它，
+    模型会把医生说的话当成患者的回答引用回来。
+    """
+    lines = []
+    for m in messages:
+        if not isinstance(m, dict):
+            continue
+        text = str(m.get("text") or m.get("content") or "").strip()
+        if not text:
+            continue
+        role = "医生" if str(m.get("role")) == "doctor" else "患者"
+        lines.append(f"{role}：{text}")
+    return "\n".join(lines)
+
+
+@router.get("/interview/followup/{patient_id}")
+async def interview_followup_plan(patient_id: str, session: Session = Depends(get_session)) -> dict:
+    """AI 追问提示 · 清单。**一次问诊只该调一次。**
+
+    清单是从患者档案里读出来的缺口，对话推进不会改变它 —— 会变的是
+    「哪些已经问到了」，那是 coverage 的事。每轮重算清单会让条目
+    在医生眼皮底下换来换去，比不给还糟。
+    """
+    patient = _patient_or_404(session, patient_id)
+    ctx = build_context(session, patient)
+    outcome = await _run_isolated(followup_plan_agent, ctx)
+    return {
+        "questions": outcome.data.get("questions", []),
+        "provider": outcome.provider,
+        "degraded": outcome.degraded,
+    }
+
+
+@router.post("/interview/followup/coverage")
+async def interview_followup_coverage(
+    body: FollowUpCoverageIn, session: Session = Depends(get_session)
+) -> dict:
+    """AI 追问提示 · 判定哪些已经问到了。
+
+    只回「已覆盖」。没被回的自然还开着 —— 这样模型漏判的默认后果是
+    **继续提醒**，而不是**不再提醒**。
+
+    降级时回空清单：宁可整份停在原地，也不按关键词硬划。
+    """
+    patient = _patient_or_404(session, body.patient_id)
+    pending = [q.strip() for q in body.pending if q and q.strip()]
+    conversation = _conversation_text(body.messages)
+    # 没有待判问题、或还没有对话 —— 不必花一次模型调用
+    if not pending or not conversation:
+        return {"covered": [], "provider": "none", "degraded": False}
+
+    ctx = build_context(session, patient)
+    ctx[followup_coverage_agent.CONVERSATION_KEY] = conversation
+    outcome = await _run_isolated(followup_coverage_agent, ctx, pending=pending)
+    return {
+        "covered": outcome.data.get("covered", []),
         "provider": outcome.provider,
         "degraded": outcome.degraded,
     }

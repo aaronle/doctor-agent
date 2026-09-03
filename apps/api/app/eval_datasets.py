@@ -39,6 +39,21 @@ class EvalCase:
     dataset_name: str
     checks: list[tuple[str, Callable]] = field(default_factory=list)
 
+    #: 传给 `agent.run()` 的额外入参。
+    #:
+    #: 吃 kwargs 的岗位（追问覆盖判定的 pending/conversation、问诊小结的
+    #: conversation_summary、病历单段续写的段名）在此之前**一条用例都进不了
+    #: 回归集** —— 跑器只传 ctx，它们拿到空参数，跑出来的是空壳输出，
+    #: 校验还全绿。缺口不在某条用例上，在跑器上。
+    kwargs: dict = field(default_factory=dict)
+
+    #: 合并进 ctx 的额外字段。
+    #:
+    #: 有些输入按性质属于**上下文**而不是请求参数（追问覆盖判定要看的那段
+    #: 对话就是），把它放进 ctx 才能让 `validate()` 够得着 ——
+    #: 「引用必须出自对话」这条硬约束就是这样从评测搬回岗位里的。
+    ctx_extra: dict = field(default_factory=dict)
+
 
 @dataclass
 class EvalDataset:
@@ -69,6 +84,8 @@ def _compile(raw: dict, path: Path) -> EvalDataset:
                     dataset_id=dataset_id,
                     dataset_name=dataset_name,
                     checks=[build_check(c) for c in case.get("checks") or []],
+                    kwargs=dict(case.get("kwargs") or {}),
+                    ctx_extra=dict(case.get("ctx_extra") or {}),
                 )
             )
     except Exception as exc:

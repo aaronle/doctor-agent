@@ -244,6 +244,47 @@ class InterviewSummaryOut(ToolCallModel):
     summary: str = ""
 
 
+# ---------------------------------------------------------------- AI 追问提示
+
+
+class FollowUpPlanOut(ToolCallModel):
+    """追问清单：这次问诊**该问**的问题。"""
+
+    questions: list[str] = Field(
+        description=(
+            "追问问题清单，6–10 条。**每条只问一件事**（原子问项）——"
+            "「疼多久了、有没有肿」是两条，不是一条。"
+            "复合问句会让后面的覆盖判定必然出错：患者只答了一半，判「已问到」是错的，"
+            "判「没问到」也是错的。用医生对患者说话的口气写，不要写成检查项名称。"
+        )
+    )
+
+
+class CoveredItem(ToolCallModel):
+    """一条被判定为「已问到」的问题，**必须带患者原话**。"""
+
+    question: str = Field(description="原样抄回清单里的那条问题，不要改写")
+    quote: str = Field(
+        description=(
+            "**患者原话**，从对话里逐字摘录，用来证明这条确实问到了。"
+            "找不到能证明的原话就不要把这条列进来。"
+        )
+    )
+
+
+class FollowUpCoverageOut(ToolCallModel):
+    """覆盖判定：清单里哪些已经被问到了。
+
+    只回「已覆盖」的，不回「未覆盖」—— 没被提到的自然还开着。
+    这样漏判的默认后果是「继续提醒」，而不是「不再提醒」。
+    """
+
+    covered: list[CoveredItem] = Field(
+        default_factory=list,
+        description="已经问到的条目。拿不准的**一律不要列**，宁可漏标。",
+    )
+
+
 # ---------------------------------------------------------------- 病历单段续写
 
 

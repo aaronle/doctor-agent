@@ -9,6 +9,8 @@ import { useCopilotChat } from '../composables/useCopilotChat'
 import { useInterview } from '../composables/useInterview'
 import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '../composables/diagnosisCommands'
 import AgentMascot from './AgentMascot.vue'
+import FollowUpHints from './FollowUpHints.vue'
+import { AUTO_OPEN_AFTER_MESSAGES, useFollowUp } from '../composables/useFollowUp'
 
 const ws = useWorkstation()
 
@@ -169,6 +171,8 @@ function startResize(event: MouseEvent) {
 }
 
 const voice = useInterview(() => ws.patientId)
+/** AI 追问提示。清单在 voice.start() 里取一次，判定随对话推进（见下面的 watch）。 */
+const followUp = useFollowUp(() => ws.patientId)
 
 /**
  * 外部（红线横幅的「逐条处置」）要求切到某个标签页。
@@ -949,48 +953,104 @@ watch(() => [voice.messages.value.length, chatMessages.value.length], scrollToBo
 const finishing = ref(false)
 const actionStep = ref('')
 
-/* ===================== 问诊提示浮框 ===================== */
+/* ===================== AI 追问提示浮框 ===================== */
 
 /**
- * 「问诊提示」：把问诊小结里的**待补问**浮在面板上给医生看一眼。
+ * 「AI 追问提示」：问诊**进行中**浮在面板右上角的清单，问到一条划掉一条。
  *
- * ## 这个功能撤过一次
+ * ## 这个功能撤过一次，又回来了
  *
- * 2026-09-02 撤掉「AI 追问提示」，理由是「一期没有临床知识库，追问做不准，
- * 对医生是干扰」。**那条理由没有失效** —— 变的是形态：
+ * 2026-09-02 撤掉，理由是「一期没有临床知识库，追问做不准，对医生是干扰」。
+ * 2026-09-04 恢复 —— **那条理由对当时的做法成立，对现在这版不成立**，
+ * 差别在清单从哪来：当初是教科书式的鉴别问诊清单（「问 Levine 征」，
+ * 需要知识库），现在是**这位患者档案里明摆着的缺口**（「过敏史空着，
+ * 没人问过」），后者不需要任何知识库。
  *
- * | 当初 | 现在 |
- * | --- | --- |
- * | 常驻，问诊一开始就挂一列 | 只在医生点「生成」或「暂停」时弹 |
- * | 关不掉 | 可缩小、可关闭，关了本轮不再自动弹 |
- * | 没内容也占位 | **空则完全不显示** |
+ * 中间还有一个过渡版（2026-09-03 的「问诊提示浮框」）：点「生成」或「暂停」
+ * 才弹一次，内容是问诊小结的 gaps，静态、不划掉、不能拖。**这一版把它替掉了** ——
+ * 同一个右上角不放两个浮框。
  *
- * 数据直接用 `interview_agent` 的 `gaps`（问诊小结的「待补问」），
- * 不新造 Agent —— 两个模型对同一件事各说一遍必然会不一致。
+ * | 当初（已撤） | 过渡版 | 现在 |
+ * | --- | --- | --- |
+ * | 常驻，一开始就挂一列 | 点生成/暂停才弹 | 攒够 3 条对话自动浮出 |
+ * | 关不掉 | 可缩小、可关闭 | 可缩小、可关闭、**可拖动** |
+ * | 已问到的不管 | 不划掉 | **问到一条划掉一条** |
+ * | 没内容也占位 | 空则不显示 | 空则不显示 |
+ *
+ * 判错的方向见 `useFollowUp.ts` 的三条不变量：单调、非阻塞、拿不准就不划。
  */
-const hintOpen = ref(false)
 const hintMinimized = ref(false)
 /** 医生按过「✕」。本轮不再自动弹 —— 他已经明确说过不需要。 */
 const hintDismissed = ref(false)
+/** 医生手动收起过。与 dismissed 不同：收起还能再展开，关闭是本轮不再自动弹。 */
+const hintOpen = ref(false)
 
-/** 有内容才可能显示。空数组一律不弹，绝不弹空框。 */
-const hasHints = computed(() => voice.hints.value.length > 0)
+/** 有内容才可能显示。空清单一律不弹，绝不弹空框。 */
+const hasHints = computed(() => followUp.hasItems.value)
 
 /**
- * 在「生成」与「暂停」之后尝试弹出。
+ * 自动浮出的判据：**攒够几条对话**，且清单里还有没问的。
  *
- * 三道闸：医生关过就不弹、没有条目就不弹、已经开着就不重复弹。
- * 少任何一道，它就会变成当初被撤掉的那种东西。
+ * 不在问诊一开始就弹：那时一条都没划掉，浮框看起来像在催人。
+ * 也不在「清单全划完」时弹：那时它没有任何要说的。
  */
-function offerHints() {
-  if (hintDismissed.value || !hasHints.value) return
-  hintOpen.value = true
-  hintMinimized.value = false
-}
+const shouldAutoOpen = computed(
+  () =>
+    !hintDismissed.value &&
+    voice.messages.value.length >= AUTO_OPEN_AFTER_MESSAGES &&
+    followUp.pending.value.length > 0,
+)
+
+watch(shouldAutoOpen, (ready) => {
+  if (ready) {
+    hintOpen.value = true
+    hintMinimized.value = false
+  }
+})
+
+/**
+ * 对话每推进一条，让追问提示自己决定要不要跑判定。
+ *
+ * **不 await** —— 它是提示，不在关键路径上；一次判定 4–6 秒，
+ * 而对话每 1.4 秒推进一条，等它会让整个播放卡住。
+ */
+watch(
+  () => voice.messages.value.length,
+  (n) => {
+    if (n > 0) void followUp.advance(voice.messages.value)
+  },
+)
+
+/**
+ * 问诊一开始就把清单取回来（**盯状态，不在 start() 调用点挂钩子**——
+ * start() 有三处调用点，挨个挂必然漏一处，而漏掉的那处表现为
+ * 「这个入口进来就是没有提示」，很难联想到原因）。
+ *
+ * 回到 idle 说明换了病人或重来一遍，整份清单连同「医生关过」的标记一起清掉。
+ */
+watch(
+  () => voice.state.value,
+  (now, before) => {
+    if (now === 'idle') {
+      followUp.reset()
+      hintOpen.value = false
+      hintMinimized.value = false
+      return
+    }
+    if (before === 'idle') void followUp.loadPlan()
+  },
+)
 
 function closeHints() {
   hintOpen.value = false
   hintDismissed.value = true
+}
+
+/** 暂停/生成时把浮框叫出来 —— 医生停下来，通常就是在想「还该问什么」。 */
+function offerHints() {
+  if (hintDismissed.value || !hasHints.value) return
+  hintOpen.value = true
+  hintMinimized.value = false
 }
 
 /**
@@ -2103,37 +2163,17 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           （看着「正开着」）。两种状态的差别要一眼可辨，否则等于没有状态。
         -->
         <!--
-          问诊提示浮框。浮在患者信息行下方、面板右侧 —— **不挡患者身份**，
+          AI 追问提示。浮在患者信息行下方、面板右侧 —— **不挡患者身份**，
           那一行是核对身份用的，最不该被遮。
 
-          三态：展开 / 缩小成胶囊 / 关闭。空内容时整个不渲染（v-if 的 hasHints）。
+          三态：展开 / 缩小成胶囊 / 关闭；可拖动。空清单整个不渲染。
         -->
-        <div v-if="hintOpen && hasHints" class="hint-float" :class="{ mini: hintMinimized }">
-          <template v-if="!hintMinimized">
-            <div class="hf-head">
-              <span class="hf-icon">💡</span>
-              <span class="hf-title">问诊提示</span>
-              <span class="hf-spacer" />
-              <button class="hf-btn" title="缩小" @click="hintMinimized = true">—</button>
-              <button class="hf-btn" title="关闭（本轮不再自动弹）" @click="closeHints">✕</button>
-            </div>
-            <div class="hf-body">
-              <div v-for="(q, i) in voice.hints.value" :key="i" class="hf-item">
-                <span class="hf-dot">💡</span><span class="hf-text">{{ q }}</span>
-              </div>
-              <!--
-                这一句是刻意的。这个功能撤过一次，理由是「做不准是干扰」——
-                措辞压住，它才是提示而不是清单。
-              -->
-              <div class="hf-foot">供参考，不是必须问的项</div>
-            </div>
-          </template>
-
-          <button v-else class="hf-pill" title="展开问诊提示" @click="hintMinimized = false">
-            <span class="hf-icon">💡</span>问诊提示
-            <span class="hf-count">{{ voice.hints.value.length }}</span>
-          </button>
-        </div>
+        <FollowUpHints
+          v-if="hintOpen && hasHints"
+          v-model:minimized="hintMinimized"
+          :items="followUp.items.value"
+          @close="closeHints"
+        />
 
         <div class="copilot-tab-bar">
           <div class="ctab active">

@@ -101,6 +101,31 @@ describe('卡通形象 · 拖动', () => {
     expect(wrapper.find('.mascot').attributes('style')).not.toBe(before)
   })
 
+  it('**连续拖两次要累加**，不是每次都从头算', async () => {
+    // 起点必须取自「上一次拖到哪」，而不是每次重新读 DOM ——
+    // `left/top` 写进的是相对定位祖先的坐标系，`getBoundingClientRect()`
+    // 给的是视口坐标系，两个混用会让元素当场跳走。
+    // 实测追问提示浮框（position:absolute 装在面板里）从 x=1205 拖一下
+    // 跳到 x=1966，跑出 1440 宽的屏幕，缩小按钮再也点不到。
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(2000)
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(2000)
+
+    const wrapper = mountMascot()
+    const el = wrapper.find('.mascot').element
+    const left = () =>
+      Number(/left:\s*([\d.]+)px/.exec(wrapper.find('.mascot').attributes('style') ?? '')?.[1])
+
+    // **往左拖**：卡通默认贴右下角，往右拖两次都会被钳在同一个边界上，
+    // 那样测的是钳位不是累加（第一版就是这么自己撞上去的）
+    await drag(el, [900, 400], [800, 400])
+    const first = left()
+    await drag(el, [800, 400], [700, 400])
+    const second = left()
+
+    expect(first).toBeGreaterThan(0)
+    expect(second).toBeCloseTo(first - 100, 0)
+  })
+
   it('拖出屏幕要拉回来 —— 拖丢了就只能刷新页面', async () => {
     // 这是「关掉两个 × 就回不来」那条死路的同一类问题：
     // 唤回入口本身必须永远够得着。

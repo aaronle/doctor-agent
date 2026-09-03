@@ -1015,7 +1015,16 @@ async function startInterview(wrapper: VueWrapper, gaps: string[] = []) {
     dialog: [
       { role: 'doctor', text: '最近哪里不舒服？' },
       { role: 'patient', text: '这两天胸口发闷。' },
+      { role: 'doctor', text: '有多久了？' },
+      { role: 'patient', text: '大概三天。' },
     ],
+  } as never)
+  // AI 追问提示：清单用 gaps 顶上，判定默认不划任何东西
+  vi.spyOn(api, 'followUpPlan').mockResolvedValue({
+    questions: gaps, provider: 'x', degraded: false,
+  } as never)
+  vi.spyOn(api, 'followUpCoverage').mockResolvedValue({
+    covered: [], provider: 'x', degraded: false,
   } as never)
   vi.spyOn(api, 'interviewComplete').mockResolvedValue({
     ok: true, degraded: false, analysis_gaps: gaps,
@@ -1061,17 +1070,32 @@ describe('问诊按钮组 · 生成不结束问诊', () => {
   })
 })
 
-describe('问诊提示浮框 · 三态', () => {
+describe('AI 追问提示浮框 · 三态与实时清单', () => {
   const THREE = ['夜尿次数有增多吗？', '胸闷与活动有关吗？', '家族里有心脏病史吗？']
 
-  /** 起一场问诊并点「暂停」—— 暂停是浮框的两个弹出时机之一 */
-  async function withHints(gaps: string[]) {
+  /** 起一场问诊，等浮框自动浮出（攒够 3 条对话） */
+  async function withHints(questions: string[]) {
     const wrapper = await mountWithPatient()
-    await startInterview(wrapper, gaps)
-    await wrapper.find('.action-bar .ib-primary').trigger('click')
-    await vi.waitFor(() => expect(wrapper.find('.hint-float').exists()).toBe(true))
+    await startInterview(wrapper, questions)
+    // 对话按 1.4s/条播，攒够 AUTO_OPEN_AFTER_MESSAGES 条要 4s 以上 ——
+    // 用它的每条用例都要显式放宽超时（第三个参数），默认 5s 不够
+    await vi.waitFor(
+      () => expect(wrapper.find('.hint-float').exists()).toBe(true),
+      { timeout: 12000 },
+    )
     return wrapper
   }
+
+  it('**攒够 3 条对话才自动浮出** —— 一开始就弹时一条都没划掉，像在催人', async () => {
+    const wrapper = await mountWithPatient()
+    await startInterview(wrapper, THREE)
+    // 起手第一条刚播出来时不该有浮框
+    expect(wrapper.find('.hint-float').exists()).toBe(false)
+    await vi.waitFor(
+      () => expect(wrapper.find('.hint-float').exists()).toBe(true),
+      { timeout: 12000 },
+    )
+  }, 20000)
 
   it('缩小成胶囊后仍带条数 —— 缩小是「先放一边」，不是「看不见了」', async () => {
     const wrapper = await withHints(THREE)
@@ -1079,8 +1103,9 @@ describe('问诊提示浮框 · 三态', () => {
 
     expect(wrapper.find('.hint-float.mini').exists()).toBe(true)
     expect(wrapper.find('.hf-body').exists()).toBe(false)
+    // 角标是**还没问**的条数，不是总数
     expect(wrapper.find('.hf-count').text()).toBe('3')
-  })
+  }, 20000)
 
   it('胶囊点一下弹回展开态', async () => {
     const wrapper = await withHints(THREE)
@@ -1089,9 +1114,9 @@ describe('问诊提示浮框 · 三态', () => {
 
     expect(wrapper.find('.hint-float.mini').exists()).toBe(false)
     expect(wrapper.findAll('.hf-item')).toHaveLength(3)
-  })
+  }, 20000)
 
-  it('关掉之后本轮不再自动弹 —— 否则每点一次生成就弹回来，等于关不掉', async () => {
+  it('关掉之后本轮不再自动弹 —— 否则对话一推进就弹回来，等于关不掉', async () => {
     const wrapper = await withHints(THREE)
     await wrapper.find('.hf-btn[title^="关闭"]').trigger('click')
     expect(wrapper.find('.hint-float').exists()).toBe(false)
@@ -1102,15 +1127,32 @@ describe('问诊提示浮框 · 三态', () => {
       expect((wrapper.vm as unknown as { finishing: boolean }).finishing).toBe(false),
     )
     expect(wrapper.find('.hint-float').exists()).toBe(false)
-  })
+  }, 20000)
 
-  it('模型给 9 条也只显示 4 条 —— 条目一多医生整个跳过，和一条不给一样', async () => {
-    const wrapper = await withHints(Array.from({ length: 9 }, (_, i) => `待补问 ${i + 1}？`))
-    const items = wrapper.findAll('.hf-item')
+  it('**已问到的划掉、留在底下**，不删除 —— 医生要能看见「问过了」', async () => {
+    const { api } = await import('../api')
+    const wrapper = await mountWithPatient()
+    await startInterview(wrapper, THREE)
+    vi.spyOn(api, 'followUpCoverage').mockResolvedValue({
+      covered: [{ question: THREE[0], quote: '夜里要起来两三趟' }],
+      provider: 'x', degraded: false,
+    } as never)
 
-    expect(items).toHaveLength(4)
-    expect(items[0].text()).toContain('待补问 1？')
-  })
+    await vi.waitFor(
+      () => expect(wrapper.find('.hf-done').exists()).toBe(true),
+      { timeout: 12000 },
+    )
+    expect(wrapper.find('.hf-done-text').text()).toBe(THREE[0])
+    // 划掉的不再占「还没问」的序号，但仍在 DOM 里
+    expect(wrapper.findAll('.hf-item')).toHaveLength(2)
+    // 原话挂在 title 上：医生想核对「凭什么算问到了」时能当场看到
+    expect(wrapper.find('.hf-done').attributes('title')).toBe('夜里要起来两三趟')
+  }, 20000)
+
+  it('进度显示 已问到/总数', async () => {
+    const wrapper = await withHints(THREE)
+    expect(wrapper.find('.hf-progress').text()).toBe('0/3')
+  }, 20000)
 
   it('措辞压住：底部写明「供参考」，不是一份必须问的清单', async () => {
     // 这个功能撤过一次，理由是「一期没有临床知识库，做不准，对医生是干扰」。
@@ -1118,7 +1160,7 @@ describe('问诊提示浮框 · 三态', () => {
     const wrapper = await withHints(THREE)
     expect(wrapper.find('.hf-foot').text()).toContain('供参考')
     expect(wrapper.find('.hint-float').text()).not.toContain('必须追问')
-  })
+  }, 20000)
 })
 
 describe('AI 助手收起时不挡 HIS', () => {

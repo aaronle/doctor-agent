@@ -645,8 +645,29 @@ export const api = {
   recordQuality: (patientId: string, fields: Record<string, string>) =>
     post<RecordQuality>('/api/emr/record/quality', { patient_id: patientId, fields }),
 
-  /** 语义覆盖判定：判断追问清单里哪些已在对话中得到回答 */
+  /** 问诊结束：出小结、解锁分析 */
   interviewComplete: (body: Record<string, unknown>) => post<Record<string, unknown>>('/api/emr/interview/complete', body),
+
+  /**
+   * AI 追问提示 · 清单。**一场问诊只调一次** —— 清单是档案里的缺口，
+   * 对话推进不会改变它；每轮重算会让条目在医生眼皮底下换来换去。
+   */
+  followUpPlan: (id: string) =>
+    get<{ questions: string[]; provider: string; degraded: boolean }>(
+      `/api/emr/interview/followup/${id}`,
+    ),
+
+  /**
+   * AI 追问提示 · 判定哪些已经问到了。
+   *
+   * `pending` 只发**还开着的**问题 —— 单调性靠这个保证：已划掉的不发上去，
+   * 服务端也就没有机会把它取消划掉。
+   */
+  followUpCoverage: (id: string, pending: string[], messages: { role: string; text: string }[]) =>
+    post<{ covered: { question: string; quote: string }[]; provider: string; degraded: boolean }>(
+      '/api/emr/interview/followup/coverage',
+      { patient_id: id, pending, messages },
+    ),
   interviewHistory: (id: string) =>
     get<{ patient_id: string; sessions: { ended_at: string; summary: string; messages: unknown[] }[] }>(
       `/api/emr/interview/history/${id}`,

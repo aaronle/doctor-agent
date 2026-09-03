@@ -403,6 +403,98 @@ def _build_closed_set(args: dict) -> Callable:
     return check_closed_set(str(args["field"]), CLOSED_SETS[name], in_list=str(args.get("in_list") or ""))
 
 
+# ------------------------------------------------------------------ AI 追问提示
+
+
+def check_no_wrong_cover(traps: list[str]) -> Callable:
+    """覆盖判定**不许标记指定的陷阱条目**。
+
+    陷阱来自实测：对话里患者只答了复合问句的一半（「降压药基本在吃」
+    答了服法没答药名），模型把整条划掉。错标的代价是**剩下那一半
+    再也不会提醒**，所以这是这个岗位唯一的红线。
+
+    陷阱条目由人写在用例里，不是拿当前输出当基线。
+    """
+    expected = {str(t).strip() for t in traps if str(t).strip()}
+
+    def run(data: dict, ctx: dict) -> tuple[bool, str]:
+        if not expected:
+            return False, "用例没给陷阱条目，这条检查等于没跑"
+        marked = {str(c.get("question") or "").strip() for c in data.get("covered") or []}
+        hit = sorted(expected & marked)
+        if hit:
+            return False, f"错标（患者并未回答）：{'、'.join(hit)}"
+        return True, f"{len(expected)} 条陷阱全部正确留在清单上"
+
+    return run
+
+
+def check_cover_has_quote(data: dict, ctx: dict) -> tuple[bool, str]:
+    """每条「已覆盖」都必须带患者原话，且原话要真在对话里。
+
+    没有原话的标记 = 模型觉得答过了。这个岗位的判据是「能指出患者在哪句话里
+    答了」，`validate()` 已经丢掉空 quote，这里再钉一道：**quote 必须
+    真的出自对话**，不能是模型顺手编的一句。
+    """
+    covered = data.get("covered") or []
+    if not covered:
+        return True, "没有标记任何条目（漏标是安全方向）"
+    # **对着岗位实际看到的那段对话核**，不是 ctx 里的通用 dialog_script。
+    # 第一版拿错了语料：ctx 的 dialog_script 是占位对话（「最近情况怎么样？」），
+    # 而岗位读的是 interview_conversation —— 于是每条正确的引用都被判成编造。
+    corpus = str(ctx.get("interview_conversation") or "") or dialog_text(ctx)
+    if not corpus:
+        return False, "上下文里没有对话，却标记了已覆盖条目"
+    bad = []
+    for item in covered:
+        quote = str(item.get("quote") or "").strip()
+        if not quote:
+            bad.append(f"{item.get('question')}（无原话）")
+        elif quote not in corpus:
+            # 逐字摘录才算证据。允许模型截取片段，但不许改写
+            bad.append(f"{item.get('question')}（原话不在对话里：{quote[:24]}）")
+    if bad:
+        return False, "；".join(bad)
+    return True, f"{len(covered)} 条标记都有对话中的原话佐证"
+
+
+def check_atomic_questions(data: dict, ctx: dict) -> tuple[bool, str]:
+    """追问清单必须是原子问项 —— 一条只问一件事。
+
+    这是清单侧的根因检查。复合问句会让下游覆盖判定必然出错：
+    患者只答一半，判「已问到」是错的，判「没问到」也是错的。
+
+    判据：一句话里出现第二个疑问点即为复合。**并列的举例不算** ——
+    「有没有别的不舒服，比如头晕、头痛？」只有一个疑问点（有没有），
+    后面那串是选项。
+    """
+    compound = []
+    for q in data.get("questions") or []:
+        text = str(q)
+        # 「比如/例如」之后是举例，不参与疑问点计数
+        head = re.split(r"比如|例如|像是", text)[0]
+        # 先把「哪几种」这类**单个**疑问词掩掉，否则会被数成两个疑问点
+        for w in _COMPOUND_WORDS:
+            head = head.replace(w, "〇")
+        hits = {m for m in _INTERROGATIVES if m in head}
+        if "〇" in head:
+            hits.add("〇")
+        if len(hits) >= 2:
+            compound.append(f"{text}（疑问点：{'、'.join(sorted(hits))}）")
+    if compound:
+        return False, "复合问句：" + "；".join(compound)
+    return True, f"{len(data.get('questions') or [])} 条都是原子问项"
+
+
+#: 疑问点标记。用于判定一条追问是不是把两件事塞在了一起。
+_INTERROGATIVES = ("什么", "哪", "多少", "怎么", "几", "有没有", "是不是", "能不能")
+
+#: **单个**疑问词里就含有两个标记的组合，必须先掩掉再计数。
+#: 「哪几种」是一个疑问点，按字面数会数出「哪」+「几」两个 ——
+#: 第一版就是这么把一条完全正常的追问误判成复合问句的。
+_COMPOUND_WORDS = ("哪几种", "哪几个", "哪几", "多少次", "什么时候", "几点")
+
+
 CHECK_REGISTRY: dict[str, Callable[[dict], Callable]] = {
     "required_fields": _build_required_fields,
     "contains": _build_contains,
@@ -626,5 +718,8 @@ CHECK_REGISTRY.update(
         "risk_fields_filled": lambda args: check_risk_fields_filled,
         "risk_must_cover": lambda args: check_risk_must_cover(list(args["keywords"])),
         "risk_high_ratio": lambda args: check_risk_high_ratio(float(args["max_ratio"])),
+        "no_wrong_cover": lambda args: check_no_wrong_cover(list(args["traps"])),
+        "cover_has_quote": lambda args: check_cover_has_quote,
+        "atomic_questions": lambda args: check_atomic_questions,
     }
 )

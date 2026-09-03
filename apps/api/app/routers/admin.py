@@ -43,6 +43,8 @@ from ..agents import (  # noqa: E402  循环导入规避：注册表在 agents �
     risk_agent,
     summary_agent,
     interview_agent,
+    followup_plan_agent,
+    followup_coverage_agent,
 )
 
 AGENTS = {
@@ -57,6 +59,8 @@ AGENTS = {
     # 界面一切正常，发布也成功，唯独线上行为一个字都不变。
     # 配置界面指错实例是最难发现的一类 bug —— 它没有任何报错。
     "interview": interview_agent,
+    "followup_plan": followup_plan_agent,
+    "followup_coverage": followup_coverage_agent,
 }
 
 # 岗位中文名。名字只在注册表里有一份，Agent 实例上没有 `.name` ——
@@ -71,6 +75,8 @@ AGENT_TASKS = {
     "risk": ["风险管理"],
     "comorbidity": ["共病管理"],
     "interview": ["问诊小结"],
+    "followup_plan": ["AI 追问提示"],
+    "followup_coverage": ["AI 追问提示"],
 }
 
 
@@ -619,7 +625,10 @@ async def run_eval(agent_key: str, body: EvalIn, session: Session = Depends(get_
                         "checks": [{"name": "病例存在", "passed": False, "detail": "用例引用的病例不存在"}],
                     }
                 ctx = build_context(inner, patient, include_dialog=True)
-                outcome = await agent.run(inner, ctx, config_override=config, record=False)
+                ctx.update(case.ctx_extra)
+                outcome = await agent.run(
+                    inner, ctx, config_override=config, record=False, **case.kwargs
+                )
             finally:
                 inner.close()
 
