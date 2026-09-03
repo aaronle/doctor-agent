@@ -5,6 +5,7 @@ import { ArrowLeft, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import AiEmrFloat from '../components/AiEmrFloat.vue'
+import HisBackdrop from '../components/HisBackdrop.vue'
 import MobileWorkstation from '../mobile/MobileWorkstation.vue'
 import { api, type LabResult, type PatientOrder } from '../api'
 import { useIsMobile } from '../composables/useMediaQuery'
@@ -317,11 +318,26 @@ onMounted(async () => {
     </div>
 
     <!--
-      这里原本是三栏 HIS 复刻：左侧患者头像栏 + 门诊病历表单 + 医嘱/阳性结果面板。
-      **整块撤掉。** 病历并没有消失 —— AI 助手里本来就有自己那一份
-      （「病历 AI 生成」那一栏），它才是 AI 草稿的落点与「确认后写回」的发生地。
-      撤掉的是那份仿真的 HIS 数据展示，留下的是 AI 真正产出的东西。
+      院内 HIS 门面 —— **纯演示道具，不实现任何功能**。
+
+      「医生智能体」是浮窗，它真实的使用场景是浮在医生本来就在用的 HIS 上。
+      底下空着的话，演示时看到的是「一个孤立的 AI 工具」；有了这层，
+      看到的才是「AI 长在医生现有的工作流里」—— 那才是产品要讲的事。
+
+      > 这块 2026-09-02 曾被**整块撤掉**，理由是「一个长得像 HIS 的页面很容易
+      > 让人以为已经和院内系统打通了」。09-03 按需求做回来，**那个顾虑一个字没变**，
+      > 所以它带着两道标识回来：页头常驻的「演示环境 · 未接入任何院内 HIS」，
+      > 以及门面自己右下角的「界面仿真 · 不可操作」。**两条都不能删。**
+      >
+      > 与当年那版的区别：这一版不再是「仿真的 HIS 数据展示」冒充功能，
+      > 而是明确的**背景道具** —— 照北大国际医院现行 HIS 的外观仿的，
+      > 只有切页签、勾选、折叠这类纯前端反馈，不发任何请求、不写任何数据。
+
+      AI 真正产出的病历在 AI 助手里（「病历 AI 生成」那一栏），
+      那里才是草稿的落点与「确认后写回」的发生地 —— 和这层门面不是一回事。
     -->
+    <HisBackdrop :patient="patient" />
+
     <AiEmrFloat v-if="patient" />
 
     <el-dialog v-model="examDialog" title="开立检查/检验" width="460px">
@@ -361,6 +377,7 @@ onMounted(async () => {
       </template>
     </el-dialog>
   </div>
+
 </template>
 
 <style scoped src="../styles/OutpatientWorkstation.scoped.css"></style>

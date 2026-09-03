@@ -1,0 +1,122 @@
+/* 院内 HIS 门面的样式。照北大国际医院现行 HIS 仿的 Windows 桌面软件观感：
+   密集小字、细边框、蓝色标题条、表格为主。
+
+   刻意**不用**本产品的设计语言（大圆角、留白、渐变）—— 它要看起来像
+   「医生本来就在用的那套系统」，而不是这个产品的一部分。
+   两者观感越不一样，「医生智能体是浮在 HIS 上的」这件事越清楚。 */
+
+.his-backdrop{flex:1;min-height:0;display:flex;flex-direction:column;
+  background:#eef3f8;font-size:12px;color:#1a2330;overflow:hidden;
+  /* 不给选中：这层是道具，划词复制它没有意义，只会让人以为能拿来用 */
+  user-select:none;
+  font-family:"Microsoft YaHei","PingFang SC",-apple-system,sans-serif}
+
+/* ---------------------------------------------------------------- 顶部工具栏 */
+.hb-toolbar{display:flex;align-items:center;justify-content:space-between;
+  height:32px;padding:0 8px;background:linear-gradient(#fdfefe,#eaf1f8);
+  border-bottom:1px solid #c9d8e6;flex-shrink:0}
+.hb-tools{display:flex;align-items:center;gap:2px;overflow:hidden}
+.hb-tool{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:3px;
+  color:#22405e;white-space:nowrap;cursor:default}
+.hb-tool:hover{background:#dce9f7}
+.hb-ti{font-style:normal;color:#1677ff;font-size:12px}
+.hb-caret{font-weight:400;color:#7a8fa6;font-size:9px;margin-left:1px}
+.hb-tools-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.hb-utd{background:#1665c0;color:#fff;font-weight:700;font-size:11px;padding:2px 7px;border-radius:2px}
+.hb-search{color:#7a8fa6}
+
+/* ---------------------------------------------------------------- 患者信息栏 */
+.hb-patient{position:relative;display:flex;align-items:flex-start;gap:10px;
+  padding:6px 10px;background:#f7fafd;border-bottom:1px solid #c9d8e6;flex-shrink:0}
+.hb-queue{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.hb-queue-row{display:flex;gap:8px;color:#22405e}
+.hb-queue-row b{color:#1665c0}
+.hb-queue-input{border:1px solid #b9cddf;background:#fff;padding:2px 6px;border-radius:2px;color:#5a7089}
+.hb-avatar{width:34px;height:34px;border:1px solid #b9cddf;background:#fff;border-radius:2px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.hb-name{font-weight:700;color:#123;white-space:nowrap;padding-top:8px;flex-shrink:0}
+.hb-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px 10px;flex:1;min-width:0}
+.hb-f{display:flex;gap:5px;align-items:baseline;white-space:nowrap;overflow:hidden}
+.hb-f i{font-style:normal;color:#7a8fa6;flex-shrink:0}
+.hb-allergy{color:#c0392b;font-weight:700}
+
+/* 「界面仿真」标识。**这条不能删** —— 见组件顶部注释：
+   一个长得像 HIS 的页面很容易让人以为已经和院内系统打通了。 */
+.hb-sim-badge{flex-shrink:0;margin-right:6px;font-size:10px;white-space:nowrap;
+  color:#8a6d3b;background:#fcf3d7;border:1px solid #eddba5;
+  padding:2px 8px;border-radius:3px;letter-spacing:.2px;font-weight:600}
+
+/* ---------------------------------------------------------------- 主体 */
+.hb-body{flex:1;display:flex;gap:4px;padding:4px;min-height:0}
+.hb-left{width:38%;min-width:0;display:flex;flex-direction:column;gap:3px}
+.hb-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+
+.hb-panel-title{display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;
+  background:linear-gradient(#3d8fd8,#1f6fc0);color:#fff;font-weight:700;
+  border-radius:2px 2px 0 0;flex-shrink:0}
+.hb-panel-title i{font-style:normal}
+.hb-panel-title.sub{background:linear-gradient(#5fa3dd,#3d8fd8);margin-top:2px}
+.hb-panel-title.mt{margin-top:4px}
+.hb-pt-right{margin-left:auto;cursor:pointer;opacity:.85;letter-spacing:2px}
+.hb-pt-right:hover{opacity:1}
+
+.hb-doc-head{display:flex;align-items:center;gap:10px;padding:4px 8px;
+  background:#fff;border:1px solid #c9d8e6;border-top:none;flex-shrink:0}
+.hb-radio{cursor:pointer;color:#5a7089;white-space:nowrap}
+.hb-radio.on{color:#1665c0;font-weight:700}
+.hb-select{flex:1;min-width:0;border:1px solid #b9cddf;background:#fff;padding:1px 6px;
+  color:#22405e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.hb-rtf{display:flex;align-items:center;gap:2px;flex-wrap:wrap;padding:3px 6px;
+  background:#f2f7fb;border:1px solid #c9d8e6;border-top:none;flex-shrink:0}
+.hb-rtf-i{min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:2px;color:#3c5a75;font-size:11px}
+.hb-rtf-i:hover{background:#dce9f7}
+.hb-rtf-i.on{font-weight:800;color:#1665c0;background:#dce9f7}
+.hb-rtf-sel{border:1px solid #b9cddf;background:#fff;padding:0 5px;height:18px;
+  display:inline-flex;align-items:center;color:#22405e;font-size:11px;margin:0 2px}
+
+.hb-doc{flex:1;min-height:0;overflow:hidden;background:#fff;border:1px solid #c9d8e6;
+  border-top:none;padding:6px 8px;display:flex;flex-direction:column;gap:3px}
+.hb-doc-row{display:flex;gap:4px;align-items:baseline}
+.hb-doc-label{color:#1a2330;flex-shrink:0}
+.hb-doc-val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  border-bottom:1px dotted #d4dfe9;color:#22405e}
+/* 「录入区」占位：真 HIS 里这些是灰底可填的槽 */
+.hb-doc-val.ph{color:#a9b8c6;background:#f5f8fb}
+.hb-doc-note{color:#1a2330;font-weight:700;margin-top:2px}
+
+/* ---------------------------------------------------------------- 表格 */
+.hb-tbl{width:100%;border-collapse:collapse;background:#fff;
+  border:1px solid #c9d8e6;font-size:11px;table-layout:fixed}
+.hb-tbl th{background:linear-gradient(#f4f8fc,#e4eef7);border:1px solid #d3e0eb;
+  padding:3px 4px;font-weight:600;color:#33506b;white-space:nowrap}
+.hb-tbl td{border:1px solid #e6eef5;padding:3px 4px;color:#22405e;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.hb-tbl td.left{text-align:left}
+.hb-tbl td.right{text-align:right}
+.hb-tbl.diag{flex-shrink:0}
+.hb-tbl.orders{flex:1;min-height:0;display:block;overflow:auto}
+.hb-tbl.orders thead,.hb-tbl.orders tbody{display:table;width:100%;table-layout:fixed}
+.hb-tbl.orders tbody tr{cursor:pointer}
+.hb-tbl.orders tbody tr:hover{background:#eef6ff}
+.hb-tbl.orders tbody tr.picked{background:#dbeafe}
+.hb-tbl tbody tr:nth-child(even){background:#fafcfe}
+.hb-tbl tbody tr.picked:nth-child(even){background:#dbeafe}
+.hb-sub{color:#7a8fa6}
+.hb-status{display:inline-block;padding:0 5px;border-radius:2px;font-size:10px;color:#fff}
+.hb-status.ok{background:#3aa76d}
+.hb-status.new{background:#8a9bad}
+.hb-lock{font-size:10px}
+.hb-empty td{color:#a9b8c6;padding:14px 0}
+.w24{width:24px}.w36{width:36px}.w46{width:46px}.w52{width:52px}.w56{width:56px}
+.w60{width:60px}.w82{width:82px}.w88{width:88px}.w90{width:90px}
+.w104{width:104px}.w110{width:110px}.w120{width:120px}
+
+.hb-tabs{display:flex;align-items:center;gap:1px;background:#e4eef7;
+  border:1px solid #c9d8e6;padding:2px 4px;flex-shrink:0}
+.hb-tab{padding:2px 9px;border-radius:2px 2px 0 0;color:#33506b;cursor:pointer;white-space:nowrap}
+.hb-tab:hover{background:#d3e4f4}
+.hb-tab.on{background:#fff;color:#1665c0;font-weight:700;border:1px solid #c9d8e6;border-bottom-color:#fff}
+.hb-amount{margin-left:auto;color:#33506b;white-space:nowrap;padding-right:4px}
+.hb-amount b{color:#c0392b}

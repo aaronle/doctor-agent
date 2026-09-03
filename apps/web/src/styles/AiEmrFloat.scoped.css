@@ -885,7 +885,15 @@
 
 /* AI 助手收起时占位。HIS 门面撤掉后那是页面最大的一块，
    空着会让人以为「没加载完」。这张卡讲清「为什么现在没有结论」与两条出路。 */
-.assistant-placeholder{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;padding:24px}
+/* 占位区**本身不吃点击**，只有中间那张卡吃。
+   
+   它 flex:1 铺满了 AI 助手收起后腾出的整片区域 —— 而底下是 HIS 门面。
+   不放行的话，医生点 HIS 的医嘱页签、病历栏全部点不到：
+   界面看着能操作，实际被一层透明的东西盖死，
+   而那层还是「已经收起来的」AI 助手。**看不见的东西不该拦住看得见的东西。** */
+.assistant-placeholder{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
+  padding:24px;pointer-events:none}
+.assistant-placeholder .ap-card{pointer-events:auto}
 .ap-card{max-width:520px;background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:26px 28px;text-align:center;box-shadow:0 4px 20px #0000000f}
 .ap-icon{font-size:26px;font-weight:700;color:#b0b5bd;line-height:1}
 .ap-title{margin-top:10px;font-size:15px;font-weight:700;color:#1f2329}
