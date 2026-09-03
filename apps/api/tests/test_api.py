@@ -3270,3 +3270,50 @@ def test_every_seeded_patient_has_a_complete_record(client):
             assert set(content) == set(SECTION_KEYS), f"{patient.id} 病历段数不对"
             for key, value in content.items():
                 assert str(value).strip(), f"{patient.id} 的 {key} 是空的"
+
+
+def test_list_fields_survive_the_item_tag_encoding():
+    """
+    模型把**数组**字段编码成 `<item>…</item>` 字符串时要能还原。
+
+    实测（claude-sonnet-5）：`InterviewSummaryOut` 的 `key_points` 与 `gaps`
+    两个相邻的 `list[str]` 被**稳定地**糊成一个字符串 ——
+
+        key_points: "\\n<item>三天前晨起发病</item>\\n<item>…</item>\\n</gaps>\\n"
+
+    后果是 `interview_agent` **100% 降级** —— 问诊小结这个岗位从来没真正工作过，
+    线上也一样，而提示词里一个尖括号都没有，是模型自发这么编的。
+
+    补了提示词（LIST_FIELD_CONVENTION）之后实测 4/4 正常，这条是兜底：
+    协议保证不了的那部分，运行时得接得住。
+    """
+    from app.agents.schemas import InterviewSummaryOut
+
+    parsed = InterviewSummaryOut.model_validate(
+        {
+            "chief_complaint": "右侧肢体无力",
+            "key_points": "\n<item>三天前晨起发病</item>\n<item>去年有TIA未规律服药</item>\n</gaps>\n",
+            "gaps": "<item>近期血压控制如何？</item>",
+            "summary": "x",
+        }
+    )
+    assert parsed.key_points == ["三天前晨起发病", "去年有TIA未规律服药"]
+    assert parsed.gaps == ["近期血压控制如何？"]
+
+
+def test_item_decoding_does_not_guess_at_other_shapes():
+    """
+    只还原 `<item>` 这一种**明确的**编码，不做任何猜测性切分。
+
+    按换行拆、按「-」拆之类的一放开，它就变成第二个 `extract_json_object` ——
+    那个连蒙带猜的函数正是这轮重构要消灭的东西。
+    """
+    import pytest
+    from pydantic import ValidationError
+
+    from app.agents.schemas import InterviewSummaryOut
+
+    with pytest.raises(ValidationError):
+        InterviewSummaryOut.model_validate(
+            {"chief_complaint": "x", "key_points": "第一条\n第二条", "gaps": [], "summary": ""}
+        )

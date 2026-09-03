@@ -34,8 +34,24 @@ from __future__ import annotations
 from typing import Literal
 
 import json
+import re
 
 from pydantic import BaseModel, Field, model_validator
+
+
+#: 模型把**列表**字段编码成字符串时用的标签。
+#:
+#: 实测（claude-sonnet-5）：`InterviewSummaryOut` 的 `key_points` 与 `gaps`
+#: 两个相邻的 `list[str]` 会被**稳定地**糊成一个字符串 ——
+#:
+#:     key_points: "\n<item>患者主诉…</item>\n<item>…</item>\n</gaps>\n"
+#:
+#: 提示词里一个尖括号都没有，是模型自发这么编的。后果是 `interview_agent`
+#: **100% 降级** —— 问诊小结这个岗位实际上从来没工作过，线上也一样。
+#:
+#: 定义在模块级而不是类属性：Pydantic 会把下划线开头的类属性收成
+#: `ModelPrivateAttr`，`cls._ITEM_TAG.findall` 会炸。
+_ITEM_TAG = re.compile(r"<item>(.*?)</item>", re.S)
 
 
 class ToolCallModel(BaseModel):
@@ -56,6 +72,7 @@ class ToolCallModel(BaseModel):
     那个函数从自由文本里连蒙带猜地抠 JSON，而这里只是把一层多余的编码剥掉。
     """
 
+
     @model_validator(mode="before")
     @classmethod
     def _unwrap_stringified_objects(cls, data: object) -> object:
@@ -63,6 +80,15 @@ class ToolCallModel(BaseModel):
             return data
         out = {}
         for key, value in data.items():
+            # 列表被编码成 `<item>…</item>` 串。**这不是连蒙带猜**：
+            # 它是一个明确的、可精确解析的编码，还原它只是把多余的一层剥掉。
+            # 解析不出条目就原样留给 Pydantic 报错，不做任何猜测性的切分
+            #（比如按换行拆）—— 那才会变成第二个 `extract_json_object`。
+            if isinstance(value, str) and "<item>" in value:
+                items = [x.strip() for x in _ITEM_TAG.findall(value) if x.strip()]
+                if items:
+                    out[key] = items
+                    continue
             if isinstance(value, str) and value[:1] in "{[":
                 try:
                     # `strict=False` 允许字符串值内部出现裸换行。

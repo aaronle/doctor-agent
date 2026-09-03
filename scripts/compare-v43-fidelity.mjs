@@ -163,8 +163,21 @@ const PAGES = [
     // 用 P006：只有带红色预警的患者才会渲染 risk-alert-section
     hash: '#/outpatient/P006',
     path: '/outpatient/P006',
-    // AI 助手默认收起（问诊前不该先摆结论），比之前先展开
-    prepare: async (page) => { await ensureAiFloat(page); },
+    // AI 助手默认收起（问诊前不该先摆结论），比之前先展开。
+    //
+    // **展开之后还要等分析真的回来。** `settle()` 只保证「遮罩散了、
+    // 不再显示『智能体分析中』」——那两个条件在**分析还没开始**时同样成立，
+    // 它分不清「没算完」和「不该有」。
+    //
+    // 这一场景是第一个需要 report-summary 产出的（.dd-* 鉴别诊断、
+    // .ra-* 风险共 13 个元素），所以每次都是它先撞上：报「重建版缺失 13 个」，
+    // 而后面八个标签页场景全绿 —— 因为轮到它们时分析已经回来了。
+    // 同一个坑文档里记过四次，判据必须是**正的条件**：要比的东西在场了。
+    prepare: async (page) => {
+      await ensureAiFloat(page);
+      await page.locator('.dd-card').first().waitFor({ state: 'attached', timeout: 200000 }).catch(() => {});
+      await page.locator('.ra-card').first().waitFor({ state: 'attached', timeout: 60000 }).catch(() => {});
+    },
     // **比对范围已收窄到 AI 助手内部**（2026-09-02）。
     //
     // 撤掉的那些（.workstation-body / .his-record-panel / .form-row / .fl /

@@ -41,6 +41,9 @@ export interface VoiceTurnMessage {
 /** 每条对话的播放间隔。太快看不清逐条推进，太慢演示拖沓。 */
 const TURN_INTERVAL_MS = 1400
 
+/** 浮框最多显示几条追问。见 persist() 里的理由。 */
+const HINT_LIMIT = 4
+
 export function useInterview(getPatientId: () => string) {
   const state = ref<VoiceState>('idle')
   const messages = ref<VoiceTurnMessage[]>([])
@@ -223,7 +226,10 @@ export function useInterview(getPatientId: () => string) {
       // 那比不给提示糟得多：它把一次故障伪装成了一条临床建议。
       const r = res as { analysis_gaps?: unknown; degraded?: boolean }
       const gaps = r?.degraded ? [] : r?.analysis_gaps
-      hints.value = Array.isArray(gaps) ? gaps.map(String).filter((x) => x.trim()) : []
+      // 只取前 4 条。实测模型一次给 8–10 条 —— 那是一份**清单**，
+      // 而浮框要的是「顺手看一眼」：条目一多，医生就不看了，
+      // 和一条不给是同一个结果，还多占了半个面板。
+      hints.value = Array.isArray(gaps) ? gaps.map(String).filter((x) => x.trim()).slice(0, HINT_LIMIT) : []
     } catch (exc) {
       error.value = `问诊记录落库失败：${(exc as Error).message}`
       throw exc

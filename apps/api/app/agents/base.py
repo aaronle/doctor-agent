@@ -40,6 +40,18 @@ QUOTE_CONVENTION = """【引用原文时】
 需要引用病历原文、患者原话时一律用中文引号「」，**不要用半角双引号 `"`**——
 它会截断字符串，导致这一段无法解析。"""
 
+#: 数组字段的填法。**和引号约定同一类：都是在补协议保证不了的那部分。**
+#:
+#: 工具调用的参数 schema 声明了某个字段是数组，但模型仍会把它填成一个字符串，
+#: 自己在里面用标签分隔。实测 `interview_agent` 的 `key_points` 与 `gaps`
+#: **稳定**被糊成 `"<item>…</item><item>…</item></gaps>"` —— 那个岗位因此
+#: 100% 降级、从来没真正工作过，而提示词里一个尖括号都没有。
+#:
+#: runtime 侧有还原（schemas._ITEM_TAG），但那是兜底；能不产生就别产生。
+LIST_FIELD_CONVENTION = """【数组字段】
+schema 里声明为数组的字段（如要点、待补问、支持证据），**每一条是数组里的一个独立元素**。
+不要把多条合并成一个字符串，也不要用 `<item>`、`-`、换行等任何标记在字符串内部分隔。"""
+
 #: 输出形状本身由工具调用的参数 schema 保证 —— 见 runtime.py。
 #:
 #: 这里原先有一段 OUTPUT_FORMAT（「只输出 JSON 对象」「字符串内不得出现半角双引号」），
@@ -167,6 +179,7 @@ class Agent:
                 f"【岗位职责】\n{role_prompt or self.role_prompt}",
                 f"【专科背景】\n{self.specialty_prompt(ctx)}",
                 QUOTE_CONVENTION,
+                LIST_FIELD_CONVENTION,
             ]
         )
         user = "\n\n".join(
