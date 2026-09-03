@@ -22,7 +22,14 @@
 .ai-float-wrapper{position:fixed;left:30%;right:0;top:15px;bottom:0;display:flex;justify-content:flex-end;align-items:stretch;gap:0;z-index:2000;pointer-events:none}
 .ai-float-wrapper>*{pointer-events:auto}
 .tips-drawer{flex:1;min-width:0;background:#fff;border-radius:12px;box-shadow:0 8px 40px #00000029;border:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden}
-.tips-drawer.connected-right{border-radius:12px 0 0 12px}
+/* 两块相连时，接缝要读成「一整块中间的一道折痕」，不是「两块拼起来」。
+   三件事一起做，少一件都还是土：
+   ① 只留一条边框线 —— 两块各 1px 贴在一起就是 2px 的灰带
+   ② 阴影只往**外侧**投 —— 原来各自 `0 8px 40px` 四面溢出，
+      在接缝处互相打到对方身上，糊出一条脏渐变
+   ③ 圆角只留外侧（本来就是这样） */
+.tips-drawer.connected-right{border-radius:12px 0 0 12px;border-right:none;
+  box-shadow:0 10px 40px #00000024;clip-path:inset(-60px 0 -60px -60px)}
 .tips-header{padding:10px 14px;background:linear-gradient(135deg,#0f2b54,#1a3a6a);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .tips-title{font-size:14px;font-weight:700;color:#e8f0fe;display:flex;align-items:center;gap:8px}
 .tips-header-actions{display:flex;align-items:center;gap:6px}
@@ -53,7 +60,18 @@
 .tips-slide-enter-from,.tips-slide-leave-to{transform:translate(30px);opacity:0}
 .assistant-panel{width:300px;flex-shrink:0;background:#fff;border-radius:12px;box-shadow:0 8px 40px #0000002e;border:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;transition:width .25s ease;position:relative}
 .assistant-panel.wide{width:600px}
-.assistant-panel.connected-left{border-radius:0 12px 12px 0}
+/* `clip-path` 把**接缝那一侧**的阴影外溢裁掉。
+   CSS 没有「单边阴影」：`0 10px 40px` 会四面各溢出 40px，
+   于是面板的阴影打到抽屉上、抽屉的打到面板上，接缝糊成一条脏渐变。
+   上右下各留 60px 让阴影正常出去，贴合的那一边裁到 0。 */
+.assistant-panel.connected-left{border-radius:0 12px 12px 0;
+  box-shadow:0 10px 40px #00000024;clip-path:inset(-60px -60px -60px 0);
+  /* 接缝线用**半透明黑**，不是固定的浅灰。
+     这条线要同时穿过两种背景：上段是深蓝标题栏、下段是白色内容区。
+     固定 #e2e8f0 在白底上刚好，在深蓝上却是一道显眼的亮缝。
+     半透明黑会透出身后抽屉的颜色 —— 深蓝处略暗一点，白底处成淡灰，
+     一条线自己适应两段。 */
+  border-left-color:#0000000f}
 .toggle-dot{position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:#e6191a;border:1px solid #fff}
 .panel-header{padding:8px 12px;background:linear-gradient(135deg,#0f2b54,#1a3a6a);display:flex;align-items:center;flex-shrink:0}
 .panel-title{flex:1;font-size:13px;font-weight:700;color:#e8f0fe;display:flex;align-items:center;gap:6px}
@@ -892,16 +910,26 @@
    **不能探出左边线**：.assistant-panel 带 overflow:hidden（裁圆角），
    探出去的部分会被切掉。所以 left:0 整个待在里面，
    由正文让出左内距来避让（见下面 .copilot-tab-bar / .chat-messages 等）。 */
+/* 把手长在接缝上，而不是贴在接缝旁边。
+   
+   原来它有完整边框 + 投影 + 展开态整圈蓝边 —— 放大看就是一张贴纸，
+   和接缝那条线并排成了「两条竖线」。现在：
+   - 左边不画线（接缝那条就是它的左边）
+   - 不投影（投影会把它从面板表面「抬起来」）
+   - 底色贴近面板白，只靠一点点灰区分
+   - 展开态只让箭头变蓝，不整圈变蓝 */
 .assistant-handle{position:absolute;left:0;top:50%;transform:translateY(-50%);
-  width:18px;height:52px;padding:0;border:1px solid #e2e8f0;border-left:none;
-  border-radius:0 8px 8px 0;background:#f2f5f8;box-shadow:2px 0 5px #00000014;
+  width:16px;height:56px;padding:0;border:1px solid #e6ebf1;border-left:none;
+  border-radius:0 7px 7px 0;background:#fbfcfd;box-shadow:none;
   cursor:pointer;z-index:4;display:flex;align-items:center;justify-content:center;
-  transition:border-color .15s,background .15s,color .15s}
-.assistant-handle:hover{border-color:#1677ff;background:#eaf3ff}
+  transition:background .15s,border-color .15s}
+.assistant-handle:hover{border-color:#c7dcff;background:#f0f6ff}
 .assistant-handle:hover .ah-chevron{color:#1677ff}
-.assistant-handle.expanded{border-color:#1677ff}
+/* 展开态只换箭头颜色 —— 整圈蓝边会把这个小开关变成视觉焦点，
+   而它只是个开关，不是内容。 */
+.assistant-handle.expanded{border-color:#e6ebf1;background:#f5f9ff}
 .assistant-handle.expanded .ah-chevron{color:#1677ff}
-.ah-chevron{font-size:15px;font-weight:500;color:#8a9099;line-height:1;transition:color .15s}
+.ah-chevron{font-size:14px;font-weight:500;color:#8a9099;line-height:1;transition:color .15s}
 
 /* 问诊结束自动展开的那一刻闪一次。
    取代原来那句「刚刚自动展开」的文字徽标 —— 同样看得见，但不占版面。 */
