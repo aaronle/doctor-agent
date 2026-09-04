@@ -861,9 +861,32 @@ describe('患者信息行', () => {
 })
 
 describe('浮窗调宽', () => {
-  it('两个浮窗各有一条调宽边线', async () => {
+  it('两个浮窗各有一条调宽边线、一条拉高边线', async () => {
     const wrapper = await renderFloat()
     expect(wrapper.findAll('.resize-edge')).toHaveLength(2)
+    expect(wrapper.findAll('.resize-edge-bottom')).toHaveLength(2)
+  })
+
+  it('**往下拖是拉高** —— 窗锚在顶部，下边线远离锚点就是变高', async () => {
+    const wrapper = await renderFloat()
+    const edge = wrapper.findAll('.resize-edge-bottom')[1].element   // 医生智能体那条
+    edge.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 500, clientY: 700 }))
+    window.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 500, clientY: 760 }))
+    window.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 500, clientY: 760 }))
+    await wrapper.vm.$nextTick()
+
+    // jsdom 里量不到真高度，回落默认 800；往下 60 → 860，
+    // 但视口高 768 会把它钳住 —— 钳到 768 正是期望行为
+    const style = wrapper.find('.assistant-panel').attributes('style') ?? ''
+    expect(style).toMatch(/height:\s*768px/)
+  })
+
+  it('拉高的边线要能被读屏软件认出来是**横向**分隔条', async () => {
+    const wrapper = await renderFloat()
+    const edge = wrapper.find('.resize-edge-bottom')
+    expect(edge.attributes('role')).toBe('separator')
+    expect(edge.attributes('aria-orientation')).toBe('horizontal')
+    expect(edge.attributes('aria-label')).toContain('高度')
   })
 
   it('边线要能被读屏软件认出来是分隔条 —— 它是纯图形，没有文字', async () => {

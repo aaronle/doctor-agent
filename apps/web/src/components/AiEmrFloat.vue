@@ -205,6 +205,24 @@ const drawerSize = useResizable({
   max: 1800,
 })
 
+/**
+ * 两个浮窗的**高度**。拖各自的下边线。
+ *
+ * 只有下边线能拉：两个窗都锚在顶部（wrapper `top:15px`），上边线拖不动 ——
+ * 和「靠右停靠所以只有左边线能拉宽」是同一个道理。
+ *
+ * 下限 320：再矮连患者信息行加两条气泡都放不下，只剩个标题栏。
+ * 上限交给视口（见 `useResizable` 的 clamp）—— 比屏幕还高没有意义。
+ */
+const panelHeight = useResizable({
+  initial: () => panelShell.value?.getBoundingClientRect().height || 800,
+  min: 320, max: 2000, edge: 'bottom',
+})
+const drawerHeight = useResizable({
+  initial: () => drawerShell.value?.getBoundingClientRect().height || 800,
+  min: 320, max: 2000, edge: 'bottom',
+})
+
 /* ===================== 合并 / 分离，与字号 ===================== */
 
 /**
@@ -1382,7 +1400,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         ref="drawerShell"
         class="tips-drawer connected-right"
         :class="{ undocked: !dock.merged.value, dragging: dock.dragging.value === 'drawer', 'will-snap': dock.willSnap.value }"
-        :style="dock.styleFor('drawer').value"
+        :style="{ ...dock.styleFor('drawer').value, ...drawerHeight.style.value }"
       >
         <div
           class="tips-header"
@@ -2208,6 +2226,21 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             </div>
           </div>
         </div>
+        <!--
+          下边线：拖它改高度。只有下边线能拉 —— 两个窗都锚在顶部
+          （wrapper top:15px），上边线拖不动，和「靠右停靠所以只有左边线
+          能拉宽」是同一个道理。双击恢复默认。
+        -->
+        <div
+          class="resize-edge-bottom"
+          :class="{ active: drawerHeight.resizing.value }"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="拖动调整AI 助手高度，双击恢复默认"
+          title="拖动调整高度 · 双击恢复默认"
+          @pointerdown="drawerHeight.onPointerDown"
+          @dblclick="drawerHeight.reset"
+        />
       </div>
 
       <!-- ======================= 医生智能体 ======================= -->
@@ -2232,7 +2265,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         ref="panelShell"
         class="assistant-panel connected-left"
         :class="{ undocked: !dock.merged.value, dragging: dock.dragging.value === 'panel' }"
-        :style="{ ...dock.styleFor('panel').value, ...panelSize.style.value }"
+        :style="{ ...dock.styleFor('panel').value, ...panelSize.style.value, ...panelHeight.style.value }"
       >
         <div
           class="panel-header"
@@ -2511,6 +2544,21 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             </div>
           </div>
         </div>
+        <!--
+          下边线：拖它改高度。只有下边线能拉 —— 两个窗都锚在顶部
+          （wrapper top:15px），上边线拖不动，和「靠右停靠所以只有左边线
+          能拉宽」是同一个道理。双击恢复默认。
+        -->
+        <div
+          class="resize-edge-bottom"
+          :class="{ active: panelHeight.resizing.value }"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="拖动调整医生智能体高度，双击恢复默认"
+          title="拖动调整高度 · 双击恢复默认"
+          @pointerdown="panelHeight.onPointerDown"
+          @dblclick="panelHeight.reset"
+        />
       </div>
 
     </div>

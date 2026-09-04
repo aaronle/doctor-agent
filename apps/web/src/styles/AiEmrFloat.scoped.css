@@ -1012,3 +1012,13 @@
 .font-opt.on{background:#e8f2ff;border-color:#1677ff;color:#1677ff;font-weight:700}
 .font-opt-pct{font-size:9px;color:#8a9099;flex-shrink:0}
 .font-opt.on .font-opt-pct{color:#1677ff}
+
+/* 下边线：拖它改高度。
+   只有下边线能拉 —— 两个窗都锚在顶部（wrapper top:15px），
+   上边线拖不动，和「靠右停靠所以只有左边线能拉宽」同理。 */
+.resize-edge-bottom{position:absolute;left:0;right:0;bottom:0;height:5px;
+  cursor:row-resize;z-index:2002;touch-action:none;
+  background:transparent;transition:background .15s}
+.resize-edge-bottom::before{content:"";position:absolute;left:0;right:0;top:-3px;bottom:-3px}
+.resize-edge-bottom:hover,.resize-edge-bottom.active{background:#1677ff66}
+.resize-edge-bottom.active{background:#1677ff}
