@@ -11,6 +11,7 @@ import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '.
 import AgentMascot from './AgentMascot.vue'
 import FollowUpHints from './FollowUpHints.vue'
 import { AUTO_OPEN_AFTER_MESSAGES, useFollowUp } from '../composables/useFollowUp'
+import { useResizable } from '../composables/useResizable'
 
 const ws = useWorkstation()
 
@@ -177,6 +178,37 @@ function startResize(event: MouseEvent) {
 const voice = useInterview(() => ws.patientId)
 /** AI 追问提示。清单在 voice.start() 里取一次，判定随对话推进（见下面的 watch）。 */
 const followUp = useFollowUp(() => ws.patientId)
+
+/* ===================== 两个浮窗的宽度可拖 ===================== */
+
+/**
+ * 医生智能体面板宽度。默认 300（样式表里那个值），下限 260 上限 560。
+ *
+ * 下限不能再低：患者信息行是「姓名 + 性别年龄出生年月就诊号 + 过敏标记」，
+ * 300px 已经很紧，260 是实测还能读全的底线。
+ */
+const panelSize = useResizable({ initial: 300, min: 260, max: 560 })
+
+/**
+ * AI 助手宽度。**拖的是整个组合的左边线。**
+ *
+ * 抽屉是 `flex:1`，自己没有宽度 —— 它的左边线就是 `.ai-float-wrapper`
+ * 的左边线。所以这里调的是**组合总宽**，抽屉实际宽度 = 总宽 − 面板宽。
+ * 起始值要运行时量（CSS 给的是 `left:30%`，换个屏幕就是另一个数）。
+ */
+const wrapperEl = ref<HTMLElement | null>(null)
+const drawerSize = useResizable({
+  initial: () => wrapperEl.value?.getBoundingClientRect().width || 900,
+  min: 640,
+  max: 1800,
+})
+
+const wrapperStyle = computed(() =>
+  drawerSize.width.value === null
+    ? {}
+    // `right:0` 还在，给了 width 就等于把左边线定在 innerWidth - width 处
+    : { left: 'auto', width: `${drawerSize.width.value}px` },
+)
 
 /**
  * 外部（红线横幅的「逐条处置」）要求切到某个标签页。
@@ -1272,7 +1304,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
       :thinking="ws.loadingSummary || finishing"
       @open="restoreAgentPanel"
     />
-    <div class="ai-float-wrapper">
+    <div ref="wrapperEl" class="ai-float-wrapper" :style="wrapperStyle">
       <!-- ======================= AI 助手 ======================= -->
       <!--
         AI 助手收起时，它原来占的位置不能就这么空着 —— HIS 门面撤掉之后，
@@ -1290,6 +1322,23 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         （做 HIS 门面时还发现它 `flex:1` 且吃点击，把底下的医嘱页签全挡死了 ——
         当时是给它加 `pointer-events:none` 放行的。现在整块没了，那条补丁也随之作废。）
       -->
+      <!--
+        AI 助手的调宽边线。**拖它改的是整个组合的左边线** ——
+        抽屉是 flex:1，它的左边线就是 .ai-float-wrapper 的左边线，
+        所以这里调的是组合总宽（抽屉宽 = 总宽 − 面板宽）。
+        双击恢复默认。
+      -->
+      <div
+        v-if="tipsOpen"
+        class="resize-edge"
+        :class="{ active: drawerSize.resizing.value }"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="拖动调整 AI 助手宽度，双击恢复默认"
+        title="拖动调整宽度 · 双击恢复默认"
+        @pointerdown="drawerSize.onPointerDown"
+        @dblclick="drawerSize.reset"
+      />
       <div v-if="tipsOpen" class="tips-drawer connected-right">
         <div class="tips-header">
           <span class="tips-title"><span class="panel-ai-dot" />AI 助手</span>
@@ -2113,14 +2162,38 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
       </div>
 
       <!-- ======================= 医生智能体 ======================= -->
-      <div v-if="panelOpen" class="assistant-panel connected-left">
+      <!--
+        医生智能体的调宽边线。
+        它和抽屉把手（.assistant-handle）在同一条边上 —— 把手贴在**面板内壁**、
+        占中间 52px 且 z-index 更高，这条边线在它外侧，两者不抢同一块区域。
+      -->
+      <div
+        v-if="panelOpen"
+        class="resize-edge"
+        :class="{ active: panelSize.resizing.value }"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="拖动调整医生智能体宽度，双击恢复默认"
+        title="拖动调整宽度 · 双击恢复默认"
+        @pointerdown="panelSize.onPointerDown"
+        @dblclick="panelSize.reset"
+      />
+      <div v-if="panelOpen" class="assistant-panel connected-left" :style="panelSize.style.value">
         <div class="panel-header">
           <span class="panel-title"><span class="panel-ai-dot" />医生智能体</span>
           <div class="panel-header-actions">
             <!--
-              这个 × 不是「关掉」，是「缩成卡通」—— 缩起来的东西一直在右下角待着。
-              光凭一个 × 看不出来（提这个功能的人自己没找到入口），
-              所以文案由 title / aria-label 承担；图形保持原件的 ×。
+              **「—」不是「×」。**
+              医生智能体没有「关掉就没了」这个状态 —— 缩起来的东西一直在
+              右下角待着（D1 卡通），点它就回来。
+
+              原来这里是 ×，只靠 title 说明它其实是最小化。不够：
+              提这个功能的人自己都没找到入口，两次问「怎么缩小」。
+              图形本身就该说清楚，靠 tooltip 补救的语义等于没有。
+
+              也**不再给一个额外的「彻底关掉」** —— 两个按钮做同一件事
+              只会让人犹豫点哪个；真做一个「关了就没」的，就又造出一条
+              回不来的死路，这个项目已经踩过两次了。
             -->
             <el-button
               text
@@ -2129,7 +2202,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               title="缩成卡通（收到右下角，点它可还原）"
               aria-label="缩成卡通，收到右下角"
               @click="panelOpen = false"
-            >×</el-button>
+            >—</el-button>
           </div>
         </div>
 

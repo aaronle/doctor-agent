@@ -3,7 +3,14 @@
    医生上一版在哪找它，这一版还在哪。 */
 
 .mascot{
-  position:fixed;right:24px;bottom:32px;z-index:2000;
+  position:fixed;right:24px;bottom:32px;
+  /* **必须高过 .ai-float-wrapper（2000）。**
+     卡通和 AI 助手抽屉都停在右下角那一片。同为 2000 时按 DOM 顺序，
+     抽屉压在上面 —— 实测「抽屉开着、面板缩起来」这个组合下，
+     卡通渲染出来了却点不到（专项评估的分类头挡住了），面板从此回不来。
+     和「两个 × 都关掉就回不来」是同一类死路，只是换了个成因：
+     上次是**条件**不对，这次是**层级**不对。 */
+  z-index:2100;
   color:#1677ff;                    /* SVG 全部用 currentColor，改这一处就换肤 */
   cursor:grab;
   /* 拖动时别把 SVG 当图片拖走，也别选中周围文字 */

@@ -195,13 +195,23 @@ describe('浮层重新唤出', () => {
     expect(wrapper.find('.assistant-panel').exists()).toBe(true)
   })
 
-  it('那个 × 要说清自己是「缩成卡通」，不是「关掉」', async () => {
-    // 提这个功能的人自己没找到入口 —— 一个光秃秃的 × 读起来是「关闭」，
-    // 而它其实是「最小化」，缩起来的东西一直在右下角待着。
+  it('缩小键的**字形是「—」不是「×」** —— 靠 tooltip 补救的语义等于没有', async () => {
+    // 提这个功能的人自己没找到入口，两次问「怎么缩小」。
+    // 之前是 ×（只靠 title 说明它其实是最小化）—— 不够：
+    // × 读起来就是「关掉」，没人会点它来「缩小」。
     const wrapper = await renderFloat()
-    const close = wrapper.find('.panel-close')
-    expect(close.attributes('title')).toContain('卡通')
-    expect(close.attributes('aria-label')).toContain('卡通')
+    const btn = wrapper.find('.panel-close')
+    expect(btn.text()).toBe('—')
+    expect(btn.text()).not.toContain('×')
+    expect(btn.attributes('title')).toContain('卡通')
+    expect(btn.attributes('aria-label')).toContain('卡通')
+  })
+
+  it('医生智能体**只有缩小，没有第二个「彻底关掉」**', async () => {
+    // 两个按钮做同一件事只会让人犹豫点哪个；真做一个「关了就没」的，
+    // 就又造出一条回不来的死路 —— 这个项目已经踩过两次。
+    const wrapper = await renderFloat()
+    expect(wrapper.findAll('.panel-header-actions .el-button')).toHaveLength(1)
   })
 
   it('点卡通把**医生智能体面板**找回来，不是打开 AI 助手', async () => {
@@ -840,6 +850,47 @@ describe('患者信息行', () => {
   it('身份证号不出现在界面上', async () => {
     const wrapper = await renderWithPatient({ status: 'denied', items: [] })
     expect(wrapper.text()).not.toMatch(/\d{17}[\dX]/)
+  })
+})
+
+describe('浮窗调宽', () => {
+  it('两个浮窗各有一条调宽边线', async () => {
+    const wrapper = await renderFloat()
+    expect(wrapper.findAll('.resize-edge')).toHaveLength(2)
+  })
+
+  it('边线要能被读屏软件认出来是分隔条 —— 它是纯图形，没有文字', async () => {
+    const wrapper = await renderFloat()
+    const edge = wrapper.find('.resize-edge')
+    expect(edge.attributes('role')).toBe('separator')
+    expect(edge.attributes('aria-orientation')).toBe('vertical')
+    expect(edge.attributes('aria-label')).toContain('宽度')
+  })
+
+  it('**往左拖是变宽** —— 浮窗靠右停靠，左边线远离锚点就是变宽', async () => {
+    const wrapper = await renderFloat()
+    const edge = wrapper.findAll('.resize-edge')[1].element   // 医生智能体那条
+    edge.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 900, clientY: 300 }))
+    window.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 820, clientY: 300 }))
+    window.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 820, clientY: 300 }))
+    await wrapper.vm.$nextTick()
+
+    // 默认 300 + 拖走的 80
+    expect(wrapper.find('.assistant-panel').attributes('style')).toContain('380px')
+  })
+
+  it('双击边线恢复默认宽度', async () => {
+    const wrapper = await renderFloat()
+    const edge = wrapper.findAll('.resize-edge')[1]
+    edge.element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 900, clientY: 300 }))
+    window.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 820, clientY: 300 }))
+    window.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 820, clientY: 300 }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.assistant-panel').attributes('style')).toContain('380px')
+
+    await edge.trigger('dblclick')
+    // 回到「交给 CSS」而不是写死一个数
+    expect(wrapper.find('.assistant-panel').attributes('style') ?? '').not.toContain('width')
   })
 })
 

@@ -961,3 +961,23 @@
    那张「AI 助手待问诊后展开」的说明卡讲的是「为什么现在还没有结论」，
    而八个标签页上的 🔒 与门禁说明卡已经说过同一件事 ——
    第三遍就只是挡住底下的 HIS。 */
+
+/* ---------------------------------------------------------------- 调宽边线
+
+   两个浮窗都**靠右停靠**，右边贴着屏幕 —— 只有左边线能拉。
+   往左拖 = 变宽。
+
+   宽 5px：再窄鼠标够不着，再宽会盖住浮窗的圆角。
+   命中区靠 ::before 往外扩到 11px，视觉上仍是一条细线。 */
+.resize-edge{position:relative;flex:0 0 5px;align-self:stretch;cursor:col-resize;
+  z-index:2001;touch-action:none;
+  /* 平时不画东西，只在悬停/拖动时露出来 —— 一条常驻的竖线会把两个浮窗
+     视觉上切开，而它们本来是连在一起的（connected-left / connected-right） */
+  background:transparent;transition:background .15s}
+.resize-edge::before{content:"";position:absolute;top:0;bottom:0;left:-3px;right:-3px}
+.resize-edge:hover,.resize-edge.active{background:#1677ff66}
+.resize-edge.active{background:#1677ff}
+
+/* 拖动中禁掉宽度过渡：边线跟手是这个交互的全部体感，
+   慢半拍跟在指针后面手感立刻变糊 */
+.resize-edge.active~.tips-drawer,.resize-edge.active+.assistant-panel{transition:none!important}

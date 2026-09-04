@@ -60,27 +60,59 @@ const warnTxt = await page.locator('.tips-tab-pane:not([style*="display: none"])
                                         : fail(`预警页也被锁了：「${warnTxt.slice(0,60)}」`);
 await handle.click(); await page.waitForTimeout(500);   // 收回去，模拟医生开始问诊
 
-// ③ 结束问诊 → AI 助手自动展开
-const stop = page.locator('button', { hasText:'结束问诊' }).first();
-const hasStop = await stop.count();
-if (!hasStop) {
-  const start = page.locator('button', { hasText:/语音问诊|开始问诊|问诊/ }).first();
-  (await start.count()) ? (await start.click(), await page.waitForTimeout(2500), ok('已点开始问诊'))
-                        : fail('找不到问诊按钮');
-}
-const stop2 = page.locator('button', { hasText:'结束问诊' }).first();
-if (await stop2.count()) {
-  await stop2.click();
-  ok('已点「结束问诊」');
+// ③ 生成 → AI 助手自动展开
+//
+// 按钮 2026-09-03 改过名：「结束问诊」→「生成」（而且不再结束问诊）。
+// 这里原来还在找「结束问诊」，找不到就走 fail 分支 —— 一个**永远红的检查**，
+// 下一个人只会给它加 skip。改名要连着改这里。
+const start = page.locator('.action-bar button', { hasText:/开始问诊|问诊/ }).first();
+if (await start.count()) { await start.click(); await page.waitForTimeout(2500); ok('已点开始问诊'); }
+
+const gen = page.locator('.action-bar .ib-primary').first();
+if (await gen.count()) {
+  await gen.click();
+  ok('已点「生成」');
   const auto = await page.locator('.tips-drawer').waitFor({state:'visible',timeout:180000}).then(()=>true).catch(()=>false);
-  auto ? ok('AI 助手**自动展开** ✔核心叙事') : fail('结束问诊后没自动展开');
+  auto ? ok('AI 助手**自动展开** ✔核心叙事') : fail('生成后没自动展开');
   const att = await page.locator('.assistant-handle.attention').count();
   att ? ok('把手闪蓝提示（自动展开）') : console.log('   · 把手闪蓝已回落（2 秒动画，正常）');
   await page.waitForFunction(()=>![...document.querySelectorAll('.el-loading-mask')]
       .some(m=>m.offsetParent!==null), null, {timeout:200000}).catch(()=>{});
   const after = await page.locator('.tips-tab-pane:not([style*="display: none"])').innerText().catch(()=>'');
   after.length>200 ? ok(`八页已解锁并出内容（${after.length} 字）`) : fail(`解锁后内容太少：${after.length} 字`);
-} else fail('没有「结束问诊」按钮');
+} else fail('没有「生成」按钮');
+
+// ④ 可达性：**缩起来的东西一定点得回来**
+//
+// 这一类 bug 已经咬过三次，每次成因都不一样，所以只能在真浏览器里守：
+//   1. 点卡通只开抽屉不还面板   —— 行为不对
+//   2. 抽屉开着时卡通干脆不出   —— 显示条件不对
+//   3. 卡通出来了但**点不到**    —— z-index 不对（抽屉压在上面）
+//
+// 前两条单测能覆盖，第三条不能：jsdom 不套 scoped CSS，层级问题只有真浏览器
+// 才看得见。`.click()` 会因为「被别的元素挡住」而超时 —— 这正是我们要的判据。
+console.log('\n■ 可达性：缩起来一定回得来');
+for (const drawerOpen of [true, false]) {
+  // 把抽屉摆成指定状态
+  const drawerNow = await page.locator('.tips-drawer').count() > 0;
+  if (drawerNow !== drawerOpen) {
+    await page.locator('.assistant-handle').first().click();
+    await page.waitForTimeout(600);
+  }
+  const label = drawerOpen ? 'AI 助手开着' : 'AI 助手收着';
+
+  await page.locator('.panel-close').first().click();
+  await page.waitForTimeout(500);
+  if (!(await page.locator('.mascot').count())) { fail(`${label}：缩小后卡通没出现`); continue; }
+
+  // **必须真的点得到** —— 被挡住时 Playwright 会在这里超时
+  const clicked = await page.locator('.mascot').click({ timeout: 5000 }).then(()=>true).catch(()=>false);
+  if (!clicked) { fail(`${label}：卡通出现了但**点不到**（被别的元素挡住，面板回不来）`); continue; }
+  await page.waitForTimeout(500);
+  (await page.locator('.assistant-panel').count())
+    ? ok(`${label}：缩小 → 点卡通 → 面板回来`)
+    : fail(`${label}：点了卡通但面板没回来`);
+}
 
 console.log(`\n控制台错误 ${errs.length} 条`);
 errs.slice(0,5).forEach(e=>console.log(`   ! ${e.slice(0,140)}`));
