@@ -144,6 +144,24 @@ export const useWorkstation = defineStore('workstation', () => {
    * 两个来源合并：**硬规则**（纯代码，一进来就有）+ 模型判定（分析生成后才有）。
    * 只取 summary 的话，分析没出来之前红线就是空的——而提交病历这条路
    * 在那时候本来就走得通，等于门禁在最需要它的阶段是敞开的。
+   *
+   * **判据只能是 level，不能是来源。**
+   *
+   * 这里原来不看 level，默认「硬规则出的都是红的」。那在当时成立
+   *（硬规则只有过敏冲突、危急值、生命体征越界三条，全是高风险），
+   * 但它把一个**巧合**当成了不变量。2026-09-03 加了「阳性检查结论」
+   * 这条中风险硬规则之后，实测 P008（骨科，4 项影像异常）：
+   *
+   *   - 横幅写着「硬规则**红色**风险 5 条」，而其中 4 条是中风险
+   *   - `writeBackBlocked` 跟着为真，**病历提交与诊断回写被中风险拦住**
+   *
+   * 服务端早就按 level 筛了（`routers/emr.py` 的 `is_red`），
+   * 只有这里没筛 —— 于是界面禁着按钮，而服务端其实放行。
+   * 零容忍门禁一旦拦错东西，医生下一步就是想办法绕过它，
+   * 那时真正该拦的也拦不住了。
+   *
+   * 中风险的硬规则不会消失，它们照常出现在「预警评估」页 ——
+   * 只是不进红色横幅、不阻断回写。
    */
   const redAlerts = computed(() => {
     const seen = new Set<string>()
@@ -152,6 +170,7 @@ export const useWorkstation = defineStore('workstation', () => {
     const fromModel = summary.value?.risk_alerts
     for (const a of [...hard, ...(Array.isArray(fromModel) ? fromModel : [])]) {
       if (!a?.id) continue
+      if (a.level !== '高风险') continue
       if (seen.has(a.id)) continue
       seen.add(a.id)
       merged.push(a)

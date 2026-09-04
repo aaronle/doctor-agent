@@ -1,318 +1,384 @@
 {
-  "P001": [
-    {
-      "time": "08:40",
-      "type": "doctor",
-      "action": "进入本次接诊",
-      "detail": "患者：王某某 · 内分泌科复诊"
-    },
-    {
-      "time": "08:42",
-      "type": "ai",
-      "action": "AI 病情概要",
-      "detail": "血糖控制不佳，合并高血压、高脂血症、早期肾病"
-    },
-    {
-      "time": "08:45",
-      "type": "system",
-      "category": "lab",
-      "action": "糖化血红蛋白结果",
-      "detail": "HbA1c 8.6%（参考 <7.0%）↑",
-      "result": "糖化血红蛋白(HbA1c)：8.6%（参考 <7.0%），近3次 9.0%→8.8%→8.6%，呈下降但仍未达标。",
-      "analysisHint": "HbA1c 长期高于目标值，提示近2-3月平均血糖控制不佳。虽较前略有下降，仍建议强化降糖（可考虑联合 SGLT2i/GLP-1RA），并加强饮食运动管理。",
-      "analysisKey": "p001_hba1c"
-    },
-    {
-      "time": "08:46",
-      "type": "system",
-      "category": "lab",
-      "action": "肾功能相关检验",
-      "detail": "UACR 45↑ · eGFR 78↓",
-      "result": "尿微量白蛋白/肌酐(UACR) 45 mg/g（参考 <30）↑；肾小球滤过率(eGFR) 78 mL/min（参考 >90）↓。",
-      "analysisHint": "UACR 升高伴 eGFR 轻度下降，提示早期糖尿病肾病可能。建议继续 ARB 护肾，严格控压控糖，3个月复查 UACR 与肾功能。",
-      "analysisKey": "p001_kidney_lab"
-    },
-    {
-      "time": "08:48",
-      "type": "system",
-      "category": "exam",
-      "action": "双眼底照相结果",
-      "detail": "NPDR 轻度",
-      "result": "双眼糖尿病视网膜病变（NPDR轻度），微动脉瘤（+），硬性渗出少量，无新生血管。",
-      "analysisHint": "已出现非增殖期视网膜病变，血糖长期不达标可加速进展。建议每年散瞳眼底复查，强化血糖血压血脂管理。",
-      "analysisKey": "p001_fundus"
-    },
-    {
-      "time": "08:50",
-      "type": "system",
-      "category": "exam",
-      "action": "12导联心电图结果",
-      "detail": "ST段轻度压低，T波低平",
-      "result": "窦性心律，HR 76次/分，ST段 V4-V6 轻度压低（0.5mm），T波低平，提示心肌供血不足可能。",
-      "analysisHint": "心电图提示可能心肌供血不足，糖尿病合并高血压患者需警惕冠心病风险。建议结合症状评估，必要时完善进一步心脏相关检查。",
-      "analysisKey": "p001_ecg"
-    },
-    {
-      "time": "08:55",
-      "type": "ai",
-      "action": "推荐治疗方案",
-      "detail": "评估联合 SGLT2i/GLP-1RA · 继续 ARB + 他汀"
-    },
-    {
-      "time": "09:02",
-      "type": "doctor",
-      "action": "确认随访计划",
-      "detail": "1 月后复查 HbA1c、肾功能，营养科会诊"
-    }
-  ],
-  "P002": [
-    {
-      "time": "09:10",
-      "type": "doctor",
-      "action": "进入本次接诊",
-      "detail": "患者：张某 · 心内科复诊"
-    },
-    {
-      "time": "09:11",
-      "type": "system",
-      "action": "过敏史提醒",
-      "detail": "青霉素过敏（皮疹）"
-    },
-    {
-      "time": "09:12",
-      "type": "ai",
-      "action": "AI 病情概要",
-      "detail": "胸闷气短加重，需警惕不稳定型心绞痛"
-    },
-    {
-      "time": "09:18",
-      "type": "system",
-      "category": "lab",
-      "action": "血脂检验结果",
-      "detail": "LDL-C 2.8↑（目标 <1.8）",
-      "result": "低密度脂蛋白(LDL-C) 2.8 mmol/L（冠心病目标 <1.8）↑；总胆固醇 5.1 mmol/L。",
-      "analysisHint": "冠心病患者 LDL-C 未达强化降脂目标，心血管事件风险仍高。建议强化他汀治疗，目标 LDL-C <1.8 mmol/L。",
-      "analysisKey": "p002_lipid"
-    },
-    {
-      "time": "09:20",
-      "type": "system",
-      "category": "exam",
-      "action": "12导联心电图结果",
-      "detail": "V4-V6 ST段压低",
-      "result": "窦性心律，HR 82次/分，V4-V6 ST段压低 0.1mV，提示心肌缺血可能。",
-      "analysisHint": "心电图改变与近期胸闷加重相符，需警惕不稳定型心绞痛/ACS。建议结合心肌酶、症状动态评估，必要时完善冠脉影像。",
-      "analysisKey": "p002_ecg"
-    },
-    {
-      "time": "09:22",
-      "type": "system",
-      "category": "exam",
-      "action": "心脏彩超结果",
-      "detail": "左室舒张功能减退，EF 58%",
-      "result": "左室舒张功能减退，EF 58%，室壁运动尚可。",
-      "analysisHint": "存在舒张功能减退，提示高血压/冠心病相关心脏重构可能。建议优化血压与抗心肌缺血治疗，随访心功能。",
-      "analysisKey": "p002_echo"
-    },
-    {
-      "time": "09:25",
-      "type": "ai",
-      "action": "推荐医嘱",
-      "detail": "抗血小板 + 他汀 · 注意青霉素过敏禁忌"
-    }
-  ],
-  "P003": [
-    {
-      "time": "10:05",
-      "type": "doctor",
-      "action": "进入本次接诊",
-      "detail": "患者：李某某 · 内分泌科甲亢复诊"
-    },
-    {
-      "time": "10:06",
-      "type": "ai",
-      "action": "AI 病情概要",
-      "detail": "甲亢药物治疗中，症状改善，TSH 仍偏低"
-    },
-    {
-      "time": "10:08",
-      "type": "system",
-      "category": "lab",
-      "action": "甲功检验结果",
-      "detail": "TSH 0.08↓ · FT4 22.1（正常上限）",
-      "result": "促甲状腺激素(TSH) 0.08 mIU/L（参考 0.27-4.20）↓；游离T4(FT4) 22.1 pmol/L（参考 12.0-22.0），接近正常上限。近3次 TSH 0.02→0.05→0.08，FT4 35.2→28.4→22.1。",
-      "analysisHint": "甲功指标向正常靠近但仍未完全达标，提示部分控制。可考虑微调抗甲亢药物剂量，1月后复查甲功与肝功。",
-      "analysisKey": "p003_thyroid_lab"
-    },
-    {
-      "time": "10:10",
-      "type": "system",
-      "category": "exam",
-      "action": "甲状腺超声结果",
-      "detail": "甲状腺Ⅰ度肿大",
-      "result": "甲状腺Ⅰ度肿大，回声欠均匀，未见明显结节。",
-      "analysisHint": "超声所见与甲亢病程相符，目前无结节需紧急处理。建议随甲功复查同步随访甲状腺形态。",
-      "analysisKey": "p003_thyroid_us"
-    },
-    {
-      "time": "10:18",
-      "type": "doctor",
-      "action": "确认治疗方案",
-      "detail": "维持丙硫氧嘧啶，1 月后复查甲功"
-    }
-  ],
-  "P004": [
-    {
-      "time": "11:00",
-      "type": "doctor",
-      "action": "进入本次接诊",
-      "detail": "患者：陈某 · 神经内科初诊"
-    },
-    {
-      "time": "11:01",
-      "type": "system",
-      "action": "生命体征预警",
-      "detail": "血压 168/102 mmHg（显著升高）"
-    },
-    {
-      "time": "11:05",
-      "type": "system",
-      "category": "lab",
-      "action": "血糖检验结果",
-      "detail": "空腹血糖 9.8↑ · HbA1c 9.2↑",
-      "result": "空腹血糖 9.8 mmol/L（参考 <7.0）↑；糖化血红蛋白(HbA1c) 9.2%（参考 <7.0%）↑。",
-      "analysisHint": "血糖与糖化血红蛋白均明显超标，合并高血压 3 级，心脑血管事件风险极高。建议同步强化降糖与降压，排查靶器官损害。",
-      "analysisKey": "p004_glucose"
-    },
-    {
-      "time": "11:08",
-      "type": "system",
-      "category": "exam",
-      "action": "头颅CT结果",
-      "detail": "未见出血及明显梗塞灶",
-      "result": "未见颅内出血及明显梗塞灶，脑沟裂稍增宽。",
-      "analysisHint": "目前影像未见急性出血/明显梗塞，但仍需结合症状与颈动脉情况评估脑供血不足风险，完善血管评估。",
-      "analysisKey": "p004_ct",
-      "abnormal": false
-    },
-    {
-      "time": "11:10",
-      "type": "system",
-      "category": "exam",
-      "action": "颈动脉超声结果",
-      "detail": "右侧斑块，狭窄约30%",
-      "result": "双侧颈动脉内膜增厚，右侧斑块形成，狭窄约30%。",
-      "analysisHint": "存在动脉粥样硬化斑块，是头晕及脑血管事件的重要危险因素。建议强化血压血脂管理，必要时神经内科随访。",
-      "analysisKey": "p004_carotid"
-    },
-    {
-      "time": "11:20",
-      "type": "doctor",
-      "action": "处置确认",
-      "detail": "启动联合降压，预约神经内科随访"
-    }
-  ],
-  "P005": [
-    {
-      "time": "14:20",
-      "type": "doctor",
-      "action": "进入本次接诊",
-      "detail": "患者：刘某某 · 内分泌科初诊"
-    },
-    {
-      "time": "14:21",
-      "type": "ai",
-      "action": "AI 病情概要",
-      "detail": "体检发现血糖升高，疑诊 2 型糖尿病"
-    },
-    {
-      "time": "14:23",
-      "type": "system",
-      "category": "lab",
-      "action": "血糖检验结果",
-      "detail": "空腹血糖 7.8↑ · HbA1c 7.2↑",
-      "result": "空腹血糖 7.8 mmol/L（参考 <7.0）↑；糖化血红蛋白(HbA1c) 7.2%（参考 <7.0%）↑，达糖尿病诊断阈值。",
-      "analysisHint": "空腹血糖与 HbA1c 均达 2 型糖尿病诊断标准。初诊阶段建议确认分型，启动生活方式干预，必要时评估药物治疗指征。",
-      "analysisKey": "p005_glucose"
-    },
-    {
-      "time": "14:30",
-      "type": "system",
-      "category": "exam",
-      "action": "12导联心电图结果",
-      "detail": "大致正常心电图",
-      "result": "窦性心律，大致正常心电图。",
-      "analysisHint": "目前心电图未见明显异常，初诊糖尿病患者仍建议完善并发症筛查与定期随访。",
-      "analysisKey": "p005_ecg",
-      "abnormal": false
-    },
-    {
-      "time": "14:33",
-      "type": "ai",
-      "action": "健康教育提醒",
-      "detail": "饮食运动指导 · 自我血糖监测教育"
-    },
-    {
-      "time": "14:36",
-      "type": "doctor",
-      "action": "开立随访",
-      "detail": "2 周后复查空腹血糖与生活方式依从性"
-    }
-  ],
-  "P006": [
-    {
-      "time": "08:30",
-      "type": "doctor",
-      "action": "进入本次接诊",
-      "detail": "患者：赵某某 · 神经内科 · 急性脑梗死"
-    },
-    {
-      "time": "08:32",
-      "type": "ai",
-      "action": "AI 病情概要",
-      "detail": "急性脑梗死 + TIA 史 + 多重危险因素"
-    },
-    {
-      "time": "08:40",
-      "type": "system",
-      "category": "lab",
-      "action": "血脂血糖检验结果",
-      "detail": "LDL-C 3.6↑↑ · HbA1c 7.8↑ · 空腹血糖 8.2↑",
-      "result": "低密度脂蛋白(LDL-C) 3.6 mmol/L（脑梗死目标 <1.8）↑↑；糖化血红蛋白 7.8%↑；空腹血糖 8.2 mmol/L↑。",
-      "analysisHint": "脑梗死患者血脂严重不达标，血糖亦未控制。二级预防需强化他汀（目标 LDL-C <1.8）并严格降糖，降低复发风险。",
-      "analysisKey": "p006_labs"
-    },
-    {
-      "time": "08:42",
-      "type": "system",
-      "category": "exam",
-      "action": "头颅MRI+DWI结果",
-      "detail": "左侧基底节区急性梗死灶",
-      "result": "左侧基底节区急性梗死灶，DWI 高信号。",
-      "analysisHint": "影像证实急性脑梗死。发病 3 天已过溶栓时间窗，重点启动双联抗血小板、强化降脂、血压血糖管理与早期康复。",
-      "analysisKey": "p006_mri"
-    },
-    {
-      "time": "08:45",
-      "type": "system",
-      "category": "exam",
-      "action": "颈部血管超声结果",
-      "detail": "双侧内膜增厚，右侧斑块",
-      "result": "双侧颈动脉内膜增厚，右侧斑块形成。",
-      "analysisHint": "颈部血管粥样硬化支持动脉粥样硬化性脑梗死机制。建议强化危险因素管理，必要时评估介入/外科干预指征。",
-      "analysisKey": "p006_carotid"
-    },
-    {
-      "time": "08:48",
-      "type": "ai",
-      "action": "推荐治疗",
-      "detail": "双联抗血小板 21 天 · 阿托伐他汀 40mg · 严格降压降糖"
-    },
-    {
-      "time": "09:00",
-      "type": "doctor",
-      "action": "确认二级预防方案",
-      "detail": "抗血小板 + 强化他汀 + 血压血糖管理 + 康复评估"
-    }
-  ]
+ "P001": [
+  {
+   "time": "08:40",
+   "type": "doctor",
+   "action": "进入本次接诊",
+   "detail": "患者：王某某 · 内分泌科复诊"
+  },
+  {
+   "time": "08:42",
+   "type": "ai",
+   "action": "AI 病情概要",
+   "detail": "血糖控制不佳，合并高血压、高脂血症、早期肾病"
+  },
+  {
+   "time": "08:45",
+   "type": "system",
+   "category": "lab",
+   "action": "糖化血红蛋白结果",
+   "detail": "HbA1c 8.6%（参考 <7.0%）↑",
+   "result": "糖化血红蛋白(HbA1c)：8.6%（参考 <7.0%），近3次 9.0%→8.8%→8.6%，呈下降但仍未达标。",
+   "analysisHint": "HbA1c 长期高于目标值，提示近2-3月平均血糖控制不佳。虽较前略有下降，仍建议强化降糖（可考虑联合 SGLT2i/GLP-1RA），并加强饮食运动管理。",
+   "analysisKey": "p001_hba1c"
+  },
+  {
+   "time": "08:46",
+   "type": "system",
+   "category": "lab",
+   "action": "肾功能相关检验",
+   "detail": "UACR 45↑ · eGFR 78↓",
+   "result": "尿微量白蛋白/肌酐(UACR) 45 mg/g（参考 <30）↑；肾小球滤过率(eGFR) 78 mL/min（参考 >90）↓。",
+   "analysisHint": "UACR 升高伴 eGFR 轻度下降，提示早期糖尿病肾病可能。建议继续 ARB 护肾，严格控压控糖，3个月复查 UACR 与肾功能。",
+   "analysisKey": "p001_kidney_lab"
+  },
+  {
+   "time": "08:48",
+   "type": "system",
+   "category": "exam",
+   "action": "双眼底照相结果",
+   "detail": "NPDR 轻度",
+   "result": "双眼糖尿病视网膜病变（NPDR轻度），微动脉瘤（+），硬性渗出少量，无新生血管。",
+   "analysisHint": "已出现非增殖期视网膜病变，血糖长期不达标可加速进展。建议每年散瞳眼底复查，强化血糖血压血脂管理。",
+   "analysisKey": "p001_fundus"
+  },
+  {
+   "time": "08:50",
+   "type": "system",
+   "category": "exam",
+   "action": "12导联心电图结果",
+   "detail": "ST段轻度压低，T波低平",
+   "result": "窦性心律，HR 76次/分，ST段 V4-V6 轻度压低（0.5mm），T波低平，提示心肌供血不足可能。",
+   "analysisHint": "心电图提示可能心肌供血不足，糖尿病合并高血压患者需警惕冠心病风险。建议结合症状评估，必要时完善进一步心脏相关检查。",
+   "analysisKey": "p001_ecg"
+  },
+  {
+   "time": "08:55",
+   "type": "ai",
+   "action": "推荐治疗方案",
+   "detail": "评估联合 SGLT2i/GLP-1RA · 继续 ARB + 他汀"
+  },
+  {
+   "time": "09:02",
+   "type": "doctor",
+   "action": "确认随访计划",
+   "detail": "1 月后复查 HbA1c、肾功能，营养科会诊"
+  }
+ ],
+ "P002": [
+  {
+   "time": "09:10",
+   "type": "doctor",
+   "action": "进入本次接诊",
+   "detail": "患者：张某 · 心内科复诊"
+  },
+  {
+   "time": "09:11",
+   "type": "system",
+   "action": "过敏史提醒",
+   "detail": "青霉素过敏（皮疹）"
+  },
+  {
+   "time": "09:12",
+   "type": "ai",
+   "action": "AI 病情概要",
+   "detail": "胸闷气短加重，需警惕不稳定型心绞痛"
+  },
+  {
+   "time": "09:18",
+   "type": "system",
+   "category": "lab",
+   "action": "血脂检验结果",
+   "detail": "LDL-C 2.8↑（目标 <1.8）",
+   "result": "低密度脂蛋白(LDL-C) 2.8 mmol/L（冠心病目标 <1.8）↑；总胆固醇 5.1 mmol/L。",
+   "analysisHint": "冠心病患者 LDL-C 未达强化降脂目标，心血管事件风险仍高。建议强化他汀治疗，目标 LDL-C <1.8 mmol/L。",
+   "analysisKey": "p002_lipid"
+  },
+  {
+   "time": "09:20",
+   "type": "system",
+   "category": "exam",
+   "action": "12导联心电图结果",
+   "detail": "V4-V6 ST段压低",
+   "result": "窦性心律，HR 82次/分，V4-V6 ST段压低 0.1mV，提示心肌缺血可能。",
+   "analysisHint": "心电图改变与近期胸闷加重相符，需警惕不稳定型心绞痛/ACS。建议结合心肌酶、症状动态评估，必要时完善冠脉影像。",
+   "analysisKey": "p002_ecg"
+  },
+  {
+   "time": "09:22",
+   "type": "system",
+   "category": "exam",
+   "action": "心脏彩超结果",
+   "detail": "左室舒张功能减退，EF 58%",
+   "result": "左室舒张功能减退，EF 58%，室壁运动尚可。",
+   "analysisHint": "存在舒张功能减退，提示高血压/冠心病相关心脏重构可能。建议优化血压与抗心肌缺血治疗，随访心功能。",
+   "analysisKey": "p002_echo"
+  },
+  {
+   "time": "09:25",
+   "type": "ai",
+   "action": "推荐医嘱",
+   "detail": "抗血小板 + 他汀 · 注意青霉素过敏禁忌"
+  }
+ ],
+ "P003": [
+  {
+   "time": "10:05",
+   "type": "doctor",
+   "action": "进入本次接诊",
+   "detail": "患者：李某某 · 内分泌科甲亢复诊"
+  },
+  {
+   "time": "10:06",
+   "type": "ai",
+   "action": "AI 病情概要",
+   "detail": "甲亢药物治疗中，症状改善，TSH 仍偏低"
+  },
+  {
+   "time": "10:08",
+   "type": "system",
+   "category": "lab",
+   "action": "甲功检验结果",
+   "detail": "TSH 0.08↓ · FT4 22.1（正常上限）",
+   "result": "促甲状腺激素(TSH) 0.08 mIU/L（参考 0.27-4.20）↓；游离T4(FT4) 22.1 pmol/L（参考 12.0-22.0），接近正常上限。近3次 TSH 0.02→0.05→0.08，FT4 35.2→28.4→22.1。",
+   "analysisHint": "甲功指标向正常靠近但仍未完全达标，提示部分控制。可考虑微调抗甲亢药物剂量，1月后复查甲功与肝功。",
+   "analysisKey": "p003_thyroid_lab"
+  },
+  {
+   "time": "10:10",
+   "type": "system",
+   "category": "exam",
+   "action": "甲状腺超声结果",
+   "detail": "甲状腺Ⅰ度肿大",
+   "result": "甲状腺Ⅰ度肿大，回声欠均匀，未见明显结节。",
+   "analysisHint": "超声所见与甲亢病程相符，目前无结节需紧急处理。建议随甲功复查同步随访甲状腺形态。",
+   "analysisKey": "p003_thyroid_us"
+  },
+  {
+   "time": "10:18",
+   "type": "doctor",
+   "action": "确认治疗方案",
+   "detail": "维持丙硫氧嘧啶，1 月后复查甲功"
+  }
+ ],
+ "P004": [
+  {
+   "time": "11:00",
+   "type": "doctor",
+   "action": "进入本次接诊",
+   "detail": "患者：陈某 · 神经内科初诊"
+  },
+  {
+   "time": "11:01",
+   "type": "system",
+   "action": "生命体征预警",
+   "detail": "血压 168/102 mmHg（显著升高）"
+  },
+  {
+   "time": "11:05",
+   "type": "system",
+   "category": "lab",
+   "action": "血糖检验结果",
+   "detail": "空腹血糖 9.8↑ · HbA1c 9.2↑",
+   "result": "空腹血糖 9.8 mmol/L（参考 <7.0）↑；糖化血红蛋白(HbA1c) 9.2%（参考 <7.0%）↑。",
+   "analysisHint": "血糖与糖化血红蛋白均明显超标，合并高血压 3 级，心脑血管事件风险极高。建议同步强化降糖与降压，排查靶器官损害。",
+   "analysisKey": "p004_glucose"
+  },
+  {
+   "time": "11:08",
+   "type": "system",
+   "category": "exam",
+   "action": "头颅CT结果",
+   "detail": "未见出血及明显梗塞灶",
+   "result": "未见颅内出血及明显梗塞灶，脑沟裂稍增宽。",
+   "analysisHint": "目前影像未见急性出血/明显梗塞，但仍需结合症状与颈动脉情况评估脑供血不足风险，完善血管评估。",
+   "analysisKey": "p004_ct",
+   "abnormal": false
+  },
+  {
+   "time": "11:10",
+   "type": "system",
+   "category": "exam",
+   "action": "颈动脉超声结果",
+   "detail": "右侧斑块，狭窄约30%",
+   "result": "双侧颈动脉内膜增厚，右侧斑块形成，狭窄约30%。",
+   "analysisHint": "存在动脉粥样硬化斑块，是头晕及脑血管事件的重要危险因素。建议强化血压血脂管理，必要时神经内科随访。",
+   "analysisKey": "p004_carotid"
+  },
+  {
+   "time": "11:20",
+   "type": "doctor",
+   "action": "处置确认",
+   "detail": "启动联合降压，预约神经内科随访"
+  }
+ ],
+ "P005": [
+  {
+   "time": "14:20",
+   "type": "doctor",
+   "action": "进入本次接诊",
+   "detail": "患者：刘某某 · 内分泌科初诊"
+  },
+  {
+   "time": "14:21",
+   "type": "ai",
+   "action": "AI 病情概要",
+   "detail": "体检发现血糖升高，疑诊 2 型糖尿病"
+  },
+  {
+   "time": "14:23",
+   "type": "system",
+   "category": "lab",
+   "action": "血糖检验结果",
+   "detail": "空腹血糖 7.8↑ · HbA1c 7.2↑",
+   "result": "空腹血糖 7.8 mmol/L（参考 <7.0）↑；糖化血红蛋白(HbA1c) 7.2%（参考 <7.0%）↑，达糖尿病诊断阈值。",
+   "analysisHint": "空腹血糖与 HbA1c 均达 2 型糖尿病诊断标准。初诊阶段建议确认分型，启动生活方式干预，必要时评估药物治疗指征。",
+   "analysisKey": "p005_glucose"
+  },
+  {
+   "time": "14:30",
+   "type": "system",
+   "category": "exam",
+   "action": "12导联心电图结果",
+   "detail": "大致正常心电图",
+   "result": "窦性心律，大致正常心电图。",
+   "analysisHint": "目前心电图未见明显异常，初诊糖尿病患者仍建议完善并发症筛查与定期随访。",
+   "analysisKey": "p005_ecg",
+   "abnormal": false
+  },
+  {
+   "time": "14:33",
+   "type": "ai",
+   "action": "健康教育提醒",
+   "detail": "饮食运动指导 · 自我血糖监测教育"
+  },
+  {
+   "time": "14:36",
+   "type": "doctor",
+   "action": "开立随访",
+   "detail": "2 周后复查空腹血糖与生活方式依从性"
+  }
+ ],
+ "P006": [
+  {
+   "time": "08:30",
+   "type": "doctor",
+   "action": "进入本次接诊",
+   "detail": "患者：赵某某 · 神经内科 · 急性脑梗死"
+  },
+  {
+   "time": "08:32",
+   "type": "ai",
+   "action": "AI 病情概要",
+   "detail": "急性脑梗死 + TIA 史 + 多重危险因素"
+  },
+  {
+   "time": "08:40",
+   "type": "system",
+   "category": "lab",
+   "action": "血脂血糖检验结果",
+   "detail": "LDL-C 3.6↑↑ · HbA1c 7.8↑ · 空腹血糖 8.2↑",
+   "result": "低密度脂蛋白(LDL-C) 3.6 mmol/L（脑梗死目标 <1.8）↑↑；糖化血红蛋白 7.8%↑；空腹血糖 8.2 mmol/L↑。",
+   "analysisHint": "脑梗死患者血脂严重不达标，血糖亦未控制。二级预防需强化他汀（目标 LDL-C <1.8）并严格降糖，降低复发风险。",
+   "analysisKey": "p006_labs"
+  },
+  {
+   "time": "08:42",
+   "type": "system",
+   "category": "exam",
+   "action": "头颅MRI+DWI结果",
+   "detail": "左侧基底节区急性梗死灶",
+   "result": "左侧基底节区急性梗死灶，DWI 高信号。",
+   "analysisHint": "影像证实急性脑梗死。发病 3 天已过溶栓时间窗，重点启动双联抗血小板、强化降脂、血压血糖管理与早期康复。",
+   "analysisKey": "p006_mri"
+  },
+  {
+   "time": "08:45",
+   "type": "system",
+   "category": "exam",
+   "action": "颈部血管超声结果",
+   "detail": "双侧内膜增厚，右侧斑块",
+   "result": "双侧颈动脉内膜增厚，右侧斑块形成。",
+   "analysisHint": "颈部血管粥样硬化支持动脉粥样硬化性脑梗死机制。建议强化危险因素管理，必要时评估介入/外科干预指征。",
+   "analysisKey": "p006_carotid"
+  },
+  {
+   "time": "08:48",
+   "type": "ai",
+   "action": "推荐治疗",
+   "detail": "双联抗血小板 21 天 · 阿托伐他汀 40mg · 严格降压降糖"
+  },
+  {
+   "time": "09:00",
+   "type": "doctor",
+   "action": "确认二级预防方案",
+   "detail": "抗血小板 + 强化他汀 + 血压血糖管理 + 康复评估"
+  }
+ ],
+ "P008": [
+  {
+   "time": "09:10",
+   "type": "doctor",
+   "action": "进入本次接诊",
+   "detail": "患者：孙某某 · 骨科（关节亚专科） · 双膝骨关节炎"
+  },
+  {
+   "time": "09:12",
+   "type": "ai",
+   "action": "AI 病情概要",
+   "detail": "终末期膝骨关节炎 + 围术期四项风险叠加"
+  },
+  {
+   "time": "09:15",
+   "type": "system",
+   "category": "exam",
+   "action": "双膝X线结果",
+   "detail": "右膝 K-L Ⅳ级，间隙近乎消失",
+   "result": "右膝内侧关节间隙近乎消失，骨赘形成，软骨下骨硬化；左膝间隙变窄。",
+   "analysisHint": "右膝已达终末期，软骨磨损殆尽。保守治疗的空间基本没有了，接下来是置换时机与围术期条件的问题。",
+   "analysisKey": "p008_xray"
+  },
+  {
+   "time": "09:18",
+   "type": "system",
+   "category": "exam",
+   "action": "下肢全长片结果",
+   "detail": "右下肢内翻 8°",
+   "result": "右下肢机械轴内移，内翻 8°；左下肢内翻 4°。",
+   "analysisHint": "内翻畸形与内侧间室磨损互为因果。置换时需据此规划截骨与假体力线，术前测量要留档。",
+   "analysisKey": "p008_alignment"
+  },
+  {
+   "time": "09:22",
+   "type": "system",
+   "category": "lab",
+   "action": "术前检验回报",
+   "detail": "HbA1c 8.1↑ · ESR 42↑ · CRP 18.6↑ · 白蛋白 36.2↓",
+   "result": "糖化血红蛋白 8.1%↑；红细胞沉降率 42 mm/h↑；C反应蛋白 18.6 mg/L↑；白蛋白 36.2 g/L↓；25-羟维生素D 14.2 ng/mL↓。",
+   "analysisHint": "四项都指向同一件事：现在不是手术窗口。血糖与白蛋白需 4–8 周优化；炎症指标持续上升要先排除关节感染。",
+   "analysisKey": "p008_labs"
+  },
+  {
+   "time": "09:26",
+   "type": "system",
+   "category": "exam",
+   "action": "骨密度结果",
+   "detail": "腰椎 T 值 −2.8",
+   "result": "DXA：腰椎 L1-L4 T 值 −2.8，股骨颈 T 值 −2.4。",
+   "analysisHint": "骨质疏松影响假体初始固定，也抬高术中骨折风险。术前补钙与维生素 D，固定方式由术者结合骨质决定。",
+   "analysisKey": "p008_dxa"
+  },
+  {
+   "time": "09:30",
+   "type": "ai",
+   "action": "硬规则红线",
+   "detail": "过敏冲突：头孢过敏 × 在用头孢呋辛酯片"
+  },
+  {
+   "time": "09:34",
+   "type": "doctor",
+   "action": "处置",
+   "detail": "停用头孢呋辛酯片；开具钙剂与维生素 D；约术前 MDT"
+  }
+ ]
 }

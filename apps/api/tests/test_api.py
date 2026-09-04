@@ -276,6 +276,60 @@ def test_model_cannot_override_hard_rule_red_alert():
     assert len(alerts) == 1
 
 
+def test_p008_allergy_conflict_fires(client):
+    """骨科关节亚专科病例（P008 孙某某）**必须触发过敏冲突红线**。
+
+    这个病例是照着关节置换最真实的坑造的：患者头孢过敏，社区医院因牙痛
+    开了头孢呋辛酯片，患者自己忘了过敏史 —— 跨机构处方没人做过敏史核对。
+
+    **它是整个病例存在的理由。** 过敏原写成「头孢菌素类」、或者把在用医嘱
+    换成别的抗生素，规则就静默失效，而界面看起来一切正常：
+    硬规则是子串匹配（`term in drug`），「头孢菌素类」不是任何真实药名的子串。
+    """
+    detail = client.get("/api/his/patient/P008").json()
+    assert detail["dept"] == "骨科"
+    assert "头孢" in detail["allergies"], "过敏原必须能被子串匹配命中真实药名"
+    assert any("头孢" in o["drug"] for o in detail["orders"]), "在用医嘱里得真有那个药"
+
+    alerts = hard_rule_alerts(
+        {k: detail.get(k) for k in ("allergies", "allergy_status", "orders", "lab_results", "vitals")}
+    )
+    conflict = [a for a in alerts if a["rule"] == "allergy_conflict"]
+    assert conflict, f"过敏冲突没触发，只有：{[a['name'] for a in alerts]}"
+    assert conflict[0]["level"] == "高风险"
+
+
+def test_p008_has_every_fixture_section(client):
+    """七份种子文件都要有 P008 —— 缺一份，界面上就是一块空白。
+
+    缺失不会报错：接口照常 200、返回空数组，标签页渲染成空的。
+    人要点进那一页才看得见，而演示时通常不会每页都点。
+    """
+    detail = client.get("/api/his/patient/P008").json()
+    assert detail["suspected_diagnoses"], "缺鉴别诊断"
+    assert detail["lab_results"], "缺检验"
+    assert detail["orders"], "缺医嘱"
+    assert detail["visit_history"], "缺既往就诊"
+
+    # 对话脚本、病历七段、检查报告、专项评估、共病、时间轴 —— 各自的落点
+    assert client.get("/api/emr/interview/init/P008").json()["dialog"], "缺对话脚本"
+
+    objective = client.get("/api/emr/objective/P008").json()
+    assert objective.get("examinations"), "缺检查报告"
+
+    from app.database import SessionLocal
+    from app.agents.context import seed_items, seed_payload
+
+    inner = SessionLocal()
+    try:
+        assert seed_payload(inner, "record_content", "P008"), "缺病历七段"
+        assert seed_payload(inner, "assessment", "P008").get("risk_assessments"), "缺专项评估"
+        assert seed_payload(inner, "comorbidity", "P008").get("conditions"), "缺共病"
+        assert seed_items(inner, "timeline", "P008"), "缺时间轴"
+    finally:
+        inner.close()
+
+
 def test_risks_are_sorted_high_to_low():
     """风险项按等级从高到低排，**不按来源排**。
 

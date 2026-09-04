@@ -179,7 +179,7 @@ describe('就诊状态机', () => {
   it('硬规则红线不等分析 —— 危急值一进来就在门禁里', async () => {
     // 只取 summary 的话，分析没出来之前 redAlerts 是空的，
     // 而提交病历那条路在那时候本来就走得通，等于门禁在最需要它的阶段敞开
-    stubEntry(false, [{ id: 'hard-k' }])
+    stubEntry(false, [{ id: 'hard-k', level: '高风险' }])
     const ws = useWorkstation()
     await ws.selectPatient('P002')
 
@@ -187,8 +187,42 @@ describe('就诊状态机', () => {
     expect(ws.writeBackBlocked).toBe(true)
   })
 
+  it('**中风险的硬规则不算红线**，不进横幅也不阻断回写', async () => {
+    // 判据只能是 level，不能是来源。
+    //
+    // 原来这里是「硬规则出的都是红的」—— 那在当时成立（硬规则只有过敏冲突、
+    // 危急值、生命体征越界三条，全是高风险），但它把一个**巧合**当成了不变量。
+    // 2026-09-03 加了「阳性检查结论」这条中风险硬规则之后：
+    //
+    //   - 横幅写着「硬规则**红色**风险 5 条」，而其中 4 条是中风险
+    //   - `writeBackBlocked` 跟着为真，**病历提交与诊断回写被中风险拦住**
+    //
+    // 服务端早就按 level 筛了（routers/emr.py 的 `is_red`），只有这里没筛 ——
+    // 于是界面禁着按钮，而服务端其实放行。零容忍门禁一旦拦错东西，
+    // 医生下一步就是想办法绕过它，那时真正该拦的也拦不住了。
+    stubEntry(false, [
+      { id: 'hard-allergy', level: '高风险' },
+      { id: 'hard-xray', level: '中风险' },
+      { id: 'hard-mri', level: '中风险' },
+    ])
+    const ws = useWorkstation()
+    await ws.selectPatient('P002')
+
+    expect(ws.redAlerts.map((a) => a.id)).toEqual(['hard-allergy'])
+    expect(ws.openRedAlerts).toHaveLength(1)
+  })
+
+  it('只有中风险时完全不阻断回写', async () => {
+    stubEntry(false, [{ id: 'hard-xray', level: '中风险' }])
+    const ws = useWorkstation()
+    await ws.selectPatient('P002')
+
+    expect(ws.redAlerts).toEqual([])
+    expect(ws.writeBackBlocked).toBe(false)
+  })
+
   it('硬规则与模型红线合并去重，不重复计数', async () => {
-    stubEntry(true, [{ id: 'model-red' }])
+    stubEntry(true, [{ id: 'model-red', level: '高风险' }])
     const ws = useWorkstation()
     await ws.selectPatient('P002')
     expect(ws.redAlerts.map((a) => a.id)).toEqual(['model-red'])
