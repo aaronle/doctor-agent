@@ -332,3 +332,97 @@ class EvalDatasetState(Base):
     dataset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# ---------------------------------------------------------------- 数据沉淀
+
+
+class TrainingSample(Base):
+    """
+    微调语料：一次「AI 给了什么 / 医生最后要了什么」的配对。
+
+    ## 为什么单独一张表，而不是从 agent_runs 里捞
+
+    `agent_runs.output` 里已经有模型的每一次输出。**但拿它去微调，等于让模型
+    学它自己已经会的东西。** 真正的监督信号是**医生的修改**：AI 写「现病史：
+    患者 3 天前晨起…」，医生改成「5 天前午后…」—— 那几个字的差异才是标注。
+
+    所以这张表的主键信息是 `ai_output` / `doctor_output` 这一对，
+    以及 `verdict`（采纳 / 改过 / 丢弃）。缺了 `doctor_output` 的行是**半成品**，
+    只有参考价值，没有训练价值。
+
+    ## trainable：合规闸，默认按数据来源定
+
+    现在库里全是虚构演示数据（`source="fixture"`），怎么用都行，所以默认 True。
+    **接真实 HIS 之后默认 False** —— 真实患者数据用于模型训练要过去标识化、
+    伦理审批、患者知情同意，那是人来判断的事，不该由一行代码默认放行。
+
+    `deidentified` 单独一列而不是并进 trainable：「能用」和「已脱敏」是两件事，
+    合并成一个布尔值之后，将来没人说得清某一行到底过了哪一关。
+    """
+
+    __tablename__ = "training_samples"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    patient_id: Mapped[str] = mapped_column(String(32), index=True)
+    #: 哪个岗位的产出（record / diagnosis / risk / …）
+    agent_key: Mapped[str] = mapped_column(String(32), index=True)
+    #: 这一对语料对应的动作（submit_record / write_back_diagnosis / …）
+    task: Mapped[str] = mapped_column(String(48), index=True, default="")
+
+    #: 送进模型的完整上下文。**存全量**（2026-09-04 产品决策）——
+    #: 此前 agent_runs 刻意只存摘要哈希，那是为了不让运行日志变成病历副本；
+    #: 而微调需要完整输入，这是一次显式的隐私权衡，由 trainable/deidentified 把关。
+    context: Mapped[dict] = mapped_column(JSON, default=dict)
+    ai_output: Mapped[dict] = mapped_column(JSON, default=dict)
+    #: 医生定稿。为空 = 还没定稿，这一行没有训练价值
+    doctor_output: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    #: accepted（一字未改）/ edited（改过）/ discarded（整段丢弃）
+    verdict: Mapped[str] = mapped_column(String(16), index=True, default="")
+    #: 改了哪些字段、各改了多少 —— 用来快速筛「模型总在哪里写错」
+    changed: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    #: 数据来源：fixture（虚构演示）/ his（真实院内）
+    source: Mapped[str] = mapped_column(String(16), default="fixture")
+    trainable: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    deidentified: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class UsageEvent(Base):
+    """
+    埋点：医生实际点了什么。
+
+    ## 为什么不复用 operation_logs
+
+    那张表是 **HTTP 级**的（method / path / status / 耗时），能回答
+    「哪个接口调得多」，回答不了「哪个按钮点得多」—— 而后者才是产品要问的。
+    大量交互根本不发请求：关掉追问提示浮框、调字号、全屏、拖窗口、切标签页。
+
+    ## 一行一个事件，不做聚合
+
+    聚合口径会变（今天想看按天、明天想看按科室），而原始事件只采一次。
+    存原始行、查询时再聚合 —— 反过来做的话，改口径就得重新采数据。
+
+    `props` 放事件特有的字段（比如字号档位、标签页名），不硬塞成列：
+    每加一种事件就加一列，表会长成一堵墙。
+    """
+
+    __tablename__ = "usage_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    #: 一次浏览器会话。用来算「人均点了几次」，而不只是总次数
+    session_id: Mapped[str] = mapped_column(String(64), index=True, default="")
+    actor: Mapped[str] = mapped_column(String(64), default="")
+    #: 事件名，如 interview_start / hints_dismiss / font_change / window_maximize
+    event: Mapped[str] = mapped_column(String(64), index=True)
+    #: 作用对象，如标签页名、按钮名。同一个 event 下的细分
+    target: Mapped[str] = mapped_column(String(64), default="")
+    patient_id: Mapped[str] = mapped_column(String(32), index=True, default="")
+    props: Mapped[dict] = mapped_column(JSON, default=dict)
+    #: 客户端时间戳（毫秒）。批量上报时服务端时间会挤在一起，
+    #: 算「两次点击间隔」这类指标必须用客户端的
+    client_ts: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

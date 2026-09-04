@@ -15,6 +15,7 @@ import { useResizable } from '../composables/useResizable'
 import { useDockedWindows } from '../composables/useDockedWindows'
 import { useFontScale } from '../composables/useFontScale'
 import { useMaximize } from '../composables/useMaximize'
+import { useTelemetry } from '../composables/useTelemetry'
 
 const ws = useWorkstation()
 
@@ -271,6 +272,14 @@ const fontMenuOpen = ref(false)
  * 以及分离态冻住的那份尺寸。
  */
 const maxi = useMaximize()
+
+/**
+ * 埋点。**采医生实际点了什么** —— 后端的 HTTP 日志答不了这个：
+ * 关掉追问提示、调字号、全屏、拖窗口、切标签页，全都不发请求。
+ *
+ * 只采「点了什么」，不采输入内容 —— 那是病历，另有 training_samples 管。
+ */
+const { track } = useTelemetry()
 
 const wrapperStyle = computed(() =>
   drawerSize.width.value === null
@@ -1149,6 +1158,8 @@ watch(
 function closeHints() {
   hintOpen.value = false
   hintDismissed.value = true
+  // 「被关掉多少次」是这个功能有没有用的最直接信号
+  track('hints_dismiss', '', { pending: voice.hints.value.length })
 }
 
 /** 暂停/生成时把浮框叫出来 —— 医生停下来，通常就是在想「还该问什么」。 */
@@ -1166,6 +1177,7 @@ function offerHints() {
 function onToggleCapture() {
   const wasPlaying = voice.state.value === 'playing'
   voice.toggleCapture()
+  track('interview_toggle', wasPlaying ? 'pause' : 'resume')
   if (wasPlaying) offerHints()
 }
 
@@ -1190,6 +1202,9 @@ function onToggleCapture() {
 async function generateNow() {
   if (!ws.patientId || finishing.value) return
   finishing.value = true
+  // 「一场问诊里点了几次生成」直接说明这个按钮的定位对不对 ——
+  // 当初就是因为它绑死了「看一眼」和「问完了」才改的
+  track('generate', '', { patient_id: ws.patientId, turns: voice.messages.value.length })
   try {
     // 落库自己会判空（persist 里 `!messages.length` 直接返回），这里不必再判。
     actionStep.value = voice.messages.value.length ? '落库问诊记录…' : '准备…'
@@ -1431,7 +1446,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               class="tips-action-btn win-max"
               :title="maxi.isMax('drawer') ? '退出全屏（Esc）' : '全屏'"
               :aria-label="maxi.isMax('drawer') ? '退出全屏' : '全屏'"
-              @click="maxi.toggle('drawer')"
+              @click="maxi.toggle('drawer'); track('window_maximize', 'drawer', { on: maxi.isMax('drawer') })"
             >{{ maxi.isMax('drawer') ? '⛶' : '⛶' }}</el-button>
             <el-button text size="small" class="tips-close" @click="tipsOpen = false">×</el-button>
           </div>
@@ -1444,7 +1459,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             class="ttab"
             :class="{ active: activeTab === tab, locked: tabLocked(tab) }"
             :title="tabLocked(tab) ? '待问诊结束后生成' : ''"
-            @click="activeTab = tab"
+            @click="activeTab = tab; track('tab_switch', tab)"
           >
             <span v-if="tabLocked(tab)" class="ttab-lock">🔒</span>{{ tab }}
             <span v-if="tab === '诊断管理' && summary?.suspected_diagnoses?.length" class="ttab-dot primary">
@@ -2328,7 +2343,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                   class="font-opt"
                   :class="{ on: lv.key === font.level.value.key }"
                   :style="{ fontSize: `${11 * lv.scale}px` }"
-                  @click="font.setLevel(lv.key); fontMenuOpen = false"
+                  @click="font.setLevel(lv.key); fontMenuOpen = false; track('font_change', lv.key)"
                 >
                   <span>{{ lv.label }}</span>
                   <span class="font-opt-pct">{{ Math.round(lv.scale * 100) }}%</span>
@@ -2354,7 +2369,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               class="panel-action-btn win-max"
               :title="maxi.isMax('panel') ? '退出全屏（Esc）' : '全屏'"
               :aria-label="maxi.isMax('panel') ? '退出全屏' : '全屏'"
-              @click="maxi.toggle('panel')"
+              @click="maxi.toggle('panel'); track('window_maximize', 'panel', { on: maxi.isMax('panel') })"
             >⛶</el-button>
             <el-button
               text
@@ -2362,7 +2377,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               class="panel-action-btn panel-close"
               title="缩成卡通（收到右下角，点它可还原）"
               aria-label="缩成卡通，收到右下角"
-              @click="panelOpen = false"
+              @click="panelOpen = false; track('panel_minimize')"
             >—</el-button>
           </div>
         </div>

@@ -37,6 +37,7 @@ from ..agents import (
     followup_coverage_agent,
 )
 from .. import cache
+from ..training import capture_diagnosis_sample, capture_record_sample
 # 与 RecordAgent 用的是同一个常量 —— 两条路径各写一个字面量就白防了
 from ..agents.record import UNCOLLECTED as UNCOLLECTED_TEXT
 from ..agents.context import build_context, has_interview, latest_dialog, seed_items, seed_payload
@@ -719,10 +720,34 @@ class RecordFieldIn(StrictIn):
 
 @router.post("/generate-record-auto")
 async def generate_record_auto(body: RecordAutoIn, session: Session = Depends(get_session)) -> dict:
+    """AI 起草病历，**并落库**。
+
+    此前这里只把结果返回给前端，草稿从不落 `record_drafts` ——
+    于是提交病历时 `latest_ai_draft` 找不到对照，微调语料一条都采不到。
+
+    **「没落库」不会报错**：接口 200、界面正常、病历照样提交，
+    只有语料表一直空着。是端到端跑一遍才看见的。
+
+    每次起草都递增一版：医生可以重新生成，每一版都留痕 ——
+    「他重生成了三次才用」本身就是关于这个岗位的信号。
+    """
     patient = _patient_or_404(session, body.patient_id)
     ctx = build_context(session, patient, include_dialog=True)
     outcome = await _run_isolated(record_agent, ctx, note_text=body.note_text)
-    return {"fields": outcome.data.get("fields", {}), "provider": outcome.provider, "degraded": outcome.degraded}
+    fields = outcome.data.get("fields", {})
+
+    # provider 用模型侧的名字，**不能是 `doctor-` 开头** ——
+    # 那个前缀是 latest_ai_draft 用来把医生自己暂存的版本剔掉的判据
+    session.add(RecordDraft(
+        patient_id=patient.id,
+        version=_next_draft_version(session, patient.id),
+        fields=fields,
+        provenance=outcome.data.get("provenance", {}) or {},
+        provider=outcome.provider or "model",
+    ))
+    session.commit()
+
+    return {"fields": fields, "provider": outcome.provider, "degraded": outcome.degraded}
 
 
 @router.post("/generate-record-field")
@@ -1100,6 +1125,10 @@ def submit_record(body: RecordSaveIn, session: Session = Depends(get_session)) -
     # 暂存不出队（它的语义就是没弄完）；误点后可在患者管理里「重新接诊」。
     patient.in_queue = False
 
+    # 微调语料：**这一刻才有监督信号** —— AI 初稿与医生定稿的配对。
+    # 挂在模型返回的那一刻是没用的，那时只有 AI 自言自语。
+    capture_record_sample(session, patient, body.fields)
+
     record_audit(
         session, action="submit_record", entity="record_draft", entity_id=str(version),
         patient_id=patient.id, detail={"fields": sorted(body.fields.keys()), "handled_alerts": body.handled_alerts},
@@ -1161,6 +1190,10 @@ async def diagnosis_write_back(body: DiagnosisWriteBackIn, session: Session = De
     _assert_red_alerts_closed(session, patient, body.handled_alerts, action="回写")
 
     payload = patient.payload or {}
+    # 微调语料要**在覆盖 payload 之前**取 AI 那份清单 —— 下面几行就把它冲掉了。
+    # 这里的监督信号是勾选：没被勾的是负样本，医生自己加的是模型漏掉的。
+    capture_diagnosis_sample(session, patient, payload.get("suspected_diagnoses") or [], body.diagnoses)
+
     payload["diagnoses"] = [
         {"name": name, "primary": name == body.primary, "source": "ai-confirmed"} for name in body.diagnoses
     ]

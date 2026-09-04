@@ -64,10 +64,29 @@ def test_put_config_does_not_accept_client_key(client):
 
 
 def test_patient_list_only_returns_queued_and_trimmed_fields(client):
+    """候诊列表只出在队列的人，且裁掉大字段与身份信息。
+
+    **判据不是写死的人数。** 原来这里是 `len(body) == 6`，加了 P008 之后
+    该是 7 —— 它没当场变红，是因为测试是随机序跑的：只要别的用例先提交了
+    一份病历（提交 = 就诊完成 = 出队），数字又对上了。
+    一个靠别人副作用才成立的断言，等于没有断言。
+
+    改成从**事实**推导：列表里的人必须都还在队列里，且不在队列的必须不出现。
+    """
     body = client.get("/api/his/patients").json()
     ids = {p["id"] for p in body}
     assert "P007" not in ids, "P007 未在候诊队列，不应出现在候诊列表"
-    assert len(body) == 6
+
+    from app.database import SessionLocal
+    from app.models import Patient
+
+    inner = SessionLocal()
+    try:
+        queued = {p.id for p in inner.query(Patient).filter(Patient.in_queue.is_(True)).all()}
+    finally:
+        inner.close()
+    assert ids == queued, f"列表与队列不一致：多 {ids - queued}，少 {queued - ids}"
+
     # 列表视图必须裁剪掉大字段与身份信息
     for key in ("lab_results", "health_archive", "id_no", "phone"):
         assert key not in body[0]
