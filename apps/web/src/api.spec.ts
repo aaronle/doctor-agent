@@ -120,3 +120,45 @@ describe('风险等级排序', () => {
       .toEqual([0, 1, 2])
   })
 })
+
+describe('ApiError · 结构化 detail', () => {
+  it('**422 的逐条错误要能穿过 request() 到达调用方**', async () => {
+    // 这条补的是一个覆盖空洞：composable 那侧的 takeErrors 有测试，
+    // 但真正往 ApiError 上挂 detail 的是 request()，那一段一直没人测 ——
+    // 把 `throw new ApiError(msg, status, raw)` 的第三个参数删掉，
+    // composable 的测试**照样全绿**（它们是自己 new 出来的 ApiError）。
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ detail: { errors: ['cases[0] 缺 patient_id'] } }),
+        { status: 422, headers: { 'Content-Type': 'application/json' } }),
+    ))
+
+    const err = await api.uploadDataset({ id: 'x' }).catch((e) => e)
+
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.status).toBe(422)
+    expect((err.detail as { errors: string[] }).errors).toEqual(['cases[0] 缺 patient_id'])
+  })
+
+  it('detail 是字符串时 message 就取它 —— 多数接口是这种', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ detail: '内置测试集不可删除' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }),
+    ))
+
+    const err = await api.deleteDataset('followup-prompt').catch((e) => e)
+
+    expect(err.message).toBe('内置测试集不可删除')
+    expect(err.detail).toBe('内置测试集不可删除')
+  })
+
+  it('detail 是对象时 message 退回状态码，**不能变成 [object Object]**', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ detail: { errors: ['x'] } }),
+        { status: 422, headers: { 'Content-Type': 'application/json' } }),
+    ))
+
+    const err = await api.uploadDataset({}).catch((e) => e)
+    expect(err.message).toBe('HTTP 422')
+    expect(err.message).not.toContain('object Object')
+  })
+})

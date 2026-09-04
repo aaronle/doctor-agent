@@ -426,3 +426,53 @@ class UsageEvent(Base):
     #: 算「两次点击间隔」这类指标必须用客户端的
     client_ts: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class CustomEvalDataset(Base):
+    """
+    上传的测试集。
+
+    **为什么必须进库，不能落文件。** 容器是 `read_only: true`，只有
+    `/opt/doctor-agent/data` 这一个卷可写；写进镜像里的文件**一次部署就没了**。
+
+    与内置数据集（`app/data/eval_datasets/*.json`，随版本走的只读事实）
+    在读取时合并，同 id 以库为准。内置的因此**删不掉**也不该给删除按钮 ——
+    删了下次部署又回来；要停用它用 `eval_dataset_states` 的开关。
+
+    存的是**原始 JSON**而不是编译后的对象：编译逻辑会跟着版本变，
+    存编译产物等于把今天的编译器固化进数据。
+    """
+
+    __tablename__ = "custom_eval_datasets"
+
+    dataset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), default="")
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    uploaded_by: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class KnowledgeEntry(Base):
+    """
+    本院自定义知识库词条。
+
+    和测试集同一个模型：内置的是镜像里的 `data/knowledge_base.json`（随版本走），
+    本院加的进库（跟着数据卷活下来），读取时合并、同 key 以库为准。
+
+    好处是**升级不丢本院内容**：内置条目随版本更新，本院那些在数据卷里，
+    两边互不覆盖。
+
+    `deleted` 是软删：要能把**内置**条目也「删掉」—— 真删不了文件，
+    但可以在库里标一条墓碑，读取时跳过。硬删一行就做不到这件事。
+    """
+
+    __tablename__ = "knowledge_entries"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(128), default="")
+    keywords: Mapped[list] = mapped_column(JSON, default=list)
+    content: Mapped[str] = mapped_column(Text, default="")
+    #: 墓碑：为真时读取端跳过这个 key（内置条目也能这样「删」）
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

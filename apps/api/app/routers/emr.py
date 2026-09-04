@@ -36,7 +36,7 @@ from ..agents import (
     followup_plan_agent,
     followup_coverage_agent,
 )
-from .. import cache
+from .. import cache, knowledge
 from ..training import capture_diagnosis_sample, capture_record_sample
 # 与 RecordAgent 用的是同一个常量 —— 两条路径各写一个字面量就白防了
 from ..agents.record import UNCOLLECTED as UNCOLLECTED_TEXT
@@ -124,15 +124,18 @@ def assessment_catalog() -> dict:
 
 # ------------------------------------------------------------------ 临床知识库
 
-_KB_PATH = Path(__file__).resolve().parents[1] / "data/knowledge_base.json"
+def _knowledge_base(session: Session | None = None) -> dict:
+    """内置词条 + 本院词条（见 `app/knowledge.py`）。
 
-
-def _knowledge_base() -> dict:
-    return json.loads(_KB_PATH.read_text(encoding="utf-8"))
+    `session` 省略时只出内置的 —— 少数不碰库的调用点用得上。
+    """
+    if session is None:
+        return knowledge.builtin()
+    return knowledge.merged(session)
 
 
 @router.get("/knowledge")
-def knowledge_list(q: str = "") -> dict:
+def knowledge_list(q: str = "", session: Session = Depends(get_session)) -> dict:
     """
     临床知识库目录：检验解读三条 + 鉴别诊断/诊疗指南四条。
 
@@ -141,7 +144,7 @@ def knowledge_list(q: str = "") -> dict:
 
     只返回目录不返回正文 —— 正文最长 800 余字，列表里带上纯属浪费。
     """
-    kb = _knowledge_base()
+    kb = _knowledge_base(session)
     items = [{"key": k, "title": v["title"], "keywords": v["keywords"]} for k, v in kb.items()]
     if not q:
         return {"items": items}

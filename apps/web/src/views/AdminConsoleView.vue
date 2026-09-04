@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import MobileAdminConsole from '../mobile/MobileAdminConsole.vue'
+import { api } from '../api'
 import { useAdminConsole } from '../composables/useAdminConsole'
+import { useDataConsole } from '../composables/useDataConsole'
 import { useIsMobile } from '../composables/useMediaQuery'
 
 /**
@@ -24,6 +27,92 @@ const {
   runEval, loadDatasets, toggleDataset,
   loadOverview, select, saveDraft, publish, rollback, discard, resetToCodeDefault, statusType,
 } = useAdminConsole()
+
+/* ===================== 数据看板 ===================== */
+
+const dc = useDataConsole()
+const dsFile = ref<HTMLInputElement | null>(null)
+const kbFile = ref<HTMLInputElement | null>(null)
+const uploadFailOpen = ref(false)
+const kbOpen = ref(false)
+const kbEditing = ref(false)
+const kbForm = reactive({ key: '', title: '', keywords: '', content: '' })
+
+/** 首次进「数据」页才拉数据 —— 别让不看这页的人白等四个请求 */
+async function openData() {
+  tab.value = 'data'
+  if (!dc.usage.value) await dc.refresh()
+}
+
+/**
+ * 条形长度按**本组最大值**归一，不按总和。
+ *
+ * 按总和的话，条目一多每根都短得看不出差别 —— 而这张图要回答的是
+ * 「谁最多、差多少」，不是「各占几成」。
+ */
+function barPct(n: number, rows?: { count: number }[]) {
+  const max = Math.max(1, ...(rows ?? []).map((r) => r.count))
+  return `${Math.round((n / max) * 100)}%`
+}
+
+async function onDataset(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  ;(e.target as HTMLInputElement).value = ''      // 同一个文件改完再传要能再触发
+  if (!f) return
+  const ok = await dc.uploadDataset(f)
+  ok ? ElMessage.success('测试集已入库') : (uploadFailOpen.value = true)
+}
+
+async function onKnowledge(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  ;(e.target as HTMLInputElement).value = ''
+  if (!f) return
+  const ok = await dc.importKnowledge(f)
+  ok ? ElMessage.success('词条已导入') : (uploadFailOpen.value = true)
+}
+
+async function removeDataset(row: { id: string; name: string }) {
+  await ElMessageBox.confirm(`删除测试集「${row.name}」？它的用例将不再参与评测。`, '确认', { type: 'warning' })
+  await api.deleteDataset(row.id)
+  await dc.refresh()
+  ElMessage.success('已删除')
+}
+
+async function editKnowledge(key: string) {
+  kbEditing.value = Boolean(key)
+  if (key) {
+    const d = await api.getKnowledge(key)
+    Object.assign(kbForm, { key, title: d.title, keywords: (d.keywords ?? []).join(', '), content: d.content })
+  } else {
+    Object.assign(kbForm, { key: '', title: '', keywords: '', content: '' })
+  }
+  kbOpen.value = true
+}
+
+async function saveKnowledge() {
+  if (!kbForm.key.trim() || !kbForm.title.trim()) {
+    ElMessage.warning('key 与标题都不能为空')
+    return
+  }
+  const r = await api.saveKnowledge(kbForm.key.trim(), {
+    key: kbForm.key.trim(),
+    title: kbForm.title.trim(),
+    keywords: kbForm.keywords.split(/[,，]/).map((x) => x.trim()).filter(Boolean),
+    content: kbForm.content,
+  })
+  kbOpen.value = false
+  await dc.refresh()
+  // 消毒改动过内容就明说 —— 悄悄改掉别人写的东西是最难查的那类问题
+  ElMessage.success(r.sanitized ? '已保存（正文中的脚本/事件属性已被转义）' : '已保存')
+}
+
+async function removeKnowledge(row: { key: string; title: string; source: string }) {
+  const extra = row.source === 'builtin' ? '这是内置词条，删除会在库里写一条墓碑，升级后仍然不出现。' : ''
+  await ElMessageBox.confirm(`删除词条「${row.title}」？${extra}`, '确认', { type: 'warning' })
+  await api.deleteKnowledge(row.key)
+  await dc.refresh()
+  ElMessage.success('已删除')
+}
 
 onMounted(async () => {
   await loadOverview()
@@ -89,13 +178,14 @@ onMounted(async () => {
           <div class="admin-tabs">
             <span class="admin-tab" :class="{ active: tab === 'config' }" @click="tab = 'config'">配置</span>
             <span class="admin-tab" :class="{ active: tab === 'tune' }" @click="tab = 'tune'">试运行</span>
-            <span class="admin-tab" :class="{ active: tab === 'eval' }" @click="tab = 'eval'">回归集</span>
+            <span class="admin-tab" :class="{ active: tab === 'eval' }" @click="tab = 'eval'">试跑测试集</span>
             <span class="admin-tab" :class="{ active: tab === 'versions' }" @click="tab = 'versions'">
               版本 <em>{{ detail.versions.length }}</em>
             </span>
             <span class="admin-tab" :class="{ active: tab === 'runs' }" @click="tab = 'runs'">
               运行日志 <em>{{ runs.length }}</em>
             </span>
+            <span class="admin-tab" :class="{ active: tab === 'data' }" @click="openData">数据</span>
           </div>
         </div>
 
@@ -360,8 +450,179 @@ onMounted(async () => {
             <el-table-column prop="error" label="错误" min-width="200" />
           </el-table>
         </section>
+        <!-- 数据看板 -->
+        <section v-show="tab === 'data'" class="admin-pane data-pane">
+          <div class="tune-bar">
+            <el-radio-group v-model="dc.usageDays.value" size="small" @change="dc.refresh">
+              <el-radio-button :value="7">近 7 天</el-radio-button>
+              <el-radio-button :value="30">近 30 天</el-radio-button>
+            </el-radio-group>
+            <el-button size="small" :loading="dc.loading.value" @click="dc.refresh">刷新</el-button>
+            <span class="tune-note">上传的内容进数据库 —— 容器只读，写进镜像里一次部署就没了</span>
+          </div>
+          <el-alert v-if="dc.error.value" type="error" :closable="false" :title="dc.error.value" />
+
+          <!-- 埋点 -->
+          <h3 class="data-h">使用埋点<em>医生实际点了什么 —— HTTP 日志答不了这个</em></h3>
+          <div class="data-metrics">
+            <div class="dm"><i>总事件</i><b>{{ dc.usage.value?.total_events ?? 0 }}</b></div>
+            <div class="dm"><i>会话数</i><b>{{ dc.usage.value?.sessions ?? 0 }}</b></div>
+            <div class="dm accent">
+              <i>人均次数</i><b>{{ dc.usage.value?.per_session ?? 0 }}</b>
+              <span>只看总量会被一个人狂点刷上去</span>
+            </div>
+          </div>
+          <div class="data-cols">
+            <div class="data-card">
+              <div class="data-card-h">按功能<em>点一行看细分</em></div>
+              <div
+                v-for="row in dc.usage.value?.by_event ?? []" :key="row.event"
+                class="bar-row" :class="{ on: dc.drillEvent.value === row.event }"
+                @click="dc.drillEvent.value = row.event"
+              >
+                <span class="bar-name">{{ row.event }}</span>
+                <span class="bar-track"><i :style="{ width: barPct(row.count, dc.usage.value?.by_event) }" /></span>
+                <span class="bar-num">{{ row.count }}</span>
+              </div>
+              <p v-if="!dc.usage.value?.by_event?.length" class="data-empty">还没有埋点数据</p>
+            </div>
+            <div class="data-card">
+              <div class="data-card-h">{{ dc.drillEvent.value || '细分' }}<em>按作用对象</em></div>
+              <div v-for="row in dc.drillRows.value" :key="row.target" class="bar-row">
+                <span class="bar-name">{{ row.target }}</span>
+                <span class="bar-track"><i :style="{ width: barPct(row.count, dc.drillRows.value) }" /></span>
+                <span class="bar-num">{{ row.count }}</span>
+              </div>
+              <p v-if="!dc.drillRows.value.length" class="data-empty">这个事件没有细分维度</p>
+            </div>
+          </div>
+
+          <!-- 测试集 -->
+          <h3 class="data-h">测试集<em>固定病例 + 确定性校验，防「改提示词修好一个、弄坏另一个」</em></h3>
+          <el-table :data="dc.datasets.value" size="small" border stripe>
+            <el-table-column prop="name" label="数据集" min-width="180" />
+            <el-table-column prop="case_count" label="用例" width="70" />
+            <el-table-column label="来源" width="80">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.builtin ? 'info' : 'primary'" effect="light">
+                  {{ row.builtin ? '内置' : '上传' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="岗位" min-width="160">
+              <template #default="{ row }">{{ row.agents.join('、') || '—' }}</template>
+            </el-table-column>
+            <el-table-column prop="error" label="加载错误" min-width="140" />
+            <el-table-column label="操作" width="150">
+              <template #default="{ row }">
+                <span v-if="row.builtin" class="data-muted">内置不可删</span>
+                <el-button v-else text type="danger" size="small" @click="removeDataset(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="data-upload">
+            <input ref="dsFile" type="file" accept=".json,application/json" hidden @change="onDataset">
+            <el-button type="primary" size="small" @click="dsFile?.click()">上传测试集 .json</el-button>
+            <span class="data-muted">全对才收 —— 半个数据集给出的通过率是误导性的</span>
+          </div>
+
+          <!-- 知识库 -->
+          <h3 class="data-h">
+            知识库<em>给模型查的临床资料</em>
+            <el-tag v-if="dc.emptyCount.value" size="small" type="warning" effect="light">
+              {{ dc.emptyCount.value }} 条正文为空
+            </el-tag>
+          </h3>
+          <el-table :data="dc.knowledge.value" size="small" border stripe>
+            <el-table-column prop="title" label="词条" min-width="160" />
+            <el-table-column label="关键词" min-width="220">
+              <template #default="{ row }">{{ row.keywords.join(' / ') }}</template>
+            </el-table-column>
+            <el-table-column label="正文" width="90">
+              <template #default="{ row }">
+                <span :class="row.content_length ? 'good' : 'bad'">
+                  {{ row.content_length ? row.content_length + ' 字' : '空' }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="来源" width="80">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.source === 'builtin' ? 'info' : 'primary'" effect="light">
+                  {{ row.source === 'builtin' ? '内置' : '本院' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150">
+              <template #default="{ row }">
+                <el-button text type="primary" size="small" @click="editKnowledge(row.key)">编辑</el-button>
+                <el-button text type="danger" size="small" @click="removeKnowledge(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="data-upload">
+            <el-button type="primary" size="small" @click="editKnowledge('')">＋ 新增词条</el-button>
+            <input ref="kbFile" type="file" accept=".json,application/json" hidden @change="onKnowledge">
+            <el-button size="small" @click="kbFile?.click()">批量导入 .json</el-button>
+            <span class="data-muted">内置词条也能删 —— 库里写墓碑，读取时跳过；升级不丢本院内容</span>
+          </div>
+
+          <!-- 微调语料 -->
+          <h3 class="data-h">微调语料<em>值钱的不是「AI 输出了什么」，是「医生改了什么」</em></h3>
+          <div class="data-metrics">
+            <div class="dm"><i>总条数</i><b>{{ dc.training.value?.total ?? 0 }}</b></div>
+            <div class="dm accent"><i>可训练</i><b>{{ dc.training.value?.trainable_count ?? 0 }}</b>
+              <span>真实院内数据默认不可训练，要人工过完合规才翻</span></div>
+            <div v-for="v in dc.training.value?.by_verdict ?? []" :key="v.verdict" class="dm">
+              <i>{{ v.verdict }}</i><b>{{ v.count }}</b>
+            </div>
+          </div>
+          <el-table :data="dc.training.value?.recent ?? []" size="small" border stripe>
+            <el-table-column prop="created_at" label="时间" width="180" />
+            <el-table-column prop="patient_id" label="病例" width="80" />
+            <el-table-column prop="agent_key" label="岗位" width="100" />
+            <el-table-column prop="verdict" label="判定" width="100" />
+            <el-table-column label="改了什么" min-width="220">
+              <template #default="{ row }">{{ row.changed_fields.join('、') || '—' }}</template>
+            </el-table-column>
+            <el-table-column prop="source" label="来源" width="90" />
+          </el-table>
+          <p class="cfg-hint">
+            列表<strong>不带病历正文</strong> —— 概览页不需要原文；顺手塞进一个随手可访问的接口，等于给自己开了个数据出口。
+          </p>
+        </section>
       </main>
     </div>
+
+    <!-- 上传校验失败：逐条列出，别只说「格式不对」 -->
+    <el-dialog v-model="uploadFailOpen" title="校验失败 · 不入库" width="640px">
+      <p class="data-muted">{{ dc.uploadName.value }}</p>
+      <ul class="data-errs"><li v-for="(e, i) in dc.uploadErrors.value" :key="i">{{ e }}</li></ul>
+      <p class="cfg-hint">全对才收 —— 一半进去一半报错，没人知道究竟进去了哪些。</p>
+    </el-dialog>
+
+    <!-- 词条编辑 -->
+    <el-dialog v-model="kbOpen" :title="kbForm.key ? '编辑词条' : '新增词条'" width="680px">
+      <el-form label-width="86px" size="small">
+        <el-form-item label="key">
+          <el-input v-model="kbForm.key" :disabled="kbEditing" placeholder="英文短标识，如 kl_grade" />
+        </el-form-item>
+        <el-form-item label="标题"><el-input v-model="kbForm.title" /></el-form-item>
+        <el-form-item label="关键词">
+          <el-input v-model="kbForm.keywords" placeholder="逗号分隔 —— 没有关键词就永远匹配不上" />
+        </el-form-item>
+        <el-form-item label="正文">
+          <el-input v-model="kbForm.content" type="textarea" :rows="10" />
+        </el-form-item>
+      </el-form>
+      <p class="cfg-hint">
+        正文写入前<strong>消毒</strong>：只保留排版标签，脚本与事件属性一律转义 ——
+        正文可编辑之后，前端 v-html 渲染就不再天然安全了。
+      </p>
+      <template #footer>
+        <el-button size="small" @click="kbOpen = false">取消</el-button>
+        <el-button type="primary" size="small" @click="saveKnowledge">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

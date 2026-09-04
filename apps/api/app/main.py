@@ -27,6 +27,7 @@ from .database import SessionLocal, engine, init_database
 from .models import OperationLog
 from .routers import admin as admin_router
 from .routers import telemetry as telemetry_router
+from .routers import data_console as data_console_router
 from .routers import config as config_router
 from .routers import delivery as delivery_router
 from .routers import emr as emr_router
@@ -114,6 +115,7 @@ app.include_router(emr_router.router)
 app.include_router(admin_router.router)
 app.include_router(delivery_router.router)
 app.include_router(telemetry_router.router)
+app.include_router(data_console_router.router)
 
 
 @app.get("/api/health")

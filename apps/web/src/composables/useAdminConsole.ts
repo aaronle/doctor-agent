@@ -38,7 +38,7 @@ export function useAdminConsole() {
   const activeKey = ref('')
   const detail = ref<AgentDetail | null>(null)
   const runs = ref<AgentRunLog[]>([])
-  const tab = ref<'config' | 'tune' | 'eval' | 'versions' | 'runs'>('config')
+  const tab = ref<'config' | 'tune' | 'eval' | 'versions' | 'runs' | 'data'>('config')
 
   /** 草稿编辑区。与已发布配置分开，未发布不影响线上。 */
   const draft = ref({ model_tier: 'clinical_fast', role_prompt: '', note: '' })

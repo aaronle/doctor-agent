@@ -11,6 +11,16 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /**
+     * 服务端原样的 `detail`。
+     *
+     * **不能只留 message。** 校验类接口把逐条错误放在
+     * `detail.errors`（如 `cases[2].checks[0].kind = "…" 检查项不存在`），
+     * 而 `Error(message)` 会把那个对象压成 `[object Object]` ——
+     * 上传失败时用户只能看到一句「[object Object]」，
+     * 手里却是一个几百行的 JSON。
+     */
+    readonly detail?: unknown,
   ) {
     super(message)
   }
@@ -22,13 +32,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   })
   if (!response.ok) {
-    let detail = `HTTP ${response.status}`
+    let raw: unknown = `HTTP ${response.status}`
     try {
-      detail = (await response.json()).detail ?? detail
+      raw = (await response.json()).detail ?? raw
     } catch {
       // 后端异常时可能不是 JSON，保留状态码即可
     }
-    throw new ApiError(detail, response.status)
+    // detail 可能是字符串（多数接口）也可能是对象（校验类接口的逐条错误）。
+    // message 取可读的那一份，结构化的原样挂在 detail 上供调用方展开。
+    const message = typeof raw === 'string' ? raw : `HTTP ${response.status}`
+    throw new ApiError(message, response.status, raw)
   }
   return response.json() as Promise<T>
 }
@@ -36,8 +49,58 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const get = <T>(path: string) => request<T>(path)
 const post = <T>(path: string, body: unknown) =>
   request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+const put = <T>(path: string, body: unknown) =>
+  request<T>(path, { method: 'PUT', body: JSON.stringify(body) })
+const del = <T>(path: string) => request<T>(path, { method: 'DELETE' })
 
 // ------------------------------------------------------------------ 类型
+
+/** 数据看板：埋点使用概览 */
+export interface UsageSummary {
+  days: number
+  total_events: number
+  sessions: number
+  /** 人均次数。只看总量会被一个人狂点刷上去 */
+  per_session: number
+  by_event: { event: string; count: number }[]
+  by_target: { event: string; target: string; count: number }[]
+}
+
+/** 数据看板：微调语料概览 */
+export interface TrainingSummary {
+  total: number
+  trainable_count: number
+  by_verdict: { verdict: string; count: number }[]
+  by_agent: { agent_key: string; count: number }[]
+  recent: {
+    id: number; patient_id: string; agent_key: string; task: string
+    verdict: string; changed_fields: string[]; source: string
+    trainable: boolean; created_at: string
+  }[]
+}
+
+/** 数据看板：测试集一行 */
+export interface DatasetRow {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+  case_count: number
+  agents: string[]
+  error: string
+  /** 内置的删不掉 —— 文件在只读镜像里，删了下次部署又回来 */
+  builtin: boolean
+}
+
+/** 数据看板：知识库一行。**带长度不带正文** */
+export interface KnowledgeRow {
+  key: string
+  title: string
+  keywords: string[]
+  content_length: number
+  source: string
+}
+
 
 /**
  * 药物过敏史。**状态和过敏原绑在一个对象里，不拆成两个平级字段。**
@@ -583,6 +646,25 @@ export const api = {
   createReferral: (body: Record<string, unknown>) => post<{ ok: boolean; message: string }>('/api/his/referral', body),
   createAdmission: (body: Record<string, unknown>) =>
     post<{ ok: boolean; message: string }>('/api/his/admission', body),
+
+  // ---------------------------------------------------------------- 数据看板
+  usageSummary: (days = 7) => get<UsageSummary>(`/api/telemetry/usage?days=${days}`),
+  trainingSummary: () => get<TrainingSummary>('/api/telemetry/training'),
+  listDatasets: () => get<{ items: DatasetRow[] }>('/api/data/datasets'),
+  uploadDataset: (payload: Record<string, unknown>) =>
+    post<{ ok: boolean; dataset_id: string; case_count: number }>('/api/data/datasets', { payload }),
+  deleteDataset: (id: string) => del<{ ok: boolean }>(`/api/data/datasets/${encodeURIComponent(id)}`),
+  listKnowledge: () => get<{ items: KnowledgeRow[]; empty_count: number }>('/api/data/knowledge'),
+  getKnowledge: (key: string) =>
+    get<{ key: string; title: string; keywords: string[]; content: string; source: string }>(
+      `/api/data/knowledge/${encodeURIComponent(key)}`),
+  saveKnowledge: (key: string, body: Record<string, unknown>) =>
+    put<{ ok: boolean; content_length: number; sanitized: boolean }>(
+      `/api/data/knowledge/${encodeURIComponent(key)}`, body),
+  deleteKnowledge: (key: string) =>
+    del<{ ok: boolean }>(`/api/data/knowledge/${encodeURIComponent(key)}`),
+  importKnowledge: (entries: Record<string, unknown>) =>
+    post<{ ok: boolean; imported: number }>('/api/data/knowledge/import', { entries }),
 
   reportSummary: (id: string, refresh = false) =>
     get<ReportSummary>(`/api/emr/report-summary/${id}${refresh ? '?refresh=true' : ''}`),
