@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import FollowUpHints from './FollowUpHints.vue'
 
@@ -52,6 +52,79 @@ describe('追问提示浮框 · 渲染', () => {
     expect(w.find('.hf-allclear').exists()).toBe(true)
     // 全问完了角标就不该再挂着
     expect(w.find('.hf-count').exists()).toBe(false)
+  })
+})
+
+describe('追问提示浮框 · 「下面还有」', () => {
+  /** jsdom 没有布局，手动摆一个「装不下」的滚动容器 */
+  function overflowing(w: ReturnType<typeof mountHints>, hidden: number) {
+    const body = w.find('.hf-body').element as HTMLElement
+    Object.defineProperty(body, 'scrollHeight', { value: 400, configurable: true })
+    Object.defineProperty(body, 'clientHeight', { value: 200, configurable: true })
+    Object.defineProperty(body, 'scrollTop', { value: 0, writable: true, configurable: true })
+    const nodes = [...body.querySelectorAll<HTMLElement>('.hf-item, .hf-done')]
+    nodes.forEach((n, i) =>
+      // 后 `hidden` 条排在可视区之下
+      Object.defineProperty(n, 'offsetTop', {
+        value: i >= nodes.length - hidden ? 300 : 10,
+        configurable: true,
+      }),
+    )
+    return body
+  }
+
+  it('装不下时给出「还有 N 条」，并给底部渐隐', async () => {
+    // 第 6 条被切一半、而没有任何东西说明下面还有 —— 半截字看起来
+    // 更像排版坏了，不像「可以往下滚」。字号调大之后更糟。
+    const w = mountHints()
+    const body = overflowing(w, 2)
+    await w.find('.hf-body').trigger('scroll')
+
+    expect(w.find('.hf-more').text()).toContain('还有 2 条')
+    expect(body.classList.contains('has-more')).toBe(true)
+  })
+
+  it('滚到底就收起来 —— 一个永远亮着的「还有更多」等于没有', async () => {
+    const w = mountHints()
+    const body = overflowing(w, 2)
+    await w.find('.hf-body').trigger('scroll')
+    expect(w.find('.hf-more').exists()).toBe(true)
+
+    Object.defineProperty(body, 'scrollTop', { value: 200, configurable: true })
+    await w.find('.hf-body').trigger('scroll')
+
+    expect(w.find('.hf-more').exists()).toBe(false)
+    expect(body.classList.contains('has-more')).toBe(false)
+  })
+
+  it('装得下就不出 —— 别凭空加一个没用的按钮', async () => {
+    const w = mountHints()
+    const body = w.find('.hf-body').element as HTMLElement
+    Object.defineProperty(body, 'scrollHeight', { value: 200, configurable: true })
+    Object.defineProperty(body, 'clientHeight', { value: 200, configurable: true })
+    await w.find('.hf-body').trigger('scroll')
+
+    expect(w.find('.hf-more').exists()).toBe(false)
+  })
+
+  it('**只数整条没露出来的**，被切一半的那条不算', async () => {
+    // 那条已经看得见了，算进「还有」会让数字比实际感受多一个。
+    const w = mountHints()
+    overflowing(w, 1)
+    await w.find('.hf-body').trigger('scroll')
+
+    expect(w.find('.hf-more').text()).toContain('还有 1 条')
+  })
+
+  it('点它往下翻', async () => {
+    const w = mountHints()
+    const body = overflowing(w, 2)
+    const spy = vi.fn()
+    body.scrollBy = spy
+    await w.find('.hf-body').trigger('scroll')
+    await w.find('.hf-more').trigger('click')
+
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }))
   })
 })
 

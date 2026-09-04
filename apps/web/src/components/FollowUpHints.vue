@@ -23,7 +23,7 @@
  * 三态（展开/缩小/关闭）都沿用它的，医生看到的还是同一个东西，
  * 只是从「问完才告诉你漏了什么」变成「边问边提示」。
  */
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import { useDraggable } from '../composables/useDraggable'
 import type { FollowUpItem } from '../composables/useFollowUp'
@@ -44,6 +44,43 @@ const done = computed(() => props.items.filter((i) => i.done))
 
 /** 拖动：和桌面卡通同一套（拖完不算点击、拖出屏幕要钳回来） */
 const { style, onPointerDown } = useDraggable({ width: 224, height: 280 })
+
+/**
+ * 「下面还有」的提示。
+ *
+ * 清单常有 8 条而框高只装得下 5–6 条，第 6 条被切一半 —— **而没有任何东西
+ * 说明下面还有**。半截字看起来更像是排版坏了，不像「可以往下滚」。
+ * 字号调大之后更糟。
+ *
+ * 两个提示一起给，缺一个都不够：
+ *   - **底部渐隐**：一眼就看出内容被切断了（这是那半截字唯一能说清的事）
+ *   - **「还有 N 条 ⌄」**：说出还剩多少，并且点一下就能翻下去 ——
+ *     只给渐隐的话，医生知道有更多，但不知道值不值得去翻
+ *
+ * 滚到底两个都收起来：一个永远亮着的「还有更多」等于没有。
+ */
+const bodyEl = ref<HTMLElement | null>(null)
+const hiddenBelow = ref(0)
+
+function measure() {
+  const el = bodyEl.value
+  if (!el) { hiddenBelow.value = 0; return }
+  const bottom = el.scrollTop + el.clientHeight
+  // 留 2px 容差：小数高度下 scrollTop+clientHeight 常常差一点点够不到 scrollHeight
+  if (el.scrollHeight - bottom <= 2) { hiddenBelow.value = 0; return }
+  // 数**整条还没露出来**的条目，不数被切了一半的那条 ——
+  // 那条已经看得见了，把它算进「还有」会让数字比实际感受多一个
+  hiddenBelow.value = [...el.querySelectorAll<HTMLElement>('.hf-item, .hf-done')]
+    .filter((n) => n.offsetTop >= bottom).length
+}
+
+function scrollDown() {
+  bodyEl.value?.scrollBy({ top: bodyEl.value.clientHeight - 40, behavior: 'smooth' })
+}
+
+onMounted(() => void nextTick(measure))
+watch(() => props.items, () => void nextTick(measure), { deep: true })
+watch(() => props.minimized, () => void nextTick(measure))
 </script>
 
 <template>
@@ -59,7 +96,7 @@ const { style, onPointerDown } = useDraggable({ width: 224, height: 280 })
         <button class="hf-btn" title="关闭（本轮不再自动弹）" @click="emit('close')">✕</button>
       </div>
 
-      <div class="hf-body">
+      <div ref="bodyEl" class="hf-body" :class="{ 'has-more': hiddenBelow > 0 }" @scroll="measure">
         <!-- 还没问的：橙色序号 -->
         <div v-for="(item, i) in pending" :key="`p-${item.question}`" class="hf-item">
           <span class="hf-num">{{ i + 1 }}</span>
@@ -87,6 +124,11 @@ const { style, onPointerDown } = useDraggable({ width: 224, height: 280 })
         -->
         <div class="hf-foot">供参考，不是必须问的项</div>
       </div>
+
+      <!-- 「下面还有」——渐隐说明被切断了，这一条说出还剩多少并能点着翻下去 -->
+      <button v-if="hiddenBelow" class="hf-more" @click="scrollDown">
+        还有 {{ hiddenBelow }} 条<span class="hf-more-arrow">⌄</span>
+      </button>
     </template>
 
     <button

@@ -12,6 +12,8 @@ import AgentMascot from './AgentMascot.vue'
 import FollowUpHints from './FollowUpHints.vue'
 import { AUTO_OPEN_AFTER_MESSAGES, useFollowUp } from '../composables/useFollowUp'
 import { useResizable } from '../composables/useResizable'
+import { useDockedWindows } from '../composables/useDockedWindows'
+import { useFontScale } from '../composables/useFontScale'
 
 const ws = useWorkstation()
 
@@ -202,6 +204,42 @@ const drawerSize = useResizable({
   min: 640,
   max: 1800,
 })
+
+/* ===================== 合并 / 分离，与字号 ===================== */
+
+/**
+ * 两个浮窗的合并与分离。默认合并（就是原来那样，拼成一整块靠右停靠）。
+ * 拖标题栏拖开，拖回去靠近了自动吸附；双击标题栏一键还原。
+ */
+const dock = useDockedWindows()
+const drawerShell = ref<HTMLElement | null>(null)
+const panelShell = ref<HTMLElement | null>(null)
+
+function beginDrag(key: 'drawer' | 'panel', e: PointerEvent) {
+  // 标题栏里的按钮（✕ / — / Aa）不算拖 —— 否则指针被标题栏捕获，
+  // 按钮收不到自己的 click。和追问提示浮框同一个坑。
+  const from = e.target as HTMLElement | null
+  if (from?.closest('button, .el-button, [role="button"]')) return
+  const self = key === 'drawer' ? drawerShell.value : panelShell.value
+  const other = key === 'drawer' ? panelShell.value : drawerShell.value
+  if (self) dock.startDrag(key, e, self, other)
+}
+
+/**
+ * 字号。
+ *
+ * **挂在内容区（`.chat-area` / `.tips-tab-body` / `.copilot-tab-bar`），
+ * 不挂在面板本身。** 面板要承载拖动与调宽的坐标；`zoom` 一旦加上去，
+ * 指针的 `clientX`（视觉像素）和我们写进 `left`/`width` 的值（局部像素）
+ * 就差一个缩放系数，两个交互立刻算错。
+ *
+ * 挂在内容区还有一个附带好处：**标题栏不跟着放大**。它是外壳不是内容，
+ * 放大了只是挤占本来就该留给正文的空间。
+ *
+ * 代价是面板宽度不会随字号变宽 —— 但现在边线可以拖，医生自己拉开就行。
+ */
+const font = useFontScale()
+const fontMenuOpen = ref(false)
 
 const wrapperStyle = computed(() =>
   drawerSize.width.value === null
@@ -1339,8 +1377,19 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         @pointerdown="drawerSize.onPointerDown"
         @dblclick="drawerSize.reset"
       />
-      <div v-if="tipsOpen" class="tips-drawer connected-right">
-        <div class="tips-header">
+      <div
+        v-if="tipsOpen"
+        ref="drawerShell"
+        class="tips-drawer connected-right"
+        :class="{ undocked: !dock.merged.value, dragging: dock.dragging.value === 'drawer', 'will-snap': dock.willSnap.value }"
+        :style="dock.styleFor('drawer').value"
+      >
+        <div
+          class="tips-header"
+          title="拖动移动窗口 · 双击恢复默认布局"
+          @pointerdown="beginDrag('drawer', $event)"
+          @dblclick="dock.resetLayout"
+        >
           <span class="tips-title"><span class="panel-ai-dot" />AI 助手</span>
           <div class="tips-header-actions">
             <el-tag v-if="ws.isDegraded" size="small" type="warning" effect="plain">降级</el-tag>
@@ -1368,7 +1417,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           </div>
         </div>
 
-        <div v-loading="ws.loadingSummary" class="tips-tab-body">
+        <div v-loading="ws.loadingSummary" class="tips-tab-body" :style="font.style.value">
           <!--
             锁定说明。**整页让位给它**，而不是显示一个空面板 ——
             空面板会让医生以为「分析跑失败了」，而不是「还没到时候」。
@@ -2178,10 +2227,58 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         @pointerdown="panelSize.onPointerDown"
         @dblclick="panelSize.reset"
       />
-      <div v-if="panelOpen" class="assistant-panel connected-left" :style="panelSize.style.value">
-        <div class="panel-header">
+      <div
+        v-if="panelOpen"
+        ref="panelShell"
+        class="assistant-panel connected-left"
+        :class="{ undocked: !dock.merged.value, dragging: dock.dragging.value === 'panel' }"
+        :style="{ ...dock.styleFor('panel').value, ...panelSize.style.value }"
+      >
+        <div
+          class="panel-header"
+          title="拖动移动窗口 · 双击恢复默认布局"
+          @pointerdown="beginDrag('panel', $event)"
+          @dblclick="dock.resetLayout"
+        >
           <span class="panel-title"><span class="panel-ai-dot" />医生智能体</span>
           <div class="panel-header-actions">
+            <!--
+              字号。放在医生智能体这边而不是 AI 助手：这个窗口**一直在**
+              （AI 助手可以整个关掉），设置该挂在关不掉的那个上。
+              两个窗共用一个字号 —— 各调各的必然会漂。
+            -->
+            <el-popover
+              v-model:visible="fontMenuOpen"
+              placement="bottom-end"
+              trigger="click"
+              :width="150"
+              popper-class="font-pop"
+            >
+              <template #reference>
+                <el-button
+                  text
+                  size="small"
+                  class="panel-action-btn font-btn"
+                  title="调整字号"
+                  aria-label="调整字号"
+                >Aa</el-button>
+              </template>
+              <div class="font-menu">
+                <div class="font-menu-title">字号</div>
+                <!-- 选项本身就用对应字号显示 —— 选之前先看见效果 -->
+                <button
+                  v-for="lv in font.levels"
+                  :key="lv.key"
+                  class="font-opt"
+                  :class="{ on: lv.key === font.level.value.key }"
+                  :style="{ fontSize: `${11 * lv.scale}px` }"
+                  @click="font.setLevel(lv.key); fontMenuOpen = false"
+                >
+                  <span>{{ lv.label }}</span>
+                  <span class="font-opt-pct">{{ Math.round(lv.scale * 100) }}%</span>
+                </button>
+              </div>
+            </el-popover>
             <!--
               **「—」不是「×」。**
               医生智能体没有「关掉就没了」这个状态 —— 缩起来的东西一直在
@@ -2252,7 +2349,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           @close="closeHints"
         />
 
-        <div class="copilot-tab-bar">
+        <div class="copilot-tab-bar" :style="font.style.value">
           <div class="ctab active">
             <span class="patient-tab-name">{{ patient?.name }}</span>
             <span class="patient-tab-meta">{{ patientMeta }}</span>
@@ -2280,7 +2377,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           </div>
         </div>
 
-        <div class="chat-area">
+        <div class="chat-area" :style="font.style.value">
           <div ref="chatScrollEl" class="chat-messages">
             <div v-if="!chatMessages.length && !voice.messages.value.length" class="quick-skill-area">
               <div class="quick-skill-title">本科常用 Skill</div>

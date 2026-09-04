@@ -52,3 +52,44 @@
 .hf-pill:hover{background:#f0f6ff}
 .hf-count{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;
   padding:0 4px;border-radius:8px;background:#ff7a00;color:#fff;font-size:9px;font-weight:700}
+
+/* ---------------------------------------------------------------- 「下面还有」
+
+   清单常有 8 条而框高只装得下 5–6 条，第 6 条被切一半 ——
+   **而没有任何东西说明下面还有**。半截字看起来更像排版坏了。
+
+   两个提示一起给：渐隐说明「被切断了」，按钮说出「还剩几条」并能点着翻。
+   滚到底两个都收起来 —— 一个永远亮着的「还有更多」等于没有。 */
+
+.hint-float{display:flex;flex-direction:column}
+.hf-body{position:relative}
+
+/* 有更多内容时，卡片下沿接一条**独立的条**放那个胶囊。
+   
+   第一版用 `position:absolute` 浮在上面，压住了被切一半的那条 ——
+   那条本来就只剩半行字，再盖掉一截纯粹是脏。
+   第二版给 `.hf-body` 加 `padding-bottom` 也不行：**滚动容器的内边距
+   是跟着内容滚的**，不是固定在底边，滚到顶时它在看不见的地方。
+   
+   在流内单开一条才是结构上不可能重叠的做法。 */
+.hf-body.has-more{border-radius:0}
+
+/* 底部渐隐。用 ::after 而不是给容器加 mask：mask 会把滚动条一起吃掉 */
+.hf-body.has-more::after{
+  content:"";position:sticky;bottom:-7px;left:0;right:0;display:block;
+  height:26px;margin-top:-26px;pointer-events:none;
+  background:linear-gradient(to bottom,#fff0,#fff)}
+
+.hf-more{
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  height:22px;flex-shrink:0;
+  border:1px solid #c7dcff;border-top:1px dashed #dbe7fb;border-radius:0 0 10px 10px;
+  background:#fbfdff;color:#1677ff;font-size:9.5px;font-weight:600;cursor:pointer;
+  box-shadow:0 4px 14px #1454991f}
+.hf-more:hover{background:#f0f6ff}
+.hf-more-arrow{font-size:11px;line-height:1;margin-top:-1px}
+
+/* 滚动条本身也让它看得见一点：默认的 overlay 滚动条在浅色背景上几乎不可见 */
+.hf-body::-webkit-scrollbar{width:5px}
+.hf-body::-webkit-scrollbar-thumb{background:#c7dcff;border-radius:3px}
+.hf-body::-webkit-scrollbar-thumb:hover{background:#9ec3f5}

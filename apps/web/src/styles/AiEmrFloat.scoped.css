@@ -981,3 +981,34 @@
 /* 拖动中禁掉宽度过渡：边线跟手是这个交互的全部体感，
    慢半拍跟在指针后面手感立刻变糊 */
 .resize-edge.active~.tips-drawer,.resize-edge.active+.assistant-panel{transition:none!important}
+
+/* ---------------------------------------------------------------- 拖动 / 合并分离
+
+   两个浮窗默认合并（拼成一整块靠右停靠）。拖标题栏拖开，靠近自动吸附。 */
+
+.tips-header,.panel-header{cursor:grab;user-select:none;touch-action:none}
+.tips-header:active,.panel-header:active{cursor:grabbing}
+/* 标题栏里的按钮不该显示成「可拖」 */
+.tips-header .el-button,.panel-header .el-button{cursor:pointer}
+
+/* 分离态：各自变成独立浮窗，补回被 connected-* 削掉的圆角与阴影 */
+.tips-drawer.undocked,.assistant-panel.undocked{
+  border-radius:12px!important;box-shadow:0 10px 44px #00000033}
+/* 拖动中不要过渡，否则窗体慢半拍跟在指针后面 */
+.tips-drawer.dragging,.assistant-panel.dragging{transition:none!important;
+  box-shadow:0 14px 52px #00000040}
+/* 松手就会吸附 —— 给一条蓝边预告，没有预告的吸附像窗口自己乱跑 */
+.tips-drawer.will-snap{outline:2px dashed #1677ff;outline-offset:2px}
+
+/* ---------------------------------------------------------------- 字号菜单 */
+
+.panel-action-btn.font-btn{font-weight:700;letter-spacing:.3px}
+.font-menu{display:flex;flex-direction:column;gap:4px}
+.font-menu-title{font-size:11px;font-weight:700;color:#8a9099;padding:0 2px 2px}
+.font-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:5px 9px;border-radius:6px;border:1px solid #e5eefc;background:#f9fbff;
+  color:#1f2937;cursor:pointer;line-height:1.4}
+.font-opt:hover{background:#f0f6ff}
+.font-opt.on{background:#e8f2ff;border-color:#1677ff;color:#1677ff;font-weight:700}
+.font-opt-pct{font-size:9px;color:#8a9099;flex-shrink:0}
+.font-opt.on .font-opt-pct{color:#1677ff}

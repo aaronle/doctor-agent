@@ -207,11 +207,18 @@ describe('浮层重新唤出', () => {
     expect(btn.attributes('aria-label')).toContain('卡通')
   })
 
-  it('医生智能体**只有缩小，没有第二个「彻底关掉」**', async () => {
+  it('医生智能体**没有第二个「彻底关掉」**', async () => {
     // 两个按钮做同一件事只会让人犹豫点哪个；真做一个「关了就没」的，
     // 就又造出一条回不来的死路 —— 这个项目已经踩过两次。
+    //
+    // 判据是「只有一个关闭类按钮」，**不是「只有一个按钮」** ——
+    // 第一版那么写，后来加了字号按钮 Aa 就无辜变红了。
+    // 按本意写的用例才不会拦住正常的功能新增。
     const wrapper = await renderFloat()
-    expect(wrapper.findAll('.panel-header-actions .el-button')).toHaveLength(1)
+    const buttons = wrapper.findAll('.panel-header-actions .el-button')
+
+    expect(wrapper.findAll('.panel-close')).toHaveLength(1)
+    expect(buttons.filter((b) => b.text() === '×')).toHaveLength(0)
   })
 
   it('点卡通把**医生智能体面板**找回来，不是打开 AI 助手', async () => {
