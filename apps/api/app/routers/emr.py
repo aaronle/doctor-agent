@@ -196,12 +196,21 @@ UNLOCK_REASONS = {"interview", "skipped"}
 def _visit_state(session: Session, patient) -> dict:
     payload = patient.payload or {}
     unlock = payload.get("analysis_unlock") or {}
+    latest = session.scalar(
+        select(InterviewSession)
+        .where(InterviewSession.patient_id == patient.id)
+        .order_by(InterviewSession.ended_at.desc())
+    )
     return {
         "patient_id": patient.id,
         "interview_done": has_interview(session, patient.id),
         "analysis_unlocked": bool(unlock.get("reason")),
         "unlocked_by": unlock.get("reason", ""),
         "unlocked_at": unlock.get("at", ""),
+        # **落库的**问诊轮数。界面横幅「对话 N 轮」原本读页面内存里的播放缓冲，
+        # 刷新一次就空了 —— 于是「✓ 已按本次问诊生成 · 对话 0 轮」，
+        # 而库里有 4 条。医生看到这行的合理结论是「问诊没被用上」。
+        "interview_turns": len(latest.messages or []) if latest else 0,
     }
 
 

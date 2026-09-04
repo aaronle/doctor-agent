@@ -1523,7 +1523,12 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             <span v-if="ws.interviewIncluded">✓ 已按本次问诊生成</span>
             <span v-else>⚠ 未含问诊 · 仅基于 HIS 已有资料</span>
             <span class="gate-banner-meta">
-              <template v-if="ws.interviewIncluded">对话 {{ voice.messages.value.length }} 轮</template>
+              <!--
+                **用落库的轮数，不用 `voice.messages`。** 那是页面内存里的播放缓冲，
+                刷新一次就空了 —— 实测「✓ 已按本次问诊生成 · 对话 0 轮」而库里有 4 条，
+                医生看到这行的合理结论是「问诊内容没被用上」。
+              -->
+              <template v-if="ws.interviewIncluded">对话 {{ ws.interviewTurns }} 轮</template>
               <template v-else>随后可点「开始问诊」，问完重算一次</template>
             </span>
           </div>
@@ -1712,7 +1717,26 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                       <div class="rc-row" :class="{ 'rc-row-single': key === 'chief_complaint' }">
                         <span class="rc-label">{{ label }}</span>
                         <div class="rc-field">
-                          <textarea :value="ws.draft[key] ?? ws.record[key] ?? ''" readonly rows="2" />
+                          <!--
+                            **不是只读的。** F03 的目标写着「组织为可编辑的病历草稿……
+                            保留医生最终决定权」，而这里原来照抄了 V4.3 演示件的
+                            `readonly` —— 那是个演示件。
+
+                            只读的后果有两层：医生的「最终决定权」只剩「全盘接受
+                            或不接受」，改一个字都没处改；而微调语料的 verdict
+                            会永远是 accepted，AI 初稿与医生定稿之间结构上不可能
+                            有 diff，那份监督信号根本采不到。
+
+                            改动落在 `draft` 而不是 `record`：`record` 是已确认的
+                            那一份，`draft` 是待定稿的。两者分开，「回写此字段」
+                            才有明确含义 —— 把这一段从待定稿挪进已确认。
+                          -->
+                          <textarea
+                            :value="ws.draft[key] ?? ws.record[key] ?? ''"
+                            rows="2"
+                            :aria-label="label"
+                            @input="ws.draft[key] = ($event.target as HTMLTextAreaElement).value"
+                          />
                         </div>
                         <button class="rc-writeback-icon" title="回写至 HIS" @click="acceptField(key)">回</button>
                       </div>

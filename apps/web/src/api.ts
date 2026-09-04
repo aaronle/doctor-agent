@@ -445,6 +445,8 @@ export interface VisitState {
   analysis_unlocked: boolean
   unlocked_by: '' | 'interview' | 'skipped'
   unlocked_at: string
+  /** 落库的问诊轮数。界面横幅用它，不用页面内存里的播放缓冲 */
+  interview_turns: number
 }
 
 export interface EvalDataset {

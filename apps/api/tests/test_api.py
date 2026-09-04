@@ -3464,3 +3464,48 @@ def test_item_decoding_does_not_guess_at_other_shapes():
         InterviewSummaryOut.model_validate(
             {"chief_complaint": "x", "key_points": "第一条\n第二条", "gaps": [], "summary": ""}
         )
+
+
+def test_visit_state_reports_persisted_interview_turns(client):
+    """就诊状态要带上**落库的**问诊轮数。
+
+    界面横幅写「✓ 已按本次问诊生成 · 对话 N 轮」，而 N 原本读的是**页面内存里的
+    播放缓冲** —— 刷新一次就空了。实测：问完诊生成分析、刷新页面，横幅变成
+    「已按本次问诊生成 · 对话 0 轮」，而库里明明有 4 条。
+
+    医生看到这行的合理结论是「问诊内容没被用上」。第二个医生打开同一个患者
+    看到的也是 0。**真相在服务端，横幅就得读服务端。**
+    """
+    client.post("/api/emr/interview/complete", json={
+        "patient_id": "P004",
+        "conversation_summary": "医生：哪里不舒服？\n患者：头晕。",
+        "messages": [
+            {"role": "doctor", "text": "哪里不舒服？"},
+            {"role": "patient", "text": "头晕。"},
+            {"role": "doctor", "text": "多久了？"},
+        ],
+    })
+    state = client.get("/api/emr/visit-state/P004").json()
+
+    assert state["interview_done"] is True
+    assert state["interview_turns"] == 3, "轮数要来自落库的那一份"
+
+
+def test_visit_state_turns_is_zero_before_any_interview(client):
+    state = client.get("/api/emr/visit-state/P003").json()
+    assert state["interview_turns"] == 0
+
+
+def test_record_fixtures_are_plain_text_not_markdown():
+    """病历字段是**纯文本**，不是 Markdown。
+
+    我在 P008 的既往史里写了 `**头孢菌素类过敏**`，界面原样渲染成带星号的
+    一行字给医生看。病历不是 Markdown —— 它会被打印、被写回 HIS、被别的系统读，
+    强调标记在那些地方全是噪声。
+    """
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[3] / "references/ui-demo/extracted/fixtures/record-content.json"
+    raw = path.read_text(encoding="utf-8")
+    assert "**" not in raw, "病历 fixture 里出现了 Markdown 强调标记"

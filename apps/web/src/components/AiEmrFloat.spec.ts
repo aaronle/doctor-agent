@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
+
 import ElementPlus from 'element-plus'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRouter, createWebHistory } from 'vue-router'
@@ -41,6 +42,8 @@ const GAPS = [
 export const UNLOCKED_VISIT = {
   patient_id: 'P001', interview_done: true, analysis_unlocked: true,
   unlocked_by: 'interview', unlocked_at: '2026-09-01T09:00:00Z',
+  // **落库的**轮数。横幅要读它，不能读页面内存里的播放缓冲
+  interview_turns: 4,
 }
 
 /** 组件挂载时会拉专项评估目录，其余接口按需返回空壳 */
@@ -752,6 +755,24 @@ describe('问诊门禁', () => {
     expect(banner.classes()).toContain('skipped')
   })
 
+  it('**「对话 N 轮」读落库的数，不读页面内存里的播放缓冲**', async () => {
+    // 缓冲刷新一次就空了。实测线上：问完诊生成分析、刷新页面，横幅变成
+    // 「✓ 已按本次问诊生成 · 对话 0 轮」，而库里有 4 条 ——
+    // 医生看到这行的合理结论是「问诊内容没被用上」；
+    // 第二个医生打开同一个患者看到的也是 0。真相在服务端，横幅就得读服务端。
+    const wrapper = await openLocked({ ...UNLOCKED_VISIT, interview_turns: 4 })
+    // 组件刚挂载，voice.messages 是空的；横幅仍要显示服务端那个 4
+    expect(wrapper.find('.gate-banner').text()).toContain('对话 4 轮')
+  })
+
+  it('跳过路径不显示轮数 —— 那条路本来就没有对话', async () => {
+    const wrapper = await openLocked({
+      patient_id: 'P001', interview_done: false, analysis_unlocked: true,
+      unlocked_by: 'skipped', unlocked_at: '', interview_turns: 0,
+    })
+    expect(wrapper.find('.gate-banner').text()).not.toContain('轮')
+  })
+
   it('来源横幅只挂在受门禁的四页上 —— 客观数据没有「含不含问诊」之分', async () => {
     const wrapper = await openLocked(UNLOCKED_VISIT)
     await goTab(wrapper, '时间轴')
@@ -921,6 +942,60 @@ describe('浮窗调宽', () => {
     await edge.trigger('dblclick')
     // 回到「交给 CSS」而不是写死一个数
     expect(wrapper.find('.assistant-panel').attributes('style') ?? '').not.toContain('width')
+  })
+})
+
+describe('病历草稿要能改', () => {
+  /** 病历页受问诊门禁，得先解锁；渲染七段还要有 record 内容 */
+  async function openRecord() {
+    stubFetch()
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] }, attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    ws.visit = { ...UNLOCKED_VISIT, interview_turns: 4 } as never
+    ws.record = { chief_complaint: 'AI 写的主诉', present_illness: 'AI 写的现病史' } as never
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+    await expandAssistant(wrapper)
+    await wrapper.findAll('.ttab').find((t) => t.text().includes('病历管理'))!.trigger('click')
+    await wrapper.vm.$nextTick()
+    return { wrapper, ws }
+  }
+
+  /** 七段的框都带 aria-label（就是段名）—— 智能笔记那个框也在 .rc-field 里，别抓错 */
+  const sectionAreas = (w: ReturnType<typeof mount>) =>
+    w.findAll('.rc-field textarea').filter((t) => t.attributes('aria-label'))
+
+  it('**七段不是只读的** —— F03 写着「可编辑的病历草稿，保留医生最终决定权」', async () => {
+    // 实现里是 `<textarea :value="…" readonly>`，照抄了 V4.3 演示件的形状 ——
+    // 但那是个演示件。只读的后果有两层：
+    //   ① 医生的「最终决定权」只剩「全盘接受或不接受」，改一个字都没处改
+    //   ② 微调语料的 verdict 永远是 accepted —— AI 初稿与医生定稿之间
+    //      结构上不可能有 diff，那份监督信号采不到
+    const { wrapper } = await openRecord()
+    const areas = sectionAreas(wrapper)
+
+    expect(areas.length).toBeGreaterThan(0)
+    for (const a of areas) expect(a.attributes('readonly')).toBeUndefined()
+  })
+
+  it('改完的内容进 draft —— 回写与提交拿到的都得是改后的那一版', async () => {
+    const { wrapper, ws } = await openRecord()
+    const cc = sectionAreas(wrapper).find((t) => t.attributes('aria-label') === '主诉')!
+    await cc.setValue('医生改过的主诉')
+
+    expect(ws.draft.chief_complaint).toBe('医生改过的主诉')
+  })
+
+  it('体征那几格仍然只读 —— 它们与左侧 HIS 表单同源，不是 AI 草稿', async () => {
+    // 只放开该放开的：七段是 AI 起草的、要医生定稿；
+    // 体征是客观录入值，在这里改会造出与 HIS 不一致的第二份真相。
+    const { wrapper } = await openRecord()
+    const vitals = wrapper.findAll('.rc-vitals-field input')
+
+    expect(vitals.length).toBeGreaterThan(0)
+    for (const v of vitals) expect(v.attributes('readonly')).toBeDefined()
   })
 })
 

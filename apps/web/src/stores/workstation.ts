@@ -55,6 +55,17 @@ export const useWorkstation = defineStore('workstation', () => {
   const interviewIncluded = computed(() => visit.value?.unlocked_by === 'interview')
 
   /**
+   * 落库的问诊轮数。
+   *
+   * **横幅上那个「对话 N 轮」必须用它，不能用页面内存里的播放缓冲。**
+   * 缓冲刷新一次就空了 —— 实测：问完诊生成分析、刷新页面，横幅变成
+   * 「✓ 已按本次问诊生成 · 对话 0 轮」，而库里有 4 条。
+   * 医生看到这行的合理结论是「问诊内容没被用上」；第二个医生打开同一个
+   * 患者看到的也是 0。真相在服务端，横幅就得读服务端。
+   */
+  const interviewTurns = computed(() => visit.value?.interview_turns ?? 0)
+
+  /**
    * 硬规则红色风险。**不锁**——纯代码判定，毫秒级，一进来就给。
    * 让医生在不知道血钾 6.8 的情况下问完一整轮，是不能接受的。
    */
@@ -270,6 +281,7 @@ export const useWorkstation = defineStore('workstation', () => {
     visit,
     analysisUnlocked,
     interviewIncluded,
+    interviewTurns,
     hardAlerts,
     objective,
     examinations,
