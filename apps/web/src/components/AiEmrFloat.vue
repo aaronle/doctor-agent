@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { api, streamSse, type RecordQuality, type RiskItem } from '../api'
+import { api, sortByRiskLevel, streamSse, type RecordQuality, type RiskItem } from '../api'
 import { RECORD_SECTIONS, useWorkstation } from '../stores/workstation'
 import { useCopilotChat } from '../composables/useCopilotChat'
 import { useInterview } from '../composables/useInterview'
@@ -50,7 +50,11 @@ const riskCards = computed(() => {
     seen.add(r.id)
     out.push(r)
   }
-  return out
+  // **按等级排，不按来源排。** 上面那个拼接顺序（硬规则在前）会把
+  // 服务端排好的次序重新打乱 —— 而硬规则里有中风险（检查结论异常），
+  // 线上因此出现过两条中风险压在两条高风险上面。
+  // 风险列表的阅读顺序就是处置顺序。
+  return sortByRiskLevel(out)
 })
 
 const unlocking = ref(false)

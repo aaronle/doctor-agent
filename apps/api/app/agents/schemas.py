@@ -119,6 +119,20 @@ DEPARTMENTS = (
 #: 风险分级闭集。工作站顶部预警条按它取色，多一个值界面就没有对应样式。
 RiskLevel = Literal["高风险", "中风险", "低风险"]
 
+#: 风险等级的**严重程度次序**，数字越小越急。
+#:
+#: 风险列表的阅读顺序就是处置顺序 —— 最急的排在最下面等于没有排序。
+#: 取值落在闭集外时排到最后（见 `risk_level_rank`）：查不到不能冒充最高。
+RISK_LEVEL_ORDER: tuple[str, ...] = ("高风险", "中风险", "低风险")
+
+
+def risk_level_rank(level: object) -> int:
+    """排序键。未知取值一律排在最后，不是最前。"""
+    try:
+        return RISK_LEVEL_ORDER.index(str(level))
+    except ValueError:
+        return len(RISK_LEVEL_ORDER)
+
 #: 共病危险度。**和上面不是一套词** —— 界面上共病卡片用的就是「高危/中危/低危」。
 #: 以前顶层字段错用了 RiskLevel 的取值，靠的是没人校验才没炸。
 ComorbidityLevel = Literal["高危", "中危", "低危"]

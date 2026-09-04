@@ -276,6 +276,57 @@ def test_model_cannot_override_hard_rule_red_alert():
     assert len(alerts) == 1
 
 
+def test_risks_are_sorted_high_to_low():
+    """风险项按等级从高到低排，**不按来源排**。
+
+    改之前的顺序是「硬规则全部在前，模型项在后」—— 而硬规则里有中风险
+    （检查结论异常），于是线上出现过：两条中风险（头颅MRI异常、颈部血管超声异常）
+    压在两条高风险（血压控制、血脂控制）**上面**。
+
+    风险列表的阅读顺序就是处置顺序，最急的排在最下面等于没有排序。
+    """
+    from app.agents.risk import merge_risks
+
+    hard = [
+        {"id": "h1", "name": "检查异常", "level": "中风险", "color": "warning", "summary": ""},
+        {"id": "h2", "name": "血钾危急值", "level": "高风险", "color": "danger", "summary": ""},
+    ]
+    model = [
+        {"id": "m1", "name": "随访建议", "level": "低风险", "color": "info", "summary": ""},
+        {"id": "m2", "name": "血压控制", "level": "高风险", "color": "danger", "summary": ""},
+        {"id": "m3", "name": "血糖控制", "level": "中风险", "color": "warning", "summary": ""},
+    ]
+    merged, _alerts, _conflicts = merge_risks(hard, model)
+
+    assert [i["level"] for i in merged] == ["高风险", "高风险", "中风险", "中风险", "低风险"]
+
+
+def test_same_level_keeps_hard_rules_first():
+    """同一等级内**硬规则仍排在模型项前面**。
+
+    排序必须是稳定的：硬规则是纯代码判定、有明确阈值，同等级下比模型判断更硬，
+    这个既有次序不能被排序打乱。
+    """
+    from app.agents.risk import merge_risks
+
+    hard = [{"id": "h1", "name": "血钾危急值", "level": "高风险", "color": "danger", "summary": ""}]
+    model = [{"id": "m1", "name": "血压控制", "level": "高风险", "color": "danger", "summary": ""}]
+    merged, _a, _c = merge_risks(hard, model)
+
+    assert [i["name"] for i in merged] == ["血钾危急值", "血压控制"]
+
+
+def test_unknown_risk_level_sorts_last_not_first():
+    """等级取值意外落在闭集外时排到**最后**，不能因为查不到就冒充最高。"""
+    from app.agents.risk import merge_risks
+
+    hard = [{"id": "h1", "name": "怪东西", "level": "", "color": "info", "summary": ""}]
+    model = [{"id": "m1", "name": "血压控制", "level": "中风险", "color": "warning", "summary": ""}]
+    merged, _a, _c = merge_risks(hard, model)
+
+    assert [i["name"] for i in merged] == ["血压控制", "怪东西"]
+
+
 # ------------------------------------------------------------------ V4.3 对齐
 
 

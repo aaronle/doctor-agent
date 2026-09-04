@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 
 from .base import Agent, require_list
-from .schemas import RiskOut
+from .schemas import risk_level_rank, RiskOut
 from .context import abnormal_labs
 
 LEVEL_COLOR = {"高风险": "danger", "中风险": "warning", "低风险": "success", "提示": "info"}
@@ -321,13 +321,21 @@ def merge_risks(hard_alerts: list[dict], model_assessments: list[dict]) -> tuple
     """
     合并硬规则与模型结果，返回 (全部风险项, 红色预警, 被硬规则压制的模型项名)。
 
-    硬规则结果排在前面且不可被模型覆盖：模型给出的同名风险一律丢弃，
+    硬规则结果不可被模型覆盖：模型给出的同名风险一律丢弃，
     名称回传给调用方留痕，便于评测时统计冲突率。
+
+    **返回顺序按等级从高到低，不按来源。** 之前是「硬规则全部在前」——
+    而硬规则里有中风险（检查结论异常），于是线上出现过两条中风险
+    压在两条高风险上面。风险列表的阅读顺序就是处置顺序。
+
+    排序是**稳定**的，所以同一等级内硬规则仍排在模型项前面：
+    硬规则有明确阈值、是纯代码判定，同等级下比模型判断更硬。
     """
     hard_names = {a["name"] for a in hard_alerts}
     merged = list(hard_alerts)
     conflicts = [item["name"] for item in model_assessments if item["name"] in hard_names]
     merged.extend(item for item in model_assessments if item["name"] not in hard_names)
+    merged.sort(key=lambda item: risk_level_rank(item.get("level")))
 
     # risk_alerts 只收红色项，供界面顶部预警条使用
     alerts = [

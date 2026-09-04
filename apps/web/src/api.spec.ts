@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, api, streamSse, type SseEvent } from './api'
+import { ApiError, api, riskLevelRank, sortByRiskLevel, streamSse, type SseEvent } from './api'
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder()
@@ -71,5 +71,52 @@ describe('请求错误处理', () => {
   it('响应不是 JSON 时回落到状态码', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502</html>', { status: 502 })))
     await expect(api.patients()).rejects.toThrow('HTTP 502')
+  })
+})
+
+describe('风险等级排序', () => {
+  it('从高到低排 —— 列表的阅读顺序就是处置顺序', () => {
+    // 线上出过：两条中风险（头颅MRI异常、颈部血管超声异常）压在两条高风险
+    // （血压控制、血脂控制）**上面**，因为拼接顺序是「硬规则在前」，
+    // 而硬规则里恰好有中风险。最急的排在最下面等于没有排序。
+    const sorted = sortByRiskLevel([
+      { level: '中风险', name: '头颅MRI异常' },
+      { level: '低风险', name: '随访建议' },
+      { level: '高风险', name: '血压控制' },
+      { level: '中风险', name: '血糖控制' },
+      { level: '高风险', name: '血脂控制' },
+    ])
+    expect(sorted.map((i) => i.level)).toEqual(['高风险', '高风险', '中风险', '中风险', '低风险'])
+  })
+
+  it('**稳定** —— 同一等级内保持传入次序，硬规则仍在模型项前面', () => {
+    // 硬规则有明确阈值、是纯代码判定，同等级下比模型判断更硬，
+    // 这个既有次序不能被排序打乱。
+    const sorted = sortByRiskLevel([
+      { level: '高风险', name: '硬规则·血钾危急值' },
+      { level: '高风险', name: '模型·血压控制' },
+    ])
+    expect(sorted.map((i) => i.name)).toEqual(['硬规则·血钾危急值', '模型·血压控制'])
+  })
+
+  it('未知等级排最后，不是最前 —— 查不到不能冒充最高', () => {
+    const sorted = sortByRiskLevel([
+      { level: '', name: '怪东西' },
+      { level: '低风险', name: '随访' },
+    ])
+    expect(sorted.map((i) => i.name)).toEqual(['随访', '怪东西'])
+  })
+
+  it('不改原数组', () => {
+    const input = [{ level: '低风险' }, { level: '高风险' }]
+    sortByRiskLevel(input)
+    expect(input.map((i) => i.level)).toEqual(['低风险', '高风险'])
+  })
+
+  it('与服务端 RISK_LEVEL_ORDER 是同一套次序', () => {
+    // 两份实现是有意的（服务端排好的顺序，前端拼硬规则时会重新打乱），
+    // 但次序必须一致 —— 改一边忘另一边，两个列表会给出不同的轻重缓急。
+    expect([riskLevelRank('高风险'), riskLevelRank('中风险'), riskLevelRank('低风险')])
+      .toEqual([0, 1, 2])
   })
 })

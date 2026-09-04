@@ -112,6 +112,29 @@ export interface PatientDetail extends PatientListItem {
   health_archive?: Record<string, unknown>
 }
 
+/**
+ * 风险等级的**严重程度次序**，数字越小越急。未知取值排最后。
+ *
+ * 与服务端 `agents/schemas.py` 的 `RISK_LEVEL_ORDER` 是同一套次序。
+ * **两份实现是有意的，不是疏忽**：服务端排好的顺序，前端拼「硬规则 + 模型项」
+ * 时会重新打乱（硬规则要在分析回来之前就显示，那时没有模型项可拼）。
+ * 改动任一侧都要同时改另一侧，两边各有测试钉着。
+ */
+const RISK_LEVEL_ORDER = ['高风险', '中风险', '低风险']
+
+export function riskLevelRank(level: unknown): number {
+  const i = RISK_LEVEL_ORDER.indexOf(String(level))
+  return i === -1 ? RISK_LEVEL_ORDER.length : i
+}
+
+/**
+ * 按等级从高到低排。**稳定排序** —— 同一等级内保持传入次序，
+ * 于是硬规则仍排在模型项前面（它有明确阈值，比模型判断更硬）。
+ */
+export function sortByRiskLevel<T extends { level?: unknown }>(items: T[]): T[] {
+  return [...items].sort((a, b) => riskLevelRank(a.level) - riskLevelRank(b.level))
+}
+
 export interface RiskItem {
   id: string
   name: string
