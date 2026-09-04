@@ -1032,3 +1032,14 @@
 .tips-action-btn{color:#9fb6d4}
 .tips-action-btn:hover{color:#fff}
 .win-max{font-size:13px;line-height:1}
+
+/* 科室看板对话框。做成对话框而不是第九个标签页 ——
+   那八页讲的都是「这一位患者」，看板讲的是「这一屏患者」。 */
+:deep(.board-dialog .el-dialog__header){padding:0;margin:0}
+:deep(.board-dialog .el-dialog__body){padding:0}
+
+/* 「不能漏」标记。排序改成「先后果、再可能性」之后，
+   一个 30% 的急性冠脉综合征会排在 55% 的冠心病上面 ——
+   不给标记的话那看起来像排序坏了。 */
+.dd-severity-tag{display:inline-block;margin-left:5px;font-size:9.5px;font-weight:700;
+  color:#c0392b;background:#fdecec;border:1px solid #f5b8b8;padding:1px 6px;border-radius:3px}

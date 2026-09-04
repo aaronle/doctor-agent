@@ -7,6 +7,13 @@
 
 from __future__ import annotations
 
+#: 漏诊后果由重到轻。**排序的第一关键字**（F04 L51）。
+SEVERITY_ORDER = ("critical", "serious", "routine")
+
+#: 一屏最多几条「不能漏」。超出的降一档 ——
+#: 全标成 critical 等于没排序，那个标记会迅速贬值成噪声。
+MAX_CRITICAL = 2
+
 from .schemas import DiagnosisOut
 from .base import Agent, require_list
 
@@ -79,9 +86,16 @@ class DiagnosisAgent(Agent):
                 # 规格要求：无反对证据必须显式写「未获得」，不允许空列表悄悄通过
                 opposing = ["未获得"]
 
+            severity = str(item.get("severity") or "routine").strip()
+            if severity not in SEVERITY_ORDER:
+                # 取值超出闭集时落到最轻的一档，**不是最重的** ——
+                # 拿不准就往上标，会让「不能漏」这个标记迅速贬值成噪声
+                severity = "routine"
+
             cleaned.append(
                 {
                     "name": name,
+                    "severity": severity,
                     "confidence": confidence,
                     "icd": str(item.get("icd") or "").strip(),
                     "desc": str(item.get("desc") or "").strip(),
@@ -92,7 +106,22 @@ class DiagnosisAgent(Agent):
                 }
             )
 
-        cleaned.sort(key=lambda d: d["confidence"], reverse=True)
+        # **F04 L51：先按漏诊后果，再按可能性。**
+        #
+        # 纯置信度降序会把一个 10% 的主动脉夹层排在 60% 的肋间神经痛下面 ——
+        # 而两者漏诊的代价差了几个数量级。医生扫这一列时是自上而下扫的，
+        # 排序就是这一屏最强的那个信号。
+        cleaned.sort(key=lambda d: (SEVERITY_ORDER.index(d["severity"]), -d["confidence"]))
+
+        # 全标成 critical 等于没排序。**这不是校验失败，是把标记收窄** ——
+        # 模型偶尔会把整屏都标成「不能漏」，那时候拒绝整份输出会让岗位降级，
+        # 代价远大于把多出来的那几条降一档。
+        crit = [d for d in cleaned if d["severity"] == "critical"]
+        if len(crit) > MAX_CRITICAL:
+            for d in crit[MAX_CRITICAL:]:
+                d["severity"] = "serious"
+            cleaned.sort(key=lambda d: (SEVERITY_ORDER.index(d["severity"]), -d["confidence"]))
+
         return _decorate(cleaned)
 
     def fallback(self, ctx: dict, **kwargs) -> dict:

@@ -182,6 +182,20 @@ class RecordOut(ToolCallModel):
 # ---------------------------------------------------------------- 鉴别诊断
 
 
+#: 漏诊后果分档。**排序的第一关键字。**
+#:
+#: F04 L51：「排序必须优先考虑『不能漏诊』与临床后果，再考虑常见度；
+#: **不能简单等同于模型置信度排序**。」
+#:
+#: 实现原本是纯置信度降序 —— 一个 10% 的主动脉夹层会排在 60% 的肋间神经痛
+#: 下面，而漏诊代价差了几个数量级。
+#:
+#: 曾经以为这需要临床知识库，**想错了**：判「这个漏了会不会出人命」靠的是常识，
+#: 需要知识库的是「这个病的患病率是多少」—— 而那个我们本来也没在用，
+#: `confidence` 就是模型拍的。
+DiagnosisSeverity = Literal["critical", "serious", "routine"]
+
+
 class SuspectedDiagnosis(ToolCallModel):
     name: str
     confidence: int = Field(ge=0, le=100, description="0–100，且必须是 5 的倍数")
@@ -194,6 +208,18 @@ class SuspectedDiagnosis(ToolCallModel):
         description="ICD-10 编码。常见诊断请给出（如 2型糖尿病 E11.9、原发性高血压 I10、"
                     "脑梗死 I63.9）；罕见诊断或亚型拿不准时留空，**不要猜一个近似的**",
     )
+    severity: DiagnosisSeverity = Field(
+        default="routine",
+        description=(
+            "**漏诊后果**，不是可能性："
+            "`critical` = 漏了可能短期内危及生命或致残（主动脉夹层、肺栓塞、脑出血、"
+            "宫外孕破裂、脓毒症、心梗）；"
+            "`serious` = 漏了会显著延误治疗或留下后遗症；"
+            "`routine` = 其余。"
+            "**按后果判，不按概率判** —— 一个 5% 的主动脉夹层仍然是 critical。"
+            "反过来也一样：常见但不致命的（上感、肋间神经痛）无论概率多高都是 routine。"
+        ),
+    )
     desc: str = Field(description="一句话说明该诊断的临床含义")
     suggestion: str = Field(default="", description="针对该诊断的下一步建议，一句话，不要与 desc 重复")
     supporting: list[str] = Field(description="支持证据")
@@ -203,7 +229,10 @@ class SuspectedDiagnosis(ToolCallModel):
 
 class DiagnosisOut(ToolCallModel):
     suspected_diagnoses: list[SuspectedDiagnosis] = Field(
-        description="按 confidence 从高到低，最多 5 条"
+        description=(
+            "最多 5 条。**排序由服务端按（severity, confidence）重排**，"
+            "你只管把每条的 severity 判准，不必自己排。"
+        )
     )
 
 

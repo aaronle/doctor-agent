@@ -1,0 +1,59 @@
+/* 科室看板。两个维度：诊疗进度 × 风险。
+   配色沿用工作站那一套 —— 红=高风险/危急，黄=需关注，无色=普通。
+   **「普通」不给颜色是有意的**：干净就是信息，医生一眼就知道这行不用管。 */
+
+.dept-board{display:flex;flex-direction:column;gap:10px;padding:12px 14px 16px}
+
+.db-head{display:flex;align-items:baseline;gap:8px}
+.db-title{font-size:15px;font-weight:700;color:#1f2937}
+.db-sub{font-size:11px;color:#8a9099}
+.db-spacer{flex:1}
+.db-refresh{border:1px solid #c7dcff;background:#fff;color:#1677ff;font-size:11px;
+  padding:3px 12px;border-radius:5px;cursor:pointer}
+.db-refresh:hover:not(:disabled){background:#f0f6ff}
+.db-refresh:disabled{opacity:.5;cursor:default}
+.db-error{font-size:12px;color:#e6191a;margin:0}
+
+/* 「该我处理」排第一且最大 —— 医生第一眼看的就是这个数 */
+.db-stats{display:flex;gap:8px}
+.db-stat{display:flex;flex-direction:column;gap:2px;padding:8px 14px;border-radius:8px;
+  background:#f7fafd;border:1px solid #dbe4ee;min-width:76px}
+.db-stat i{font-style:normal;font-size:10px;color:#8a9099}
+.db-stat b{font-size:19px;color:#1f2937;line-height:1.1}
+.db-stat.attention{background:#fff1f0;border-color:#f5b8b8;cursor:pointer;text-align:left}
+.db-stat.attention i{color:#c0392b}
+.db-stat.attention b{font-size:24px;color:#e5484d}
+.db-stat.attention:hover{background:#ffe7e5}
+.db-stat.attention.on{outline:2px solid #e5484d;outline-offset:1px}
+
+.db-table{width:100%;border-collapse:collapse;font-size:12px}
+.db-table th{text-align:left;font-weight:600;color:#8a9099;font-size:10.5px;
+  padding:6px 8px;border-bottom:1px solid #e8ebf0}
+.db-table td{padding:9px 8px;border-bottom:1px solid #f2f5f8;vertical-align:top}
+.db-table tr.tier-critical{background:#fffafa}
+.db-table tr:hover{background:#f7fafd}
+
+.db-who b{color:#1f2937}
+.db-meta{margin-left:6px;font-size:10.5px;color:#8a9099}
+.db-allergy{display:inline-block;margin-left:6px;font-size:10px;font-weight:700;
+  color:#c0392b;background:#fdecec;border:1px solid #f5b8b8;padding:1px 6px;border-radius:3px}
+.db-allergy.unknown{color:#8a6d3b;background:#fcf3d7;border-color:#eddba5}
+
+.db-progress{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:10px;
+  background:#eef2f7;color:#5a7089}
+.db-progress.pending_report{background:#fff4e6;color:#c2670a;font-weight:600}
+.db-progress.done{background:#eaf7ef;color:#2f8f57}
+.db-pending{margin-left:5px;font-size:10px;color:#c2670a}
+
+.db-tier{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px}
+.db-tier.critical{background:#fdecec;color:#c0392b}
+.db-tier.warning{background:#fff4e6;color:#c2670a}
+/* 普通不给颜色 —— 干净就是信息 */
+.db-tier.ordinary{background:transparent;color:#a9b8c6;font-weight:400}
+.db-red{display:block;margin-top:3px;font-size:10px;color:#c0392b}
+
+.db-cc{color:#5a7089;max-width:260px}
+.db-open{border:1px solid #1677ff;background:#1677ff;color:#fff;font-size:11px;
+  padding:3px 12px;border-radius:5px;cursor:pointer;white-space:nowrap}
+.db-open:hover{background:#0958d9}
+.db-empty{text-align:center;color:#a9b8c6;padding:26px 0}

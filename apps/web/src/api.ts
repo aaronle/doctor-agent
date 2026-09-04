@@ -55,6 +55,36 @@ const del = <T>(path: string) => request<T>(path, { method: 'DELETE' })
 
 // ------------------------------------------------------------------ 类型
 
+/** 科室看板一行 */
+export interface BoardRow {
+  patient_id: string
+  name: string
+  age: number
+  gender: string
+  dept: string
+  chief_complaint: string
+  /** 闭集：未接诊 / 待报告 / 已问诊 / 已完成 */
+  progress: 'not_started' | 'pending_report' | 'interviewed' | 'done'
+  pending_exams: number
+  in_queue: boolean
+  /** 闭集。**「普通病人」是其中一档，不是「没标记」** */
+  risk_tier: 'critical' | 'warning' | 'ordinary'
+  open_red: number
+  open_warn: number
+  red_names: string[]
+  allergy_status: string
+  allergies: string[]
+}
+
+export interface BoardResponse {
+  total: number
+  done: number
+  pending_report: number
+  /** 今天还剩几个要处理 —— 医生第一眼看的就是这个数 */
+  needs_attention: number
+  rows: BoardRow[]
+}
+
 /** 数据看板：埋点使用概览 */
 export interface UsageSummary {
   days: number
@@ -230,6 +260,11 @@ export interface SuspectedDiagnosis {
   /** 以下四项由后端按置信度排序派生，界面直接用，不在前端重算 */
   rank?: number
   rank_label?: string
+  /**
+   * 漏诊后果。**排序的第一关键字**（F04 L51）——
+   * 一个 30% 的急性冠脉综合征要排在 55% 的冠心病之上。
+   */
+  severity?: 'critical' | 'serious' | 'routine'
   rank_key?: string
   likelihood?: string
   differentials?: DifferentialRef[]
@@ -648,6 +683,9 @@ export const api = {
   createReferral: (body: Record<string, unknown>) => post<{ ok: boolean; message: string }>('/api/his/referral', body),
   createAdmission: (body: Record<string, unknown>) =>
     post<{ ok: boolean; message: string }>('/api/his/admission', body),
+
+  /** 科室看板：诊疗进度 × 风险两个维度 */
+  departmentBoard: () => get<BoardResponse>('/api/his/board'),
 
   // ---------------------------------------------------------------- 数据看板
   usageSummary: (days = 7) => get<UsageSummary>(`/api/telemetry/usage?days=${days}`),

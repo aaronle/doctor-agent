@@ -9,6 +9,7 @@ import { useCopilotChat } from '../composables/useCopilotChat'
 import { useInterview } from '../composables/useInterview'
 import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '../composables/diagnosisCommands'
 import AgentMascot from './AgentMascot.vue'
+import DepartmentBoard from './DepartmentBoard.vue'
 import FollowUpHints from './FollowUpHints.vue'
 import { AUTO_OPEN_AFTER_MESSAGES, useFollowUp } from '../composables/useFollowUp'
 import { useResizable } from '../composables/useResizable'
@@ -272,6 +273,28 @@ const fontMenuOpen = ref(false)
  * 以及分离态冻住的那份尺寸。
  */
 const maxi = useMaximize()
+
+/**
+ * 科室看板。做成对话框而不是第九个标签页 ——
+ * 那八页讲的都是**这一位患者**，看板讲的是**这一屏患者**，
+ * 混进去会让「当前患者是谁」这件事变模糊。
+ */
+const boardOpen = ref(false)
+const boardRef = ref<InstanceType<typeof DepartmentBoard> | null>(null)
+
+function openBoard() {
+  boardOpen.value = true
+  track('board_open')
+  // 每次打开都重拉：看板的价值全在「现在是什么状态」，
+  // 给一份上次打开时的快照等于给了个假的
+  void nextTick(() => boardRef.value?.load())
+}
+
+function openFromBoard(patientId: string) {
+  boardOpen.value = false
+  track('board_pick', patientId)
+  void router.push(`/outpatient/${patientId}`)
+}
 
 /**
  * 埋点。**采医生实际点了什么** —— 后端的 HTTP 日志答不了这个：
@@ -1400,6 +1423,17 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
       :thinking="ws.loadingSummary || finishing"
       @open="restoreAgentPanel"
     />
+    <el-dialog
+      v-model="boardOpen"
+      title=""
+      width="900px"
+      top="6vh"
+      destroy-on-close
+      class="board-dialog"
+    >
+      <DepartmentBoard ref="boardRef" @open="openFromBoard" />
+    </el-dialog>
+
     <div ref="wrapperEl" class="ai-float-wrapper" :style="wrapperStyle">
       <!-- ======================= AI 助手 ======================= -->
       <!--
@@ -1603,6 +1637,16 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                         <div class="dd-card-body">
                           <div class="dd-card-top">
                             <span class="dd-primary-tag dd-rank-tag" :class="item.rank_key">{{ item.rank_label }}</span>
+                            <!--
+                              **重排了就得解释。** 排序改成「先后果、再可能性」之后，
+                              一个 30% 的急性冠脉综合征会排在 55% 的冠心病上面 ——
+                              不给标记的话，那看起来像排序坏了。
+                            -->
+                            <span
+                              v-if="item.severity === 'critical'"
+                              class="dd-severity-tag"
+                              title="漏诊后果严重，因此排在前面 —— 与可能性高低无关"
+                            >不能漏</span>
                             <span class="dd-primary-name" @click="markPrimary(item.name)">{{ item.name }}</span>
                             <em v-if="item.icd" class="dd-icd">{{ item.icd }}</em>
                           </div>
@@ -2616,12 +2660,12 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                 <button class="tb-action-btn" @click="nextPatient">接诊下一位</button>
                 <!--
                   「报告解读」2026-09-03 撤掉：一期不做。
-                  「鉴别诊断」改名「科室看板」—— **内容待定**，所以它现在
-                  只切到智慧诊疗页，不假装已经有一个看板。
-                  等看板定义清楚再接上去；在那之前，一个点了跳到别处的按钮
+                  「鉴别诊断」改名「科室看板」，2026-09-04 定义清楚并接上：
+                  **诊疗进度 × 风险** 两个维度，用来回顾今天走到哪了、谁该先看。
+                  在此之前它只是切到智慧诊疗 —— 一个点了跳到别处的按钮，
                   比一个点了弹「敬请期待」的按钮诚实。
                 -->
-                <button class="tb-action-btn" @click="activeTab = '智慧诊疗'">科室看板</button>
+                <button class="tb-action-btn" @click="openBoard">科室看板</button>
               </div>
             </div>
           </div>

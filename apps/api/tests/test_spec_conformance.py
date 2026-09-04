@@ -221,3 +221,72 @@ def test_f02_departments_closed_set_has_no_phantom_clinic():
 
     assert "骨科" in DEPARTMENTS
     assert len(set(DEPARTMENTS)) == len(DEPARTMENTS), "闭集里有重复项"
+
+
+# ------------------------------------------------------------------ F04 排序口径
+
+
+def _dx(name, conf, sev):
+    return {"name": name, "confidence": conf, "severity": sev, "desc": "x",
+            "supporting": ["a"], "opposing": [], "missing": []}
+
+
+def test_f04_orders_by_consequence_before_likelihood():
+    """F04 L51：**先按漏诊后果，再按可能性。**
+
+    > 排序必须优先考虑「不能漏诊」与临床后果，再考虑常见度；
+    > 不能简单等同于模型置信度排序。
+
+    纯置信度降序会把一个 10% 的主动脉夹层排在 60% 的肋间神经痛下面 ——
+    两者漏诊的代价差了几个数量级。医生扫这一列是自上而下扫的，
+    排序就是这一屏最强的那个信号。
+    """
+    from app.agents.diagnosis import DiagnosisAgent
+
+    out = DiagnosisAgent().validate({"suspected_diagnoses": [
+        _dx("肋间神经痛", 60, "routine"),
+        _dx("主动脉夹层", 10, "critical"),
+        _dx("心绞痛", 40, "serious"),
+    ]}, {})
+    assert [d["name"] for d in out["suspected_diagnoses"]] == ["主动脉夹层", "心绞痛", "肋间神经痛"]
+
+
+def test_f04_same_severity_still_sorts_by_confidence():
+    """同一档内仍按可能性排 —— 后果只是第一关键字，不是唯一关键字。"""
+    from app.agents.diagnosis import DiagnosisAgent
+
+    out = DiagnosisAgent().validate({"suspected_diagnoses": [
+        _dx("甲", 30, "serious"), _dx("乙", 70, "serious"), _dx("丙", 50, "serious"),
+    ]}, {})
+    assert [d["confidence"] for d in out["suspected_diagnoses"]] == [70, 50, 30]
+
+
+def test_f04_too_many_criticals_get_demoted_not_rejected():
+    """**全标成 critical 等于没排序。**
+
+    超出上限的降一档，而不是拒绝整份输出 —— 拒绝会让岗位降级，
+    代价远大于把多出来的那几条降一级。
+    """
+    from app.agents.diagnosis import DiagnosisAgent, MAX_CRITICAL
+
+    out = DiagnosisAgent().validate({"suspected_diagnoses": [
+        _dx(f"诊断{i}", 90 - i * 5, "critical") for i in range(5)
+    ]}, {})
+    crit = [d for d in out["suspected_diagnoses"] if d["severity"] == "critical"]
+    assert len(crit) == MAX_CRITICAL
+    assert len(out["suspected_diagnoses"]) == 5, "多的是降档，不是丢弃"
+
+
+def test_f04_unknown_severity_falls_to_routine_not_critical():
+    """取值超出闭集时落到**最轻**的一档。
+
+    拿不准就往上标，会让「不能漏」这个标记迅速贬值成噪声。
+    """
+    from app.agents.diagnosis import DiagnosisAgent
+
+    out = DiagnosisAgent().validate({"suspected_diagnoses": [
+        _dx("怪东西", 50, "very-urgent"), _dx("正常项", 40, "serious"),
+    ]}, {})
+    by = {d["name"]: d["severity"] for d in out["suspected_diagnoses"]}
+    assert by["怪东西"] == "routine"
+    assert out["suspected_diagnoses"][0]["name"] == "正常项"

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from ..audit import next_id, record_audit
 from ..schemas import StrictIn
 from ..database import get_session
+from ..agents.context import seed_items
 from ..models import Admission, Drug, Order, Patient, Referral, Reminder
 
 router = APIRouter(prefix="/api/his", tags=["his"])
@@ -363,4 +364,110 @@ def create_admission(body: AdmissionIn, session: Session = Depends(get_session))
             "patient_name": admission.patient_name,
             "target_dept": admission.target_dept,
         },
+    }
+
+
+# ------------------------------------------------------------------ 科室看板
+
+#: 进度闭集。多一个值界面就没有对应样式，那一行会渲染成裸文字。
+PROGRESS = ("not_started", "pending_report", "interviewed", "done")
+
+#: 风险分档闭集。**「普通病人」是其中一档，不是「没标记」** ——
+#: 看板只标危险的，医生仍要逐个确认「这个是真没事还是我漏看了」。
+RISK_TIER = ("critical", "warning", "ordinary")
+
+
+def _pending_exams(session: Session, patient_id: str) -> int:
+    """已开单、报告还没回来的检查数。
+
+    这是产品定义里点名的那个状态：**既不是「没看过」**（医生已经开了单、
+    做了判断），**也不是「已完成」**（结论还没法下）。合并进任何一边，
+    医生就看不出「这个人还欠我一个报告」。
+    """
+    return sum(
+        1 for e in seed_items(session, "examination", patient_id)
+        if isinstance(e, dict) and str(e.get("status") or "") != "已完成"
+    )
+
+
+def _progress(patient, pending: int) -> str:
+    payload = patient.payload or {}
+    if payload.get("submitted_record"):
+        return "done"
+    if pending:
+        return "pending_report"
+    if payload.get("analysis_unlock"):
+        return "interviewed"
+    return "not_started"
+
+
+@router.get("/board")
+def department_board(session: Session = Depends(get_session)) -> dict:
+    """
+    科室看板：**诊疗进度** × **风险** 两个维度。
+
+    产品定义（2026-09-04 确认）：
+
+    > 病人看板主要是从两个维度回顾：① 诊疗进度 —— 哪些看过了、哪些没有
+    > （比如做完检查但报告还没回来的）；② 风险评估 —— 哪些有风险或危急值，
+    > 哪些是普通病人。
+
+    它**不是运营报表**（那面向科主任，是另一个人另一个场景），
+    也**不只是「下一个看谁」的队列** —— 关键词是「回顾」，
+    所以已出队、已完成的患者同样要在，否则今天回顾不了。
+
+    排序是「**该我处理的排前面**」：未处置红线 > 报告已回但没看 > 其余。
+    不按患者号排 —— 那个顺序对医生没有任何含义。
+    """
+    from ..agents.risk import hard_rule_alerts
+
+    rows = []
+    for patient in session.scalars(select(Patient).order_by(Patient.id)).all():
+        payload = patient.payload or {}
+        pending = _pending_exams(session, patient.id)
+        progress = _progress(patient, pending)
+
+        ctx = {
+            "allergies": payload.get("allergies") or [],
+            "allergy_status": payload.get("allergy_status") or "",
+            "orders": payload.get("orders") or [],
+            "lab_results": payload.get("lab_results") or [],
+            "vitals": payload.get("vitals") or {},
+        }
+        alerts = hard_rule_alerts(ctx)
+        handled = set(payload.get("handled_alerts") or [])
+        # **未处置的条数**，不是总数 —— 已处置的还算在里面，
+        # 医生会以为自己没处理完
+        open_red = [a for a in alerts if a["level"] == "高风险" and a["id"] not in handled]
+        open_warn = [a for a in alerts if a["level"] == "中风险" and a["id"] not in handled]
+
+        tier = "critical" if open_red else ("warning" if open_warn else "ordinary")
+        rows.append({
+            "patient_id": patient.id,
+            "name": patient.name,
+            "age": patient.age,
+            "gender": patient.gender,
+            "dept": patient.dept,
+            "chief_complaint": patient.chief_complaint,
+            "progress": progress,
+            "pending_exams": pending,
+            "in_queue": bool(patient.in_queue),
+            "risk_tier": tier,
+            "open_red": len(open_red),
+            "open_warn": len(open_warn),
+            "red_names": [a["name"] for a in open_red][:3],
+            "allergy_status": payload.get("allergy_status") or "unknown",
+            "allergies": payload.get("allergies") or [],
+        })
+
+    order = {t: i for i, t in enumerate(RISK_TIER)}
+    rows.sort(key=lambda r: (order[r["risk_tier"]], r["progress"] == "done", r["patient_id"]))
+
+    return {
+        "total": len(rows),
+        "done": sum(1 for r in rows if r["progress"] == "done"),
+        "pending_report": sum(1 for r in rows if r["progress"] == "pending_report"),
+        # 「今天还剩几个要处理」—— 医生第一眼看的就是这个数
+        "needs_attention": sum(1 for r in rows if r["risk_tier"] != "ordinary" and r["progress"] != "done"),
+        "rows": rows,
     }

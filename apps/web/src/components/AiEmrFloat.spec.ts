@@ -945,6 +945,40 @@ describe('浮窗调宽', () => {
   })
 })
 
+describe('鉴别诊断「不能漏」标记', () => {
+  it('critical 的诊断带「不能漏」标记 —— **重排了就得解释**', async () => {
+    // 排序改成「先后果、再可能性」之后，一个 30% 的急性冠脉综合征
+    // 会排在 55% 的冠心病上面。不给标记的话，那看起来像排序坏了。
+    // 必须把 mount 用的那个 pinia 传给 useWorkstation ——
+    // 不传会拿到**另一个 store 实例**，改了半天组件那边纹丝不动
+    stubFetch()
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] }, attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    ws.visit = { ...UNLOCKED_VISIT, interview_turns: 4 } as never
+    ws.summary = {
+      _meta: { degraded_agents: [] },
+      suspected_diagnoses: [
+        { name: '急性冠脉综合征', confidence: 30, severity: 'critical', desc: '', icd: '',
+          supporting: [], opposing: ['未获得'], missing: [], rank_key: 'primary', rank_label: '首选' },
+        { name: '冠心病', confidence: 55, severity: 'routine', desc: '', icd: '',
+          supporting: [], opposing: ['未获得'], missing: [], rank_key: 'alt', rank_label: '次选' },
+      ],
+    } as never
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+    await expandAssistant(wrapper)
+    await wrapper.vm.$nextTick()
+
+    const tags = wrapper.findAll('.dd-severity-tag')
+    expect(tags).toHaveLength(1)
+    expect(tags[0].text()).toBe('不能漏')
+    // 说清为什么排前面 —— 光一个红标仍然解释不了 30% 压 55%
+    expect(tags[0].attributes('title')).toContain('与可能性高低无关')
+  })
+})
+
 describe('病历草稿要能改', () => {
   /** 病历页受问诊门禁，得先解锁；渲染七段还要有 record 内容 */
   async function openRecord() {

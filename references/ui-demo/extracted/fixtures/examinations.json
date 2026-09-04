@@ -61,6 +61,16 @@
    "abnormal": true,
    "result": "左室舒张功能减退，EF 58%，室壁运动尚可",
    "conclusion": "异常：舒张功能减退"
+  },
+  {
+   "id": "e2-p1",
+   "name": "冠脉 CTA",
+   "type": "影像",
+   "date": "2026-06-18",
+   "status": "已开单",
+   "abnormal": null,
+   "result": "",
+   "conclusion": ""
   }
  ],
  "P003": [
@@ -137,6 +147,26 @@
    "abnormal": false,
    "result": "窦性心律，大致正常心电图",
    "conclusion": "大致正常"
+  },
+  {
+   "id": "e5-p1",
+   "name": "糖化血红蛋白复查",
+   "type": "检验",
+   "date": "2026-06-19",
+   "status": "检查中",
+   "abnormal": null,
+   "result": "",
+   "conclusion": ""
+  },
+  {
+   "id": "e5-p2",
+   "name": "尿微量白蛋白",
+   "type": "检验",
+   "date": "2026-06-19",
+   "status": "已开单",
+   "abnormal": null,
+   "result": "",
+   "conclusion": ""
   }
  ],
  "P006": [
@@ -221,6 +251,16 @@
    "abnormal": false,
    "result": "窦性心律，大致正常心电图",
    "conclusion": "大致正常"
+  },
+  {
+   "id": "e8-p1",
+   "name": "术前凝血四项",
+   "type": "检验",
+   "date": "2026-06-22",
+   "status": "已开单",
+   "abnormal": null,
+   "result": "",
+   "conclusion": ""
   }
  ]
 }
