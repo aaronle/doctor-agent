@@ -14,6 +14,7 @@ import { AUTO_OPEN_AFTER_MESSAGES, useFollowUp } from '../composables/useFollowU
 import { useResizable } from '../composables/useResizable'
 import { useDockedWindows } from '../composables/useDockedWindows'
 import { useFontScale } from '../composables/useFontScale'
+import { useMaximize } from '../composables/useMaximize'
 
 const ws = useWorkstation()
 
@@ -258,6 +259,18 @@ function beginDrag(key: 'drawer' | 'panel', e: PointerEvent) {
  */
 const font = useFontScale()
 const fontMenuOpen = ref(false)
+
+/**
+ * 全屏（铺满视口）。ESC 退出。
+ *
+ * **一次只能一个** —— 两个窗都铺满会互相盖住，所以进全屏时另一个收起来。
+ * 它是纯样式覆盖：底下的拖动位置、尺寸、停靠状态一点没动，退出时原样回来，
+ * 不需要「保存现场再恢复」那套东西。
+ *
+ * 样式合并时**放在最后**：它要盖过 dock 的定位、resize 的宽高、
+ * 以及分离态冻住的那份尺寸。
+ */
+const maxi = useMaximize()
 
 const wrapperStyle = computed(() =>
   drawerSize.width.value === null
@@ -1385,7 +1398,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         双击恢复默认。
       -->
       <div
-        v-if="tipsOpen"
+        v-if="tipsOpen && !maxi.maximized.value"
         class="resize-edge"
         :class="{ active: drawerSize.resizing.value }"
         role="separator"
@@ -1397,10 +1410,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
       />
       <div
         v-if="tipsOpen"
+        v-show="!maxi.isHidden('drawer')"
         ref="drawerShell"
         class="tips-drawer connected-right"
         :class="{ undocked: !dock.merged.value, dragging: dock.dragging.value === 'drawer', 'will-snap': dock.willSnap.value }"
-        :style="{ ...dock.styleFor('drawer').value, ...drawerHeight.style.value }"
+        :style="{ ...dock.styleFor('drawer').value, ...drawerHeight.style.value, ...maxi.styleFor('drawer').value }"
       >
         <div
           class="tips-header"
@@ -1411,6 +1425,14 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           <span class="tips-title"><span class="panel-ai-dot" />AI 助手</span>
           <div class="tips-header-actions">
             <el-tag v-if="ws.isDegraded" size="small" type="warning" effect="plain">降级</el-tag>
+            <el-button
+              text
+              size="small"
+              class="tips-action-btn win-max"
+              :title="maxi.isMax('drawer') ? '退出全屏（Esc）' : '全屏'"
+              :aria-label="maxi.isMax('drawer') ? '退出全屏' : '全屏'"
+              @click="maxi.toggle('drawer')"
+            >{{ maxi.isMax('drawer') ? '⛶' : '⛶' }}</el-button>
             <el-button text size="small" class="tips-close" @click="tipsOpen = false">×</el-button>
           </div>
         </div>
@@ -2250,7 +2272,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         占中间 52px 且 z-index 更高，这条边线在它外侧，两者不抢同一块区域。
       -->
       <div
-        v-if="panelOpen"
+        v-if="panelOpen && !maxi.maximized.value"
         class="resize-edge"
         :class="{ active: panelSize.resizing.value }"
         role="separator"
@@ -2262,10 +2284,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
       />
       <div
         v-if="panelOpen"
+        v-show="!maxi.isHidden('panel')"
         ref="panelShell"
         class="assistant-panel connected-left"
         :class="{ undocked: !dock.merged.value, dragging: dock.dragging.value === 'panel' }"
-        :style="{ ...dock.styleFor('panel').value, ...panelSize.style.value, ...panelHeight.style.value }"
+        :style="{ ...dock.styleFor('panel').value, ...panelSize.style.value, ...panelHeight.style.value, ...maxi.styleFor('panel').value }"
       >
         <div
           class="panel-header"
@@ -2325,6 +2348,14 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               只会让人犹豫点哪个；真做一个「关了就没」的，就又造出一条
               回不来的死路，这个项目已经踩过两次了。
             -->
+            <el-button
+              text
+              size="small"
+              class="panel-action-btn win-max"
+              :title="maxi.isMax('panel') ? '退出全屏（Esc）' : '全屏'"
+              :aria-label="maxi.isMax('panel') ? '退出全屏' : '全屏'"
+              @click="maxi.toggle('panel')"
+            >⛶</el-button>
             <el-button
               text
               size="small"

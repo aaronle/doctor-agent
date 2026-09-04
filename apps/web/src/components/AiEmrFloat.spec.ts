@@ -924,6 +924,49 @@ describe('浮窗调宽', () => {
   })
 })
 
+describe('全屏', () => {
+  it('两个窗各有一个全屏钮', async () => {
+    const wrapper = await renderFloat()
+    expect(wrapper.findAll('.win-max')).toHaveLength(2)
+  })
+
+  it('点全屏 → 铺满视口，**另一个窗藏起来**', async () => {
+    // 两个都铺满会互相盖住。
+    const wrapper = await renderFloat()
+    await wrapper.findAll('.win-max')[1].trigger('click')   // 医生智能体
+
+    const panel = wrapper.find('.assistant-panel')
+    expect(panel.attributes('style')).toContain('position: fixed')
+    expect(panel.attributes('style')).toContain('left: 0px')
+    // v-show 隐藏 → display:none
+    expect(wrapper.find('.tips-drawer').attributes('style')).toContain('display: none')
+  })
+
+  it('全屏时**不再显示调宽/拉高边线** —— 铺满了没得调', async () => {
+    const wrapper = await renderFloat()
+    await wrapper.findAll('.win-max')[1].trigger('click')
+
+    expect(wrapper.findAll('.resize-edge')).toHaveLength(0)
+  })
+
+  it('再点一下退出，被藏的窗回来', async () => {
+    const wrapper = await renderFloat()
+    await wrapper.findAll('.win-max')[1].trigger('click')
+    await wrapper.findAll('.win-max')[1].trigger('click')
+
+    expect(wrapper.find('.tips-drawer').attributes('style') ?? '').not.toContain('display: none')
+    expect(wrapper.find('.assistant-panel').attributes('style') ?? '').not.toContain('left: 0px')
+  })
+
+  it('全屏钮**不叫 `.tips-close`** —— 类名是有含义的，不能拿来当样式简写', async () => {
+    // 第一版图省事复用了那个类去蹭样式，于是 find('.tips-close')
+    // 同时命中两个按钮，另一条用例点全屏钮去了。
+    const wrapper = await renderFloat()
+    expect(wrapper.findAll('.tips-close')).toHaveLength(1)
+    expect(wrapper.find('.tips-close').classes()).not.toContain('win-max')
+  })
+})
+
 describe('过敏标记', () => {
   it('有过敏史 → 红标，并且写出过敏原是什么', async () => {
     const wrapper = await renderWithPatient({ status: 'confirmed', items: ['青霉素'] })

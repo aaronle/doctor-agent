@@ -1022,3 +1022,13 @@
 .resize-edge-bottom::before{content:"";position:absolute;left:0;right:0;top:-3px;bottom:-3px}
 .resize-edge-bottom:hover,.resize-edge-bottom.active{background:#1677ff66}
 .resize-edge-bottom.active{background:#1677ff}
+
+/* 全屏钮。铺满视口，ESC 退出。
+   一次只能一个窗全屏 —— 两个都铺满会互相盖住，所以另一个会收起来。
+
+   **它不叫 `.tips-close`。** 第一版图省事复用了那个类去蹭样式，
+   于是 `find('.tips-close')` 同时命中两个按钮，测试点全屏钮去了 ——
+   类名是有含义的（那个类的意思是「关抽屉」），不能拿来当样式简写。 */
+.tips-action-btn{color:#9fb6d4}
+.tips-action-btn:hover{color:#fff}
+.win-max{font-size:13px;line-height:1}
