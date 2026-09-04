@@ -216,6 +216,7 @@ export const useWorkstation = defineStore('workstation', () => {
     summaryError.value = ''
     record.value = {}
     draft.value = {}
+    doctorEdited.value = new Set()
     handledAlerts.value = new Set()
 
     visit.value = null
@@ -258,6 +259,52 @@ export const useWorkstation = defineStore('workstation', () => {
     }
   }
 
+  /**
+   * 医生亲手改过的那几段。
+   *
+   * **F02 SAFE-002：新概况不得覆盖医生正在编辑的病历。**
+   *
+   * `generateRecord()` 原本第一行是 `draft = {}`，把整份草稿清空再流式写入。
+   * 医生改完现病史、又多问两句、再点一次「生成」，改的东西无声消失。
+   *
+   * 这条以前踩不到（七段是 readonly，没东西可丢），是 2026-09-04 把它们
+   * 改成可编辑之后才变成可达路径 —— **放开一个只读约束，等于打开它
+   * 原本挡住的所有下游风险**。
+   */
+  const doctorEdited = ref<Set<string>>(new Set())
+
+  /** 医生手输时走这里，同时留下「这段归我了」的标记 */
+  function setDraftByDoctor(field: string, value: string) {
+    draft.value = { ...draft.value, [field]: value }
+    doctorEdited.value = new Set([...doctorEdited.value, field])
+  }
+
+  /** 模型流式写入走这里。**医生改过的段一律跳过。** */
+  function appendDraftFromModel(field: string, chunk: string) {
+    if (doctorEdited.value.has(field)) return
+    draft.value = { ...draft.value, [field]: (draft.value[field] ?? '') + chunk }
+  }
+
+  /**
+   * 重新生成前清空草稿，**但保住医生改过的那几段**，并返回保住了哪几段。
+   *
+   * 返回值不是可选的：悄悄保留和悄悄覆盖一样糟 —— 医生得知道
+   * 这次重算里有哪几段不是新的。
+   */
+  function resetDraftForRegenerate(): string[] {
+    const kept = [...doctorEdited.value].filter((f) => draft.value[f] !== undefined)
+    const next: Record<string, string> = {}
+    for (const f of kept) next[f] = draft.value[f]
+    draft.value = next
+    return kept
+  }
+
+  /** 换患者 / 重来：草稿与编辑标记一起清，否则会挡住下一位患者的生成 */
+  function clearDraft() {
+    draft.value = {}
+    doctorEdited.value = new Set()
+  }
+
   /** 把 AI 草稿的某一段写进正式病历。这是「医生确认」这一步的落点。 */
   function acceptDraftField(field: string) {
     if (draft.value[field] === undefined) return
@@ -278,6 +325,11 @@ export const useWorkstation = defineStore('workstation', () => {
     summaryError,
     record,
     draft,
+    doctorEdited,
+    setDraftByDoctor,
+    appendDraftFromModel,
+    resetDraftForRegenerate,
+    clearDraft,
     visit,
     analysisUnlocked,
     interviewIncluded,

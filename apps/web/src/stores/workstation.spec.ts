@@ -120,6 +120,82 @@ describe('工作站状态', () => {
   })
 })
 
+describe('重新生成不许盖掉医生改过的段', () => {
+  // 每条用例开一份干净的 store —— Pinia 实例是共享的，
+  // 不隔离的话上一条的 draft 会漏进下一条（第一次写就中招了）
+  beforeEach(() => setActivePinia(createPinia()))
+
+  /**
+   * F02 SAFE-002：**新概况不得覆盖医生正在编辑的病历。**
+   *
+   * `generateRecord()` 第一行是 `ws.draft = {}` —— 把整份草稿清空再流式写入。
+   * 医生改完现病史、又多问两句、再点一次「生成」，改的东西无声消失。
+   *
+   * 这条以前踩不到（七段是 readonly，没东西可丢），是 2026-09-04 把它们
+   * 改成可编辑之后才变成可达路径 —— **放开一个只读约束，等于打开它
+   * 原本挡住的所有下游风险**。
+   */
+  it('医生改过的段落在重新生成时保留', () => {
+    const ws = useWorkstation()
+    ws.setDraftByDoctor('present_illness', '医生写的现病史')
+    ws.draft.chief_complaint = 'AI 写的主诉'
+
+    ws.resetDraftForRegenerate()
+
+    expect(ws.draft.present_illness).toBe('医生写的现病史')
+    expect(ws.draft.chief_complaint).toBeUndefined()
+  })
+
+  it('保留了哪几段要能说出来 —— 悄悄保留和悄悄覆盖一样糟', () => {
+    const ws = useWorkstation()
+    ws.setDraftByDoctor('present_illness', 'x')
+    ws.setDraftByDoctor('past_history', 'y')
+
+    expect(ws.resetDraftForRegenerate()).toEqual(['present_illness', 'past_history'])
+  })
+
+  it('AI 流式写入不许覆盖医生改过的段', () => {
+    const ws = useWorkstation()
+    ws.setDraftByDoctor('present_illness', '医生写的')
+    ws.resetDraftForRegenerate()
+
+    ws.appendDraftFromModel('present_illness', 'AI 想写的')
+    ws.appendDraftFromModel('past_history', 'AI 写的既往史')
+
+    expect(ws.draft.present_illness).toBe('医生写的')
+    expect(ws.draft.past_history).toBe('AI 写的既往史')
+  })
+
+  it('换患者时医生的编辑标记要清掉 —— 否则**下一位患者那一段永远是空的**', () => {
+    // 第一版这条是空过的：断言写的是 `resetDraftForRegenerate() === []`，
+    // 而 draft 清空后过滤器本来就会把陈旧标记滤掉 —— 标记留不留都通过。
+    //
+    // 真实危害在别处：标记还在的话，下一位患者生成时
+    // `appendDraftFromModel` 会**跳过**这一段，那一栏就永远空着。
+    // 按危害写断言才抓得住。
+    const ws = useWorkstation()
+    ws.setDraftByDoctor('present_illness', '上一位患者的内容')
+
+    ws.clearDraft()
+    ws.appendDraftFromModel('present_illness', '新患者的 AI 现病史')
+
+    expect(ws.draft.present_illness).toBe('新患者的 AI 现病史')
+  })
+
+  it('换患者（selectPatient 的重置路径）同样要清标记', async () => {
+    // clearDraft 是显式入口，但真实路径是选患者时的整体重置 —— 两条都要清
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ id: 'P002', alerts: [], _meta: { degraded_agents: [] } }), { status: 200 })))
+    const ws = useWorkstation()
+    ws.setDraftByDoctor('present_illness', '上一位患者的内容')
+
+    await ws.selectPatient('P002')
+    ws.appendDraftFromModel('present_illness', '新患者的 AI 现病史')
+
+    expect(ws.draft.present_illness).toBe('新患者的 AI 现病史')
+  })
+})
+
 describe('就诊状态机', () => {
   // 必须自己重置：上一个 describe 的 beforeEach 不覆盖这里，
   // 沿用同一个 store 的话 patientId 已是 P002，selectPatient 会因 id 相同直接返回。

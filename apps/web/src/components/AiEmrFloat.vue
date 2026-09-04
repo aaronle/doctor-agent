@@ -553,7 +553,11 @@ const smartNote = ref('')
 async function generateRecord() {
   if (!ws.patientId) return
   generating.value = true
-  ws.draft = {}
+  // **F02 SAFE-002：新概况不得覆盖医生正在编辑的病历。**
+  // 原来这里是 `ws.draft = {}`，把整份草稿连医生改过的一起清掉 ——
+  // 医生改完现病史、又多问两句、再点一次「生成」，改的东西无声消失。
+  // 这条以前踩不到（七段是 readonly），是把它们改成可编辑之后才变成可达路径。
+  const keptFields = ws.resetDraftForRegenerate()
   try {
     await streamSse(
       '/api/emr/copilot/chat',
@@ -561,13 +565,21 @@ async function generateRecord() {
       (event) => {
         if (event.type === 'record_node_start') {
           streamingField.value = String(event.node_id)
-          ws.draft = { ...ws.draft, [streamingField.value]: '' }
+          // 医生改过的段这里会被 appendDraftFromModel 跳过，不必另判
+          ws.appendDraftFromModel(streamingField.value, '')
         } else if (event.type === 'record_token') {
-          const key = String(event.node_id)
-          ws.draft = { ...ws.draft, [key]: (ws.draft[key] ?? '') + String(event.token) }
+          ws.appendDraftFromModel(String(event.node_id), String(event.token))
         } else if (event.type === 'record_done') {
           streamingField.value = ''
           if (event.degraded) ElMessage.warning('模型不可用，病历为本地规则生成，请人工补全')
+          // **保住了哪几段要说出来。** 悄悄保留和悄悄覆盖一样糟 ——
+          // 医生得知道这次重算里有哪几段不是新的。
+          if (keptFields.length) {
+            const names = keptFields
+              .map((f) => RECORD_SECTIONS.find(([k]) => k === f)?.[1] ?? f)
+              .join('、')
+            ElMessage.info(`已保留您改过的：${names}（这几段没有被重新生成）`)
+          }
         }
       },
     )
@@ -1735,7 +1747,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                             :value="ws.draft[key] ?? ws.record[key] ?? ''"
                             rows="2"
                             :aria-label="label"
-                            @input="ws.draft[key] = ($event.target as HTMLTextAreaElement).value"
+                            @input="ws.setDraftByDoctor(key, ($event.target as HTMLTextAreaElement).value)"
                           />
                         </div>
                         <button class="rc-writeback-icon" title="回写至 HIS" @click="acceptField(key)">回</button>
