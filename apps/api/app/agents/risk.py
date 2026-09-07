@@ -16,6 +16,54 @@ from .context import abnormal_labs
 
 LEVEL_COLOR = {"高风险": "danger", "中风险": "warning", "低风险": "success", "提示": "info"}
 
+#: 过敏原的**同类药物**。
+#:
+#: 子串匹配只能拦住「过敏原字面出现在药名里」的情形 —— 头孢过敏 × 头孢呋辛酯片
+#: 能拦，是因为「头孢」三个字就在药名里。但临床上最常见的恰恰是另一种：
+#: **青霉素过敏 × 阿莫西林**。两个词毫无字面交集，而阿莫西林就是青霉素类。
+#: 同类交叉过敏本来就是过敏史最核心的临床意义，只做子串等于把它漏掉一大半。
+#:
+#: 三条取舍：
+#:
+#: **① 只收类内，不收类间。** 青霉素与头孢菌素确有 1–2% 的交叉反应率，
+#: 但把所有头孢都对青霉素过敏者标红，会让红线迅速贬值成噪声 ——
+#: 与鉴别诊断限 2 条 critical 是同一个道理：**过度告警等于没有告警**。
+#: 需要临床权衡的那一档交给模型，硬规则只做确定的事。
+#:
+#: **② 表按通用名写，不按商品名。** 商品名成千上万且各院不同，
+#: 一份追不全的清单会让人误以为「没告警就是安全」。
+#:
+#: **③ 双向匹配。** 医生可能把过敏史记成类名（青霉素），
+#: 也可能记成具体药名（阿莫西林）—— 后者要能反查到同类的其他药。
+DRUG_CLASSES: dict[str, tuple[str, ...]] = {
+    "青霉素": ("阿莫西林", "氨苄西林", "哌拉西林", "美洛西林", "苄星青霉素", "普鲁卡因青霉素"),
+    "磺胺": ("复方磺胺甲噁唑", "磺胺嘧啶", "柳氮磺吡啶"),
+    "大环内酯": ("阿奇霉素", "红霉素", "克拉霉素", "罗红霉素"),
+    "喹诺酮": ("左氧氟沙星", "莫西沙星", "环丙沙星", "诺氟沙星"),
+    "氨基糖苷": ("庆大霉素", "阿米卡星", "妥布霉素"),
+}
+
+
+def allergy_aliases(term: str) -> list[str]:
+    """
+    一个过敏原要比对的全部药名关键词（含它自己）。
+
+    双向：给「青霉素」返回全类；给「阿莫西林」也返回全类 ——
+    医生把过敏史记成哪一种写法都拦得住。
+    """
+    term = term.strip()
+    if not term:
+        return []
+    names = {term}
+    for cls, members in DRUG_CLASSES.items():
+        if cls in term or term in cls:
+            names.update(members)
+            names.add(cls)
+        elif any(m in term or term in m for m in members):
+            names.update(members)
+            names.add(cls)
+    return sorted(names)
+
 # 危急值：达到即触发红色，必须处置。阈值取国内门诊常用口径。
 CRITICAL_LABS = {
     "空腹血糖": (2.8, 16.7, "mmol/L"),
@@ -108,19 +156,26 @@ def hard_rule_alerts(ctx: dict) -> list[dict]:
         )
 
     for term in allergy_terms:
+        # 除了过敏原本身，还要比它的**同类药**：青霉素过敏 × 阿莫西林
+        # 两个词毫无字面交集，只做子串会整条漏掉。见 `DRUG_CLASSES`
+        keywords = allergy_aliases(term)
         for order in ctx.get("orders", []) or []:
             drug = str(order.get("drug") or order.get("name") or "")
-            if term and drug and term in drug:
+            hit_kw = next((k for k in keywords if k and drug and k in drug), None)
+            if hit_kw:
+                # 命中的是同类而非过敏原本身时，把这一层说出来 ——
+                # 医生看到「青霉素过敏 → 阿莫西林」要能立刻明白为什么
+                same_class = "" if hit_kw == term else f"（同属{term}类）"
                 alerts.append(
                     {
                         "id": f"hard_allergy_{drug}",
                         "name": "过敏冲突",
                         "level": "高风险",
                         "color": "danger",
-                        "summary": f"患者对「{term}」过敏，当前医嘱含「{drug}」，存在用药冲突。",
+                        "summary": f"患者对「{term}」过敏，当前医嘱含「{drug}」{same_class}，存在用药冲突。",
                         "evidence": f"过敏史：{term}；在用医嘱：{drug}",
                         "source": "硬规则 · 过敏史与在用医嘱比对",
-                        "threshold": "过敏原与医嘱药名匹配即触发",
+                        "threshold": "过敏原或其同类药与医嘱药名匹配即触发",
                         "suggestion": "立即停用该药并更换替代方案，记录过敏反应类型。",
                         "rule": "allergy_conflict",
                     }

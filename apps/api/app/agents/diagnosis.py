@@ -125,15 +125,29 @@ class DiagnosisAgent(Agent):
         return _decorate(cleaned)
 
     def fallback(self, ctx: dict, **kwargs) -> dict:
-        """降级时沿用种子里的既往疑似诊断，并明确标注证据未经本次评估。"""
+        """
+        降级时沿用种子里的既往疑似诊断，并明确标注证据未经本次评估。
+
+        **排序与模型路径同口径**：先后果、再可能性（F04 L51）。
+        原来这里只按 confidence 排，与模型路径正相反 —— 网关一抖，
+        25% 的子宫内膜癌就被 60% 的功血顶下去，而那恰恰是那条规格要防的事。
+        降级本来就是最需要保守的时刻，不该在这里放宽。
+
+        种子没标 severity 的（P001–P008 就没有）一律落到最轻档，
+        于是它们的相对顺序仍旧只由 confidence 决定，既有病例不受影响。
+        """
         seeded = ctx.get("suspected_diagnoses") or []
         cleaned = []
         for item in seeded:
             if not isinstance(item, dict):
                 continue
+            severity = str(item.get("severity") or "routine")
+            if severity not in SEVERITY_ORDER:
+                severity = "routine"
             cleaned.append(
                 {
                     "name": item.get("name", ""),
+                    "severity": severity,
                     "confidence": int(item.get("confidence") or 0),
                     "icd": item.get("icd", ""),
                     "desc": item.get("desc", ""),
@@ -143,7 +157,7 @@ class DiagnosisAgent(Agent):
                     "missing": ["需人工复核支持与反对证据"],
                 }
             )
-        cleaned.sort(key=lambda d: d["confidence"], reverse=True)
+        cleaned.sort(key=lambda d: (SEVERITY_ORDER.index(d["severity"]), -d["confidence"]))
         return _decorate(cleaned)
 
 

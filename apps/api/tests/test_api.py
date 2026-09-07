@@ -110,8 +110,27 @@ def test_missing_patient_returns_404(client):
 
 
 def test_drugs_dictionary(client):
+    """
+    药品字典要与种子文件逐条对上。
+
+    **不写死条数。** 原来是 `assert len(body) == 18`，加一味药就假红一次 ——
+    而它本该守的是「种子里的药一味不少地进了库」，不是「一共几味」。
+    这类魔数上一次是 `len(body) == 6`，加 P008 时同样红过。
+    """
+    import json
+    from pathlib import Path
+
+    fixture = json.loads(
+        (Path(__file__).resolve().parents[3] / "references/ui-demo/extracted/fixtures/drugs.json")
+        .read_text(encoding="utf-8")
+    )
     body = client.get("/api/his/drugs").json()
-    assert len(body) == 18
+
+    assert len(body) == len(fixture)
+    assert {d["name"] for d in body} == {d["name"] for d in fixture}
+    # 每一味都要有规格与分类 —— 开立医嘱的对话框直接读它们
+    for drug in body:
+        assert drug["spec"] and drug["category"], drug
 
 
 def test_order_and_exam_ids_do_not_skip_within_prefix(client):

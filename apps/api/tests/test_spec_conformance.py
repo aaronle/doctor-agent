@@ -290,3 +290,248 @@ def test_f04_unknown_severity_falls_to_routine_not_critical():
     by = {d["name"]: d["severity"] for d in out["suspected_diagnoses"]}
     assert by["怪东西"] == "routine"
     assert out["suspected_diagnoses"][0]["name"] == "正常项"
+
+
+# ------------------------------------------------------------------ P009 妇科
+
+
+def test_p009_two_hard_red_lines(client):
+    """
+    妇科病例必须同时触发两条**独立来源**的红线：过敏冲突与危急值。
+
+    它们分别走硬规则的第 1 条和第 2 条 —— 一条来自「过敏史 × 在用医嘱」比对，
+    一条来自检验阈值。同时在场才能证明红线不是靠某一条规则撑着的。
+    """
+    body = client.get("/api/emr/red-alerts/P009").json()
+    reds = [a for a in body["alerts"] if a["level"] == "高风险"]
+    rules = {a.get("rule") for a in reds}
+
+    assert "allergy_conflict" in rules, "青霉素过敏 × 在用阿莫西林克拉维酸钾，必须拦"
+    assert "critical_lab" in rules, "血红蛋白 58 g/L 低于危急值下限 60"
+
+    allergy = next(a for a in reds if a.get("rule") == "allergy_conflict")
+    assert "青霉素" in allergy["evidence"] and "阿莫西林" in allergy["evidence"]
+
+
+def test_p009_writeback_blocked_until_red_lines_handled(client):
+    """
+    红线未处置时禁止回写诊断，处置后放行 —— 妇科这条线上同样成立（F05 SAFE-001）。
+
+    两半都要测：只测「拦得住」的话，一个永远拒绝的接口也能通过。
+    """
+    # 先过问诊门禁，否则 409 来自门禁而不是红线，测的就不是这条规格
+    client.post("/api/emr/analysis/unlock", json={"patient_id": "P009", "reason": "skipped"})
+
+    alerts = client.get("/api/emr/red-alerts/P009").json()
+    open_red = [a["id"] for a in (alerts.get("alerts") or []) if a.get("level") == "高风险"]
+    assert open_red, "P009 得有未处置的高风险，否则这条用例是空过的"
+
+    payload = {"patient_id": "P009", "diagnoses": ["异常子宫出血"], "primary": "异常子宫出血"}
+    blocked = client.post("/api/emr/diagnosis/write-back", json={**payload, "handled_alerts": []})
+    assert blocked.status_code == 409
+
+    passed = client.post(
+        "/api/emr/diagnosis/write-back", json={**payload, "handled_alerts": open_red}
+    )
+    assert passed.status_code == 200, passed.text
+
+
+def test_p009_seed_diagnoses_are_ordered_by_consequence(client):
+    """
+    种子里的鉴别诊断按「先后果、再可能性」排 —— 与 F04 L51 的实现口径一致。
+
+    这条盯的是**种子数据本身**：60% 的无排卵性出血排在 25% 的内膜癌之后。
+    种子若按置信度排，演示时第一屏就与规格自相矛盾，而模型的输出反倒是对的。
+    """
+    body = client.get("/api/his/patient/P009").json()
+    names = [d["name"] for d in body["suspected_diagnoses"]]
+    conf = {d["name"]: d["confidence"] for d in body["suspected_diagnoses"]}
+
+    cancer = names.index("子宫内膜癌")
+    functional = names.index("围绝经期无排卵性异常子宫出血（AUB-O）")
+    assert cancer < functional, "内膜癌必须排在无排卵性出血之前"
+    assert conf["子宫内膜癌"] < conf["围绝经期无排卵性异常子宫出血（AUB-O）"], (
+        "这条用例的前提就是「可能性更低」—— 若两者置信度反了，它就测不出排序原则"
+    )
+
+
+def test_p009_negative_findings_are_kept_not_dropped(client):
+    """
+    阴性结果要留在档案里。β-hCG、TSH、凝血四项都是**用来排除**的，
+    删掉它们病历就只剩支持证据 —— F04 L44「反对证据没有时写未获得，不得写无」
+    守的是同一件事，这里守的是数据源头。
+    """
+    body = client.get("/api/his/patient/P009").json()
+    names = {lab["name"] for lab in body["lab_results"]}
+    for must in ("人绒毛膜促性腺激素(β-hCG)", "促甲状腺激素(TSH)", "凝血酶原时间(PT)"):
+        assert must in names, f"缺少排除性检验：{must}"
+        lab = next(x for x in body["lab_results"] if x["name"] == must)
+        assert lab["abnormal"] is False and lab["diff_note"], "阴性项必须带上它排除了什么"
+
+
+def test_p009_has_pending_reports_for_the_board(client):
+    """
+    科室看板的「待报告」一档要有真实数据。做这个功能时发现库里 21 项检查
+    全是「已完成」，那一档一条数据都没有 —— 新病例不该再把它做空。
+    """
+    exams = client.get("/api/emr/objective/P009").json()["examinations"]
+    pending = [e for e in exams if e["status"] in ("已开单", "检查中")]
+    assert len(pending) >= 2, "宫腔镜活检与阴道镜都还没出结果"
+
+
+# -------------------------------------------------------------- 同类药交叉过敏
+
+
+def test_allergy_matches_same_class_drugs():
+    """
+    过敏拦截必须认**同类药**，不能只做子串。
+
+    「青霉素」与「阿莫西林」毫无字面交集，而阿莫西林就是青霉素类 ——
+    这正是临床上最常见的一种过敏事故，只做子串会整条漏掉。
+    P008 的「头孢 × 头孢呋辛酯片」能拦住，只是因为字面凑巧重合。
+    """
+    from app.agents.risk import hard_rule_alerts
+
+    alerts = hard_rule_alerts({
+        "allergy_status": "confirmed",
+        "allergies": ["青霉素"],
+        "orders": [{"drug": "阿莫西林克拉维酸钾片"}],
+    })
+    conflicts = [a for a in alerts if a.get("rule") == "allergy_conflict"]
+    assert conflicts, "青霉素过敏 × 阿莫西林必须拦"
+    assert "同属" in conflicts[0]["summary"], "要说清为什么拦 —— 医生看不出关联就会以为是误报"
+
+
+def test_allergy_class_matching_is_bidirectional():
+    """过敏史记成类名（青霉素）或具体药名（阿莫西林）都要拦得住 —— 两种写法都真实存在。"""
+    from app.agents.risk import hard_rule_alerts
+
+    alerts = hard_rule_alerts({
+        "allergy_status": "confirmed",
+        "allergies": ["阿莫西林"],
+        "orders": [{"drug": "注射用哌拉西林钠"}],
+    })
+    assert [a for a in alerts if a.get("rule") == "allergy_conflict"]
+
+
+def test_allergy_does_not_cross_between_classes():
+    """
+    **不做类间联想。** 青霉素与头孢确有 1–2% 交叉反应，但把所有头孢
+    对青霉素过敏者标红会让红线迅速贬值成噪声 —— 与鉴别诊断限 2 条 critical
+    是同一个道理：过度告警等于没有告警。需要权衡的那一档交给模型。
+    """
+    from app.agents.risk import hard_rule_alerts
+
+    alerts = hard_rule_alerts({
+        "allergy_status": "confirmed",
+        "allergies": ["青霉素"],
+        "orders": [{"drug": "头孢呋辛酯片"}],
+    })
+    assert not [a for a in alerts if a.get("rule") == "allergy_conflict"]
+
+
+def test_allergy_class_table_uses_generic_names_only():
+    """
+    类表按通用名写，不收商品名。商品名成千上万且各院不同，
+    一份追不全的清单会让人误以为「没告警就是安全」。
+    """
+    from app.agents.risk import DRUG_CLASSES
+
+    flat = [m for members in DRUG_CLASSES.values() for m in members]
+    assert flat, "类表不能是空的"
+    for name in flat:
+        assert not any(ch in name for ch in "®™()（）"), f"{name} 看起来像商品名"
+
+
+# ------------------------------------------------------ 置信度的单位与降级排序
+
+
+def test_seed_confidence_uses_the_same_unit_as_the_contract(client):
+    """
+    种子里的 `confidence` 必须和输出契约同一个单位：**0–100 整数**。
+
+    契约写在 `schemas.py`（`ge=0, le=100`），界面直接渲染 `{{ confidence }}%`
+    和 `width: ${confidence}%`。种子却一直用 0–1 小数 —— 两个单位并存，
+    而降级路径 `int(0.94)` 会算出 **0**：所有鉴别诊断显示 0%，
+    看起来像模型对每一条都毫无把握。
+
+    模型在场时它的输出会盖掉种子，所以这个洞在正常路径上看不见 ——
+    只在网关抖动降级时才露出来，而那正是演示最怕的时刻。
+    """
+    import json
+    from pathlib import Path
+
+    rows = json.loads(
+        (Path(__file__).resolve().parents[3] / "references/ui-demo/extracted/fixtures/patients.json")
+        .read_text(encoding="utf-8")
+    )
+    for patient in rows:
+        for d in patient.get("suspected_diagnoses") or []:
+            c = d["confidence"]
+            assert isinstance(c, int), f"{patient['id']} {d['name']} 的 confidence 是 {c!r}，应为整数"
+            assert 0 <= c <= 100, f"{patient['id']} {d['name']} 的 confidence 越界：{c}"
+            assert c % 5 == 0, f"{patient['id']} {d['name']} 的 confidence 应取 5 的倍数：{c}"
+
+
+def test_degraded_diagnosis_keeps_consequence_ordering():
+    """
+    降级时也要按「先后果、再可能性」排（F04 L51）。
+
+    降级分支原来只按 confidence 排，与模型路径的口径正相反 ——
+    演示时网关一抖，25% 的子宫内膜癌就会被 60% 的功血顶下去，
+    而那恰恰是这条规格要防的事。
+    """
+    from app.agents.diagnosis import DiagnosisAgent
+
+    out = DiagnosisAgent().fallback({
+        "suspected_diagnoses": [
+            {"name": "功能性出血", "confidence": 60, "icd": "N93.8", "severity": "routine"},
+            {"name": "子宫内膜癌", "confidence": 25, "icd": "C54.1", "severity": "critical"},
+        ]
+    })
+    names = [d["name"] for d in out["suspected_diagnoses"]]
+    assert names[0] == "子宫内膜癌", f"降级排序仍按置信度：{names}"
+
+
+def test_degraded_unknown_severity_falls_to_the_lightest_tier():
+    """
+    没标 severity 的落到**最轻**档，不是最重。
+
+    与模型路径同一条理由：拿不准就往上标，「不能漏」这个标记会迅速贬值成噪声。
+    P001–P008 的种子都没有 severity，若默认成 critical，它们会集体挤到
+    标了 critical 的真危重项前面。
+
+    **这条用例第一版是空过的** —— 两条都不带 severity，默认值改成什么
+    相对顺序都不变，变异验证当场把它抓出来了。现在一条标了最轻档、
+    一条不标，默认值一旦调重就会分出先后。
+    """
+    from app.agents.diagnosis import DiagnosisAgent
+
+    out = DiagnosisAgent().fallback({
+        "suspected_diagnoses": [
+            # 明确标最轻、且置信度更高 —— 它应当在前
+            {"name": "已标routine", "confidence": 90, "icd": "X", "severity": "routine"},
+            # 没标。若默认成 critical，它会越过上面那条
+            {"name": "未标severity", "confidence": 40, "icd": "Y"},
+        ]
+    })
+    assert [d["name"] for d in out["suspected_diagnoses"]] == ["已标routine", "未标severity"]
+    assert all(d["severity"] == "routine" for d in out["suspected_diagnoses"])
+
+
+def test_degraded_invalid_severity_falls_to_the_lightest_tier():
+    """
+    档位是**闭集**。模型或手工数据写了个不在集合里的词（"严重"、"high"…），
+    要落到最轻档，不是让它靠 `SEVERITY_ORDER.index` 抛异常，
+    也不是当成最重 —— 后者等于给任何一个拼写错误发一张插队证。
+    """
+    from app.agents.diagnosis import DiagnosisAgent
+
+    out = DiagnosisAgent().fallback({
+        "suspected_diagnoses": [
+            {"name": "正常项", "confidence": 90, "icd": "X", "severity": "routine"},
+            {"name": "档位写错", "confidence": 40, "icd": "Y", "severity": "非常严重"},
+        ]
+    })
+    assert [d["name"] for d in out["suspected_diagnoses"]] == ["正常项", "档位写错"]
+    assert out["suspected_diagnoses"][1]["severity"] == "routine"

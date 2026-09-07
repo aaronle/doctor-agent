@@ -1,129 +1,185 @@
 {
- "P001": {
-  "detected": true,
-  "risk_level": "高风险",
-  "conditions": [
-   {
-    "name": "2型糖尿病",
-    "icd": "E11.9",
-    "duration": "5年",
-    "risk_level": "高危",
-    "analysis": "糖尿病病程5年，近期血糖控制不佳（HbA1c 8.5%），存在糖尿病肾病早期风险。建议加强血糖监测，考虑SGLT2i或GLP-1RA类药物。",
-    "recommended_dept": "内分泌科"
-   },
-   {
-    "name": "原发性高血压 2级",
-    "icd": "I10",
-    "duration": "3年",
-    "risk_level": "高危",
-    "analysis": "高血压合并糖尿病，需更严格控制血压（目标<130/80mmHg）。建议调整降压方案，优选ACEI/ARB类。",
-    "recommended_dept": "心内科"
-   },
-   {
-    "name": "高脂血症",
-    "icd": "E78.5",
-    "duration": "2年",
-    "risk_level": "高危",
-    "analysis": "合并糖尿病+高血压，ASCVD风险分层为极高危。LDL-C目标<1.8mmol/L。",
-    "recommended_dept": "心内科"
-   },
-   {
-    "name": "超重",
-    "icd": "E66.3",
-    "risk_level": "中危",
-    "analysis": "BMI 26.1kg/m²，建议制定个体化饮食运动方案，目标减重5-10%。",
-    "recommended_dept": "营养科"
-   }
-  ],
-  "summary": "患者同时患有2型糖尿病、原发性高血压、高脂血症、超重等4种慢性疾病，属于典型的多病共存患者。需综合管理而非单病种分治。",
-  "recommendation": "建议转诊至「多病共存管理门诊」进行综合评估和管理。"
- },
- "P006": {
-  "detected": true,
-  "risk_level": "高风险",
-  "conditions": [
-   {
-    "name": "脑梗死（急性期）",
-    "icd": "I63.9",
-    "duration": "3天",
-    "risk_level": "高危",
-    "analysis": "急性脑梗死3天，需紧急启动二级预防：双联抗血小板+强化降脂。",
-    "recommended_dept": "神经内科"
-   },
-   {
-    "name": "高血压 3级",
-    "icd": "I10",
-    "duration": "15年",
-    "risk_level": "高危",
-    "analysis": "高血压合并脑梗死、糖尿病，属极高危。需严格控制血压<130/80mmHg。",
-    "recommended_dept": "心内科"
-   },
-   {
-    "name": "2型糖尿病",
-    "icd": "E11.9",
-    "duration": "10年",
-    "risk_level": "中危",
-    "analysis": "合并脑梗死，需强化降糖管理。建议优选具有心血管获益的降糖药物。",
-    "recommended_dept": "内分泌科"
-   },
-   {
-    "name": "高脂血症",
-    "icd": "E78.5",
-    "duration": "10年",
-    "risk_level": "高危",
-    "analysis": "LDL-C 3.6mmol/L，脑梗死患者目标<1.8mmol/L，严重不达标。",
-    "recommended_dept": "心内科"
-   }
-  ],
-  "summary": "患者同时患有脑梗死（急性期）、高血压3级、2型糖尿病、高脂血症等4种疾病，属于典型的多病共存高危患者。",
-  "recommendation": "建议启动多学科协作（MDT）会诊，联合制定综合治疗方案。"
- },
- "P008": {
-  "detected": true,
-  "risk_level": "高风险",
-  "conditions": [
-   {
-    "name": "双膝骨关节炎（右膝 K-L Ⅳ级）",
-    "icd": "M17.0",
-    "duration": "5年",
-    "risk_level": "高危",
-    "analysis": "保守治疗失效，出现夜间静息痛，具备全膝关节置换指征。",
-    "recommended_dept": "骨科"
-   },
-   {
-    "name": "2型糖尿病",
-    "icd": "E11.9",
-    "duration": "6年",
-    "risk_level": "高危",
-    "analysis": "HbA1c 8.1% 未达标，是假体周围感染的独立危险因素，须术前优化。",
-    "recommended_dept": "内分泌科"
-   },
-   {
-    "name": "骨质疏松症",
-    "icd": "M81.0",
-    "duration": "未规律治疗",
-    "risk_level": "中危",
-    "analysis": "腰椎 T 值 −2.8，影响假体初始固定与术中骨折风险。",
-    "recommended_dept": "内分泌科"
-   },
-   {
-    "name": "原发性高血压 2级",
-    "icd": "I10",
-    "duration": "8年",
-    "risk_level": "中危",
-    "analysis": "本次 152/88 mmHg 未达标，影响麻醉与围术期血流动力学管理。",
-    "recommended_dept": "心内科"
-   },
-   {
-    "name": "肥胖症",
-    "icd": "E66.9",
-    "duration": "多年",
-    "risk_level": "中危",
-    "analysis": "BMI 31.4，既加重关节负荷，也抬高感染与 VTE 风险。",
-    "recommended_dept": "营养科"
-   }
-  ],
-  "summary": "患者同时存在膝骨关节炎、2型糖尿病、骨质疏松、高血压、肥胖 5 种疾病，其中后四项全部指向同一个焦点——**能不能安全地做关节置换**。",
-  "recommendation": "建议以骨科为主科，联合内分泌科（血糖与骨代谢）、心内科（血压与麻醉评估）、营养科（减重与白蛋白）开展术前 MDT，明确手术窗口。"
- }
+  "P001": {
+    "detected": true,
+    "risk_level": "高风险",
+    "conditions": [
+      {
+        "name": "2型糖尿病",
+        "icd": "E11.9",
+        "duration": "5年",
+        "risk_level": "高危",
+        "analysis": "糖尿病病程5年，近期血糖控制不佳（HbA1c 8.5%），存在糖尿病肾病早期风险。建议加强血糖监测，考虑SGLT2i或GLP-1RA类药物。",
+        "recommended_dept": "内分泌科"
+      },
+      {
+        "name": "原发性高血压 2级",
+        "icd": "I10",
+        "duration": "3年",
+        "risk_level": "高危",
+        "analysis": "高血压合并糖尿病，需更严格控制血压（目标<130/80mmHg）。建议调整降压方案，优选ACEI/ARB类。",
+        "recommended_dept": "心内科"
+      },
+      {
+        "name": "高脂血症",
+        "icd": "E78.5",
+        "duration": "2年",
+        "risk_level": "高危",
+        "analysis": "合并糖尿病+高血压，ASCVD风险分层为极高危。LDL-C目标<1.8mmol/L。",
+        "recommended_dept": "心内科"
+      },
+      {
+        "name": "超重",
+        "icd": "E66.3",
+        "risk_level": "中危",
+        "analysis": "BMI 26.1kg/m²，建议制定个体化饮食运动方案，目标减重5-10%。",
+        "recommended_dept": "营养科"
+      }
+    ],
+    "summary": "患者同时患有2型糖尿病、原发性高血压、高脂血症、超重等4种慢性疾病，属于典型的多病共存患者。需综合管理而非单病种分治。",
+    "recommendation": "建议转诊至「多病共存管理门诊」进行综合评估和管理。"
+  },
+  "P006": {
+    "detected": true,
+    "risk_level": "高风险",
+    "conditions": [
+      {
+        "name": "脑梗死（急性期）",
+        "icd": "I63.9",
+        "duration": "3天",
+        "risk_level": "高危",
+        "analysis": "急性脑梗死3天，需紧急启动二级预防：双联抗血小板+强化降脂。",
+        "recommended_dept": "神经内科"
+      },
+      {
+        "name": "高血压 3级",
+        "icd": "I10",
+        "duration": "15年",
+        "risk_level": "高危",
+        "analysis": "高血压合并脑梗死、糖尿病，属极高危。需严格控制血压<130/80mmHg。",
+        "recommended_dept": "心内科"
+      },
+      {
+        "name": "2型糖尿病",
+        "icd": "E11.9",
+        "duration": "10年",
+        "risk_level": "中危",
+        "analysis": "合并脑梗死，需强化降糖管理。建议优选具有心血管获益的降糖药物。",
+        "recommended_dept": "内分泌科"
+      },
+      {
+        "name": "高脂血症",
+        "icd": "E78.5",
+        "duration": "10年",
+        "risk_level": "高危",
+        "analysis": "LDL-C 3.6mmol/L，脑梗死患者目标<1.8mmol/L，严重不达标。",
+        "recommended_dept": "心内科"
+      }
+    ],
+    "summary": "患者同时患有脑梗死（急性期）、高血压3级、2型糖尿病、高脂血症等4种疾病，属于典型的多病共存高危患者。",
+    "recommendation": "建议启动多学科协作（MDT）会诊，联合制定综合治疗方案。"
+  },
+  "P008": {
+    "detected": true,
+    "risk_level": "高风险",
+    "conditions": [
+      {
+        "name": "双膝骨关节炎（右膝 K-L Ⅳ级）",
+        "icd": "M17.0",
+        "duration": "5年",
+        "risk_level": "高危",
+        "analysis": "保守治疗失效，出现夜间静息痛，具备全膝关节置换指征。",
+        "recommended_dept": "骨科"
+      },
+      {
+        "name": "2型糖尿病",
+        "icd": "E11.9",
+        "duration": "6年",
+        "risk_level": "高危",
+        "analysis": "HbA1c 8.1% 未达标，是假体周围感染的独立危险因素，须术前优化。",
+        "recommended_dept": "内分泌科"
+      },
+      {
+        "name": "骨质疏松症",
+        "icd": "M81.0",
+        "duration": "未规律治疗",
+        "risk_level": "中危",
+        "analysis": "腰椎 T 值 −2.8，影响假体初始固定与术中骨折风险。",
+        "recommended_dept": "内分泌科"
+      },
+      {
+        "name": "原发性高血压 2级",
+        "icd": "I10",
+        "duration": "8年",
+        "risk_level": "中危",
+        "analysis": "本次 152/88 mmHg 未达标，影响麻醉与围术期血流动力学管理。",
+        "recommended_dept": "心内科"
+      },
+      {
+        "name": "肥胖症",
+        "icd": "E66.9",
+        "duration": "多年",
+        "risk_level": "中危",
+        "analysis": "BMI 31.4，既加重关节负荷，也抬高感染与 VTE 风险。",
+        "recommended_dept": "营养科"
+      }
+    ],
+    "summary": "患者同时存在膝骨关节炎、2型糖尿病、骨质疏松、高血压、肥胖 5 种疾病，其中后四项全部指向同一个焦点——**能不能安全地做关节置换**。",
+    "recommendation": "建议以骨科为主科，联合内分泌科（血糖与骨代谢）、心内科（血压与麻醉评估）、营养科（减重与白蛋白）开展术前 MDT，明确手术窗口。"
+  },
+  "P009": {
+    "detected": true,
+    "risk_level": "高风险",
+    "conditions": [
+      {
+        "name": "缺铁性贫血（重度）",
+        "icd": "D50.9",
+        "duration": "6个月",
+        "risk_level": "高危",
+        "analysis": "血红蛋白 58 g/L 已达危急值下限，铁蛋白 6.2 ng/mL 提示储备耗竭。口服补铁追不上失血速度，需静脉铁剂并评估输血指征。",
+        "recommended_dept": "血液科"
+      },
+      {
+        "name": "子宫内膜病变待排",
+        "icd": "N85.9",
+        "duration": "1个月",
+        "risk_level": "高危",
+        "analysis": "内膜 14 mm 伴丰富血流，叠加肥胖、2 型糖尿病、长期无排卵三项内膜癌高危因素。诊断只能靠病理，影像不能替代。",
+        "recommended_dept": "妇科"
+      },
+      {
+        "name": "2型糖尿病",
+        "icd": "E11.9",
+        "duration": "4年",
+        "risk_level": "高危",
+        "analysis": "HbA1c 8.3% 持续上行。高胰岛素血症既是内膜增生的促进因素，也影响后续手术与麻醉安全。",
+        "recommended_dept": "内分泌科"
+      },
+      {
+        "name": "多囊卵巢综合征",
+        "icd": "E28.2",
+        "duration": "十余年",
+        "risk_level": "中危",
+        "analysis": "长期无排卵使内膜处于单一雌激素刺激下，是本次内膜病变的病理基础，不是独立的旁枝问题。",
+        "recommended_dept": "内分泌科"
+      },
+      {
+        "name": "肥胖症",
+        "icd": "E66.9",
+        "duration": "多年",
+        "risk_level": "中危",
+        "analysis": "BMI 32.8。脂肪组织外周芳香化增加内源性雌激素，与前两项互为因果。",
+        "recommended_dept": "营养科"
+      },
+      {
+        "name": "原发性高血压 1级",
+        "icd": "I10",
+        "duration": "2年",
+        "risk_level": "中危",
+        "analysis": "本次 138/86 mmHg。与肥胖同为代谢综合征组分，且是雌孕激素治疗选择时要考虑的因素。",
+        "recommended_dept": "心内科"
+      }
+    ],
+    "summary": "六项共病并非各自独立：多囊卵巢的长期无排卵、肥胖的外周雌激素转化、糖尿病的高胰岛素血症共同构成子宫内膜病变的病理基础，而慢性失血又造成了重度贫血。",
+    "recommendation": "以「先止血纠正贫血、同期取得病理」为主线：静脉铁剂并评估输血，尽快完成宫腔镜活检与阴道镜。内分泌与营养干预是长期防复发的部分，不应因此推迟病理诊断。"
+  }
 }

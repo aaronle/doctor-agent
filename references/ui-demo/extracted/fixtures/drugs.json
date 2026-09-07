@@ -142,5 +142,53 @@
     "unit": "片",
     "category": "复方降压药",
     "stock": 100
+  },
+  {
+    "id": "D019",
+    "name": "阿莫西林克拉维酸钾片",
+    "spec": "0.457g/片",
+    "unit": "片",
+    "category": "抗菌药",
+    "stock": 200
+  },
+  {
+    "id": "D020",
+    "name": "氨甲环酸片",
+    "spec": "0.5g/片",
+    "unit": "片",
+    "category": "止血药",
+    "stock": 300
+  },
+  {
+    "id": "D021",
+    "name": "琥珀酸亚铁片",
+    "spec": "0.1g/片",
+    "unit": "片",
+    "category": "抗贫血药",
+    "stock": 400
+  },
+  {
+    "id": "D022",
+    "name": "屈螺酮炔雌醇片(II)",
+    "spec": "1片/片",
+    "unit": "片",
+    "category": "性激素",
+    "stock": 150
+  },
+  {
+    "id": "D023",
+    "name": "醋酸甲羟孕酮片",
+    "spec": "10mg/片",
+    "unit": "片",
+    "category": "性激素",
+    "stock": 200
+  },
+  {
+    "id": "D024",
+    "name": "蔗糖铁注射液",
+    "spec": "100mg/5mL",
+    "unit": "支",
+    "category": "抗贫血药",
+    "stock": 120
   }
 ]
