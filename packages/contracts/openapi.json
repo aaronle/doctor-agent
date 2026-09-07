@@ -3186,6 +3186,7 @@
           "preferences"
         ],
         "summary": "Get Preferences",
+        "description": "读一份**完整**偏好，外加一个 `stored`：库里到底有没有这一行。\n\n完整性那条契约不变（见模块文档）—— 但只有完整性还不够：前端因此分不清\n「医生就是要默认」和「这行根本没写过」，而这两件事的正确处理相反。\n没写过时，本地那份要**推上去**，不是被后端的默认值冲掉。\n\n这不是假想的边角情形。旧字号 key 的迁移（规格 §4.1）每个老用户都会撞上：\n迁移把旧值读进本地，紧接着 `load()` 就用后端的默认值把它抹了。",
         "operationId": "get_preferences_api_preferences_get",
         "parameters": [
           {

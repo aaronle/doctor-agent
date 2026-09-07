@@ -371,3 +371,98 @@ describe('个人配置 · 服务端回了个怪东西', () => {
     expect(p.prefs.value.theme).toBe('contrast')
   })
 })
+
+describe('个人配置 · 医生名是全局的', () => {
+  /**
+   * 这条是在**真浏览器里**发现的，单测全绿时它已经坏了 ——
+   * 因为每条用例都在同一个实例上先 `load` 再 `update`，永远碰不到。
+   *
+   * `actorRef` 原来建在 `usePreferences()` 内部，于是每个调用点各拿一份：
+   * App.vue 那份 `load('张医生')` 之后知道医生是谁，浮窗组件那份是空串。
+   * 浮窗自动写回的布局因此落到了服务端的 `demo-doctor` 名下 ——
+   * **换台电脑登录同一个医生名，布局读不回来**（AC-PREF-005）。
+   *
+   * 本地 localStorage 仍然生效，所以表面上「看起来是好的」。
+   * 这类 bug 只有跨实例才暴露得出来。
+   */
+  it('一处 load，别处 update 也带同一个医生名', async () => {
+    await usePreferences().load('王医生')
+
+    // 另一个调用点 —— 组件里就是这么拿的，它自己不会去 load
+    await usePreferences().update({ windows: { panel_width: 320 } })
+
+    expect(vi.mocked(api.savePreferences).mock.lastCall?.[0]).toBe('王医生')
+  })
+
+  it('恢复默认同理 —— 别把别人的那一行删了', async () => {
+    await usePreferences().load('王医生')
+    await usePreferences().resetAll()
+
+    expect(vi.mocked(api.resetPreferences).mock.lastCall?.[0]).toBe('王医生')
+  })
+})
+
+describe('个人配置 · 后端还没有这一行', () => {
+  /**
+   * 「后端为准」这条规则在**后端从没写过**时会反过来伤人：服务端对没有记录的
+   * 医生也返回一份完整默认值，客户端照单全收，本地设置当场清零。
+   *
+   * 每个老用户都会撞上：旧字号 key 的迁移把值读进本地，紧接着 `load()`
+   * 就把它抹了 —— 规格 §4.1 承诺的迁移等于没做。
+   *
+   * 判据是服务端下发的 `stored`，不是「远端等于默认值」—— 后者分不清
+   * 「医生显式选了默认」和「这行不存在」，而这两件事的正确处理相反。
+   */
+  it('本地那份保住，不被后端的默认值冲掉', async () => {
+    window.localStorage.setItem(
+      'doctor-agent:preferences',
+      JSON.stringify({ theme: 'eyecare', font_level: 'large' }),
+    )
+    vi.mocked(api.fetchPreferences).mockResolvedValue({
+      actor: '张医生', prefs: { ...FALLBACK_DEFAULTS }, stored: false,
+    } as never)
+
+    const p = usePreferences()
+    await p.load('张医生')
+
+    expect(p.prefs.value.theme).toBe('eyecare')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('eyecare')
+  })
+
+  it('并且**推上去** —— 否则换台电脑还是拿不到', async () => {
+    window.localStorage.setItem(
+      'doctor-agent:preferences',
+      JSON.stringify({ theme: 'eyecare' }),
+    )
+    vi.mocked(api.fetchPreferences).mockResolvedValue({
+      actor: '张医生', prefs: { ...FALLBACK_DEFAULTS }, stored: false,
+    } as never)
+
+    await usePreferences().load('张医生')
+
+    expect(vi.mocked(api.savePreferences).mock.lastCall?.[1]).toMatchObject({ theme: 'eyecare' })
+  })
+
+  it('本地也是干净的就什么都不做 —— 别为「两边都是默认」凭空建一行', async () => {
+    vi.mocked(api.fetchPreferences).mockResolvedValue({
+      actor: '张医生', prefs: { ...FALLBACK_DEFAULTS }, stored: false,
+    } as never)
+    const before = vi.mocked(api.savePreferences).mock.calls.length
+
+    await usePreferences().load('张医生')
+
+    expect(vi.mocked(api.savePreferences).mock.calls.length).toBe(before)
+  })
+
+  it('后端有这一行时照旧以它为准', async () => {
+    window.localStorage.setItem('doctor-agent:preferences', JSON.stringify({ theme: 'eyecare' }))
+    vi.mocked(api.fetchPreferences).mockResolvedValue({
+      actor: '张医生', prefs: { ...FALLBACK_DEFAULTS, theme: 'contrast' }, stored: true,
+    } as never)
+
+    const p = usePreferences()
+    await p.load('张医生')
+
+    expect(p.prefs.value.theme).toBe('contrast')
+  })
+})

@@ -343,3 +343,39 @@ def test_a_full_layout_still_fits_under_the_cap(client):
     assert len(full) <= MAX_WINDOW_KEYS, f"完整布局 {len(full)} 项，上限只有 {MAX_WINDOW_KEYS}"
     r = client.put("/api/preferences", json={"actor": "整套医生", "prefs": {"windows": full}})
     assert r.status_code == 200, r.json()
+
+
+# -------------------------------------------------------------- 有没有这一行
+
+
+def test_get_says_whether_a_row_exists(client):
+    """
+    GET 仍然返回一份**完整**偏好（合并过默认值），但要额外说清
+    **库里到底有没有这一行**。
+
+    少了这个标志，前端分不清「医生就是要默认」和「这行根本没写过」——
+    而它必须分清：本地有设置、后端没有记录时，正确做法是把本地那份推上去，
+    而不是拿后端的默认值把本地冲掉。
+
+    这不是假想。旧字号 key 的迁移（规格 §4.1）**每个老用户都会撞上**：
+    迁移把旧值读进本地，紧接着 load() 就用后端的默认值把它抹了。
+    """
+    fresh = client.get("/api/preferences", params={"actor": "新医生"}).json()
+    assert fresh["stored"] is False
+    # 完整性这条契约不变
+    assert fresh["prefs"]["theme"] == "default"
+    assert set(fresh["prefs"]) >= {"theme", "font_level", "follow_up", "remember_windows", "windows"}
+
+    client.put("/api/preferences", json={"actor": "新医生", "prefs": {"theme": "eyecare"}})
+    after = client.get("/api/preferences", params={"actor": "新医生"}).json()
+    assert after["stored"] is True
+
+
+def test_reset_makes_the_row_absent_again(client):
+    """恢复默认是删行，所以 `stored` 要跟着回到 False —— 否则下次登录别的设备，
+    前端会以为「这个医生显式选择了全部默认」，从而不再把本地那份推上去。"""
+    client.put("/api/preferences", json={"actor": "复位医生", "prefs": {"theme": "contrast"}})
+    assert client.get("/api/preferences", params={"actor": "复位医生"}).json()["stored"] is True
+
+    client.delete("/api/preferences", params={"actor": "复位医生"})
+    assert client.get("/api/preferences", params={"actor": "复位医生"}).json()["stored"] is False

@@ -93,6 +93,17 @@ export const FOLLOW_UP_LABELS: Record<string, { name: string; desc: string }> = 
 
 /** 模块级单例：整个应用共用同一份偏好，各存一份必然会漂 */
 const prefs = ref<Preferences>({ ...FALLBACK_DEFAULTS })
+/**
+ * 当前医生名。**必须是模块级的，和 `prefs` 一样。**
+ *
+ * 曾经建在 `usePreferences()` 里面，于是每个调用点各拿一份：`App.vue` 那份
+ * `load('张医生')` 之后知道医生是谁，浮窗组件那份是空串 —— 浮窗自动写回的
+ * 布局因此落到服务端的 `demo-doctor` 名下，换台电脑登录同一个医生名读不回来。
+ *
+ * 本地 localStorage 照常生效，所以表面上完全看不出问题。
+ * 是在真浏览器里查「后端为什么没记住」时才发现的，单测全绿。
+ */
+const actorRef = ref('')
 const options = ref<PreferenceOptions | null>(null)
 const syncError = ref('')
 const loaded = ref(false)
@@ -208,7 +219,29 @@ export function bootstrapPreferences() {
 }
 
 export function usePreferences() {
-  const actorRef = ref('')
+  /**
+   * 后端还没有这一行，而本地有设置：把本地那份推上去。
+   *
+   * 不推的话，这台机器上的设置永远只是本地的 —— 换台电脑登录同一个医生名
+   * 依然是默认值，而 AC-PREF-005 承诺的是「换浏览器登录同一医生名，设置仍在」。
+   *
+   * 两边都是干净的就什么都不做：不为「都是默认」凭空建一行，
+   * 那与「恢复默认是删行」是同一条口径。
+   */
+  async function pushLocalUp(local: Partial<Preferences>) {
+    const patch: Partial<Preferences> = {}
+    for (const key of ['theme', 'font_level', 'follow_up', 'remember_windows'] as const) {
+      const v = local[key]
+      if (v !== undefined && v !== FALLBACK_DEFAULTS[key]) (patch as Record<string, unknown>)[key] = v
+    }
+    if (local.windows && Object.keys(local.windows).length) patch.windows = local.windows
+    if (!Object.keys(patch).length) return
+    try {
+      await savePreferences(actorRef.value, patch)
+    } catch {
+      // 推不上去不算失败：本地照常生效，下次进来还会再试一遍
+    }
+  }
 
   /**
    * 进入页面时调用。
@@ -227,9 +260,17 @@ export function usePreferences() {
         fetchPreferences(actor),
       ])
       options.value = opt
-      // 后端为准 —— 但只在它确实回了一份偏好时。回了别的就守着本地那份，
-      // 见 `isPreferences`
-      if (isPreferences(remote?.prefs)) apply(remote.prefs)
+      // 后端为准 —— 两个前提：它确实回了一份偏好（见 `isPreferences`），
+      // 且**库里真有这一行**（`stored`）。
+      //
+      // 少了后一个判断，「后端为准」在后端从没写过时会反过来伤人：服务端对
+      // 没有记录的医生也返回一份完整默认值，照单全收就是把本地设置清零。
+      // 每个老用户都会撞上 —— 旧字号 key 的迁移刚把值读进本地，
+      // 这一步就把它抹了，规格 §4.1 承诺的迁移等于没做。
+      if (isPreferences(remote?.prefs)) {
+        if (remote.stored === false) await pushLocalUp(local)
+        else apply(remote.prefs)
+      }
       syncError.value = ''
     } catch (error) {
       syncError.value = error instanceof Error ? error.message : String(error)

@@ -85,8 +85,22 @@ def get_options() -> dict:
 
 @router.get("")
 def get_preferences(actor: str = "", session: Session = Depends(get_session)) -> dict:
+    """
+    读一份**完整**偏好，外加一个 `stored`：库里到底有没有这一行。
+
+    完整性那条契约不变（见模块文档）—— 但只有完整性还不够：前端因此分不清
+    「医生就是要默认」和「这行根本没写过」，而这两件事的正确处理相反。
+    没写过时，本地那份要**推上去**，不是被后端的默认值冲掉。
+
+    这不是假想的边角情形。旧字号 key 的迁移（规格 §4.1）每个老用户都会撞上：
+    迁移把旧值读进本地，紧接着 `load()` 就用后端的默认值把它抹了。
+    """
     row = session.get(UserPreference, _actor(actor))
-    return {"actor": _actor(actor), "prefs": merge(row.prefs if row else None)}
+    return {
+        "actor": _actor(actor),
+        "prefs": merge(row.prefs if row else None),
+        "stored": row is not None,
+    }
 
 
 @router.put("")

@@ -949,7 +949,11 @@ export interface PreferenceOptions {
 export const fetchPreferenceOptions = () => get<PreferenceOptions>('/api/preferences/options')
 
 export const fetchPreferences = (actor: string) =>
-  get<{ actor: string; prefs: Preferences }>(`/api/preferences?actor=${encodeURIComponent(actor)}`)
+  // `stored` = 库里有没有这一行。没有时前端要把本地那份推上去，
+  // 而不是拿服务端的默认值把本地冲掉 —— 见 usePreferences.load
+  get<{ actor: string; prefs: Preferences; stored?: boolean }>(
+    `/api/preferences?actor=${encodeURIComponent(actor)}`,
+  )
 
 /** PATCH 语义：只传要改的项，没传的不动。 */
 export const savePreferences = (actor: string, prefs: Partial<Preferences>) =>

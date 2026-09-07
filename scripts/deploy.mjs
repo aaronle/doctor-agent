@@ -76,10 +76,21 @@ function run(label, cmd, args, { tone = 'dim' } = {}) {
 }
 
 /** 远端脚本从 stdin 送进 `bash -s`，避免为了引号转义把命令拧成一团。 */
+/**
+ * SSH 连接参数。**keepalive 不是可选的** —— 广州这条链路上跑十几分钟的
+ * docker build 时实测被 `Connection reset by peer` 掐断过，
+ * 而那一刀把整次部署都作废了。
+ */
+const SSH_OPTS = [
+  '-o', 'ServerAliveInterval=20',
+  '-o', 'ServerAliveCountMax=15',
+  '-o', 'ConnectTimeout=20',
+];
+
 function sshRun(label, script, tone = 'dim') {
   process.stdout.write(`  ▸ ${label} … `);
   const t0 = Date.now();
-  const r = spawnSync('ssh', ['-i', KEY, HOST, 'bash', '-s'], { encoding: 'utf8', input: script });
+  const r = spawnSync('ssh', [...SSH_OPTS, '-i', KEY, HOST, 'bash', '-s'], { encoding: 'utf8', input: script });
   const ms = Date.now() - t0;
   const out = `${r.stdout || ''}${r.stderr || ''}`.trim();
   for (const line of out.split('\n').filter(Boolean).slice(-14)) {
@@ -107,7 +118,7 @@ const rs = run('rsync 源码 → /tmp/da-src', 'rsync', [
   '--exclude', '/.git', '--exclude', 'node_modules', '--exclude', '/.venv',
   '--exclude', '/apps/web/dist', '--exclude', '/.env', '--exclude', '/data',
   '--exclude', '/build',
-  '-e', `ssh -i ${KEY}`,
+  '-e', `ssh ${SSH_OPTS.join(' ')} -i ${KEY}`,
   './', `${HOST}:/tmp/da-src/`,
 ]);
 if (!rs.ok) { push('部署', 'failed', 'rsync 失败'); await report('failed'); process.exit(1); }
@@ -115,19 +126,63 @@ if (!rs.ok) { push('部署', 'failed', 'rsync 失败'); await report('failed'); 
 // ── 2~4. 安装、构建、重建 ──────────────────────────────────────────────────
 // --delete 的作用域必须只有 source/，绝不能指向 /opt/doctor-agent/ ——
 // 持久化的 SQLite 在 /opt/doctor-agent/data 下，那一刀下去就没了。
-const build = sshRun(
-  '安装 → docker build → 重建容器',
+//
+// **构建脱离 SSH 连接跑。** 一次 docker build 十几分钟，链路抖一下就
+// `Connection reset by peer`，而在此之前那一刀会把整次部署作废 ——
+// 更糟的是它断在半路：镜像没换、容器还是旧的，但脚本已经退出了。
+// 现在 `setsid nohup` 起来写日志，本地只负责轮询那个日志和退出码。
+const BUILD_LOG = '/tmp/da-build.log';
+const BUILD_RC = '/tmp/da-build.rc';
+const start = sshRun(
+  '起构建（脱离连接）',
   `set -e
 rsync -a --delete /tmp/da-src/ /opt/doctor-agent/source/
-cd /opt/doctor-agent/source
-docker compose -f ${COMPOSE} build
-docker compose -f ${COMPOSE} up -d --force-recreate doctor-agent
-sleep 8
-docker ps --format '{{.Names}}\t{{.Status}}'
+rm -f ${BUILD_LOG} ${BUILD_RC}
+setsid nohup bash -c '
+  cd /opt/doctor-agent/source
+  docker compose -f ${COMPOSE} build \
+    && docker compose -f ${COMPOSE} up -d --force-recreate doctor-agent
+  echo $? > ${BUILD_RC}
+' > ${BUILD_LOG} 2>&1 < /dev/null &
+echo started
 `,
   'ok',
 );
-if (!build.ok) { push('部署', 'failed', '构建或重建失败'); await report('failed'); process.exit(1); }
+if (!start.ok) { push('部署', 'failed', '构建未能启动'); await report('failed'); process.exit(1); }
+
+/** 轮询远端构建。断线只会让这一轮 poll 失败，下一轮接着问，不影响构建本身。 */
+async function waitBuild(maxMs = 30 * 60 * 1000) {
+  const t0 = Date.now();
+  let lastTail = '';
+  while (Date.now() - t0 < maxMs) {
+    await new Promise((r) => setTimeout(r, 15000));
+    const q = spawnSync(
+      'ssh',
+      [...SSH_OPTS, '-i', KEY, HOST, `cat ${BUILD_RC} 2>/dev/null; echo ---; tail -3 ${BUILD_LOG} 2>/dev/null`],
+      { encoding: 'utf8' },
+    );
+    const out = `${q.stdout || ''}`;
+    const [rc, tail = ''] = out.split('---');
+    if (tail.trim() && tail.trim() !== lastTail) {
+      lastTail = tail.trim();
+      process.stdout.write('.');
+    }
+    if (rc.trim()) return { ok: rc.trim() === '0', ms: Date.now() - t0, out };
+  }
+  return { ok: false, ms: Date.now() - t0, out: '构建超过 30 分钟未结束' };
+}
+
+process.stdout.write('  ▸ 等构建完成 ');
+const build = await waitBuild();
+console.log(` ${build.ok ? '✓' : '✗'} (${(build.ms / 1000).toFixed(1)}s)`);
+if (!build.ok) {
+  const why = sshRun('取构建日志尾部', `tail -40 ${BUILD_LOG} 2>/dev/null || echo '没有日志'`, 'err');
+  console.log(why.out);
+  push('部署', 'failed', '构建或重建失败');
+  await report('failed');
+  process.exit(1);
+}
+sshRun('容器状态', `docker ps --format '{{.Names}}\t{{.Status}}'`, 'ok');
 
 // ── 5. 公网复验 ────────────────────────────────────────────────────────────
 // 健康接口**不读** assessment_catalog.json 与 knowledge_base.json，
