@@ -48,22 +48,31 @@ describe('字号 · 两个浮窗共用一个值', () => {
   })
 })
 
-describe('字号 · 存本地', () => {
-  it('设过就写进 localStorage —— 刷新、换病人都不该丢', () => {
-    // 字号是「设一次就不想再设」的偏好。
+describe('字号 · 谁负责存', () => {
+  /**
+   * 这一组原来断言的是「setLevel 自己写 localStorage」。
+   *
+   * 那正是要修的东西：配置页写 `doctor-agent:preferences`、这里写
+   * `doctor-agent:font-level`，**两个写入方各管各的** —— 在配置页把字号
+   * 调到特大，回工作站一点没变。持久化已收归 `usePreferences`
+   * （见 `usePreferences.spec.ts` 的「字号是同一份取值」），
+   * 这里只剩「应用」这一件事。
+   */
+  it('**不再自己写盘** —— 旧 key 只读不写，规格 §4.1', () => {
+    window.localStorage.removeItem('doctor-agent:font-level')
+
     useFontScale().setLevel('large')
-    expect(window.localStorage.getItem('doctor-agent:font-level')).toBe('large')
+
+    expect(useFontScale().level.value.key).toBe('large')
+    // 写了才是 bug：那就又有两个写入方了
+    expect(window.localStorage.getItem('doctor-agent:font-level')).toBeNull()
   })
 
-  it('localStorage 抛异常时回落默认，不让字号把页面拖垮', () => {
-    // 隐私模式下 setItem 会抛。字号不是关键功能。
-    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('QuotaExceeded')
-    })
-    const f = useFontScale()
-    expect(() => f.setLevel('small')).not.toThrow()
-    // 存不下，但本次会话内仍然生效
-    expect(f.level.value.key).toBe('small')
-    spy.mockRestore()
+  it('旧 key 仍然认 —— 老用户的字号要能迁过来', async () => {
+    // 迁移逻辑在 usePreferences.migrateLegacyFont；这里钉住「读」这一侧还在
+    window.localStorage.setItem('doctor-agent:font-level', 'xlarge')
+    vi.resetModules()
+    const fresh = await import('./useFontScale')
+    expect(fresh.useFontScale().level.value.key).toBe('xlarge')
   })
 })

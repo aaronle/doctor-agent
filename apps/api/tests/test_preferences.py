@@ -216,3 +216,130 @@ def test_window_key_count_is_capped(client):
     fat = {f"w{i}": 1 for i in range(MAX_WINDOW_KEYS + 1)}
     r = client.put("/api/preferences", json={"actor": "胖医生", "prefs": {"windows": fat}})
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------- 分离态的位置
+
+
+def test_separated_positions_are_storable(client):
+    """
+    分离态必须连**位置**一起记，不能只记尺寸。
+
+    `useDockedWindows` 在 `merged=false` 时用 `pos` 定位；只恢复 `merged` 而不
+    恢复位置，两个窗会一起被拍到 (0,0) 的左上角 —— 那比不恢复更糟。
+    规格 §4.2 也把「位置」列进了要记住的东西。
+    """
+    actor = "位医生"
+    r = client.put(
+        "/api/preferences",
+        json={
+            "actor": actor,
+            "prefs": {
+                "windows": {
+                    "merged": False,
+                    "panel_left": 900, "panel_top": 60,
+                    "drawer_left": 200, "drawer_top": 60,
+                }
+            },
+        },
+    )
+    assert r.status_code == 200, r.json()
+
+    windows = client.get("/api/preferences", params={"actor": actor}).json()["prefs"]["windows"]
+    assert windows["merged"] is False
+    assert windows["panel_left"] == 900
+    assert windows["drawer_top"] == 60
+
+
+def test_position_may_be_negative_but_not_off_into_the_void(client):
+    """
+    `left` 允许为负 —— `clampTitleBar` 本来就允许窗体左半部分出屏，
+    只要标题栏还抓得住。但也不能是任意数：存进去的值下次会被当成初始位置。
+    """
+    ok = client.put(
+        "/api/preferences", json={"actor": "负医生", "prefs": {"windows": {"panel_left": -400}}}
+    )
+    assert ok.status_code == 200
+
+    absurd = client.put(
+        "/api/preferences", json={"actor": "负医生", "prefs": {"windows": {"panel_left": -99999}}}
+    )
+    assert absurd.status_code == 400
+
+
+def test_top_is_never_negative(client):
+    """
+    `top` 为负意味着标题栏在屏幕上方 —— 那个窗再也抓不回来了。
+    `clampTitleBar` 前端钳的就是这一条，后端要一致。
+    """
+    r = client.put(
+        "/api/preferences", json={"actor": "顶医生", "prefs": {"windows": {"panel_top": -1}}}
+    )
+    assert r.status_code == 400
+
+
+def test_all_window_keys_fit_under_the_cap(client):
+    """
+    加了四个位置键之后，**一份完整的浮窗布局仍要能一次写进去**。
+    上限是防滥用的，不该把正常用法卡住 —— 这条测试就是那个对账。
+    """
+    from app.preferences import MAX_WINDOW_KEYS
+
+    full = {
+        "merged": False,
+        "panel_width": 320, "panel_height": 700,
+        "drawer_width": 900, "drawer_height": 700,
+        "panel_left": 1000, "panel_top": 50,
+        "drawer_left": 100, "drawer_top": 50,
+    }
+    assert len(full) <= MAX_WINDOW_KEYS
+    r = client.put("/api/preferences", json={"actor": "全医生", "prefs": {"windows": full}})
+    assert r.status_code == 200, r.json()
+
+
+def test_top_edge_offset_is_storable(client):
+    """
+    上边线拖出来的那段外边距也要能存。
+
+    不存的话医生把窗从上方收短、刷新一下又顶回去 —— 而另外三条边都记住了，
+    **只有一条边不记比全都不记更像坏了**。
+    """
+    actor = "顶边医生"
+    r = client.put(
+        "/api/preferences",
+        json={"actor": actor, "prefs": {"windows": {"panel_offset_top": 120, "drawer_offset_top": 80}}},
+    )
+    assert r.status_code == 200, r.json()
+
+    windows = client.get("/api/preferences", params={"actor": actor}).json()["prefs"]["windows"]
+    assert windows["panel_offset_top"] == 120
+
+
+def test_offset_cannot_be_negative(client):
+    """负的外边距等于把窗顶到默认位置上方 —— 前端 onTopMove 钳的就是这一条。"""
+    r = client.put(
+        "/api/preferences", json={"actor": "顶边医生", "prefs": {"windows": {"panel_offset_top": -1}}}
+    )
+    assert r.status_code == 400
+
+
+def test_a_full_layout_still_fits_under_the_cap(client):
+    """
+    加了位置与顶边偏移之后，**一份完整的浮窗布局仍要能一次写进去**。
+
+    键数上限是防滥用的（docs/19 P0-4），不该把正常用法卡住 ——
+    这条测试就是那个对账。它红了说明该抬上限，而不是该删字段。
+    """
+    from app.preferences import MAX_WINDOW_KEYS
+
+    full = {
+        "merged": False,
+        "panel_width": 320, "panel_height": 700,
+        "drawer_width": 900, "drawer_height": 700,
+        "panel_left": 1000, "panel_top": 50,
+        "drawer_left": 100, "drawer_top": 50,
+        "panel_offset_top": 40, "drawer_offset_top": 40,
+    }
+    assert len(full) <= MAX_WINDOW_KEYS, f"完整布局 {len(full)} 项，上限只有 {MAX_WINDOW_KEYS}"
+    r = client.put("/api/preferences", json={"actor": "整套医生", "prefs": {"windows": full}})
+    assert r.status_code == 200, r.json()

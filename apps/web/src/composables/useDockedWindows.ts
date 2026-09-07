@@ -176,6 +176,33 @@ export function useDockedWindows() {
     return overlapV && Math.min(gapRight, gapLeft) < SNAP_PX
   }
 
+  /**
+   * 铺回上次记住的布局（`useWindowMemory` 在进工作站时调）。
+   *
+   * **位置照样要钳。** 存下来的是上次那块屏幕上的坐标；换台小屏打开，
+   * 标题栏可能整个在屏幕外 —— 那个窗就再也抓不回来了。
+   * 和拖拽走同一个 `clampTitleBar`，不另写一套。
+   *
+   * 恢复成合并态时把冻住的尺寸一并释放：合并态的尺寸由 CSS 停靠决定，
+   * 留着 `size` 会让 `styleFor` 继续输出 `width/flex:none`，把停靠撑歪。
+   */
+  function restore(state: {
+    merged: boolean
+    pos: Record<WindowKey, WindowPos>
+    size: Record<WindowKey, { width: number; height: number } | null>
+  }) {
+    merged.value = state.merged
+    if (state.merged) {
+      size.value = { drawer: null, panel: null }
+      return
+    }
+    size.value = { ...state.size }
+    pos.value = {
+      drawer: clampTitleBar(state.pos.drawer, state.size.drawer?.width ?? 900),
+      panel: clampTitleBar(state.pos.panel, state.size.panel?.width ?? 300),
+    }
+  }
+
   /** 双击标题栏：回到默认停靠位置。拖乱了有一键还原，不用刷新页面 */
   function resetLayout() {
     merged.value = true
@@ -184,5 +211,5 @@ export function useDockedWindows() {
     willSnap.value = false
   }
 
-  return { merged, pos, size, dragging, willSnap, styleFor, startDrag, resetLayout }
+  return { merged, pos, size, dragging, willSnap, styleFor, startDrag, resetLayout, restore }
 }

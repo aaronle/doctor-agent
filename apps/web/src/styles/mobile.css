@@ -1076,3 +1076,31 @@
   align-items: center;
   gap: 8px;
 }
+
+/* ------------------------------------------------------------------ 字号
+ *
+ * 个人配置的字号档位（规格 §4.1）。桌面把 `zoom` 内联挂在浮窗的内容区上
+ * （外壳要承载拖拽坐标，不能缩放，见 useFontScale 文件头）；移动端没有那些
+ * 组件，改由根元素属性驱动。
+ *
+ * **挂 `.m-body` 不挂 `.m-page`。** `.m-page` 是 `position:fixed; inset:0`，
+ * 给它加 `zoom` 会让 `.m-scrim` / `.m-sheet` 改以它为包含块 ——
+ * 那两个「铺满屏幕」的浮层会当场算错大小。
+ *
+ * 标准档没有规则：`zoom:1` 同样会凭空造出一个包含块，而默认档本来一切正常。
+ */
+
+html[data-font='small'] .m-body,
+html[data-font='small'] .m-sheet-body {
+  zoom: 0.9;
+}
+
+html[data-font='large'] .m-body,
+html[data-font='large'] .m-sheet-body {
+  zoom: 1.15;
+}
+
+html[data-font='xlarge'] .m-body,
+html[data-font='xlarge'] .m-sheet-body {
+  zoom: 1.3;
+}

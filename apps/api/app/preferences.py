@@ -25,8 +25,9 @@ PREFERENCE_VERSION = 1
 #: 且必须等 scoped CSS 里的硬编码十六进制全部收敛完才可能做对。
 THEMES = ("default", "eyecare", "contrast")
 
-#: 字号档位。与前端 `useFontScale.ts` 的 zoom 0.9/1/1.15/1.3 一一对应，
-#: 改这里必须同步改那边 —— 它现在还自己存着 localStorage 的 doctor-agent:font-level
+#: 字号档位。与前端 `useFontScale.ts` 的 zoom 0.9/1/1.15/1.3 一一对应，改这里必须同步改那边。
+#: `useFontScale` 现在**只应用不写盘**，持久化归这套偏好一家管 —— 曾经两边各写各的 key，
+#: 结果是在配置页把字号调到特大、回工作站一点没变。
 FONT_LEVELS = ("small", "normal", "large", "xlarge")
 
 #: AI 智能追问的初始状态。
@@ -46,6 +47,24 @@ WINDOW_BOUNDS = {
     "panel_height": (320, 2000),
     "drawer_height": (320, 2000),
     "split_ratio": (25, 75),
+    #: 分离态下两个窗各自的位置。**只记尺寸不记位置是不行的** ——
+    #: `useDockedWindows` 在 merged=false 时完全按 pos 定位，恢复了分离态却
+    #: 没有位置，两个窗会一起被拍到屏幕左上角。
+    #:
+    #: `left` 允许为负：前端 `clampTitleBar` 本来就允许窗体左半部分出屏，
+    #: 只要标题栏还抓得住。`top` **不允许为负** —— 标题栏跑到屏幕上方之后
+    #: 那个窗再也抓不回来了，这正是 clampTitleBar 钳的那一条。
+    #: 上界给得比常见分辨率宽松（超宽屏、多显示器），但不是任意值：
+    #: 存进去的数下次会被当成初始位置用。
+    "panel_left": (-2000, 8000),
+    "drawer_left": (-2000, 8000),
+    "panel_top": (0, 4000),
+    "drawer_top": (0, 4000),
+    #: 拖**上边线**让出的那段外边距（前端 useResizable 的 `offset`）。
+    #: 上边线拖动时顶边下移、高度变矮，底边留在原地 —— 这个数就是顶边下移了多少。
+    #: 不能为负：负的等于把窗顶到默认位置上方，前端 `onTopMove` 钳的就是这一条。
+    "panel_offset_top": (0, 2000),
+    "drawer_offset_top": (0, 2000),
 }
 
 DEFAULTS: dict = {
@@ -83,7 +102,11 @@ class PreferenceError(ValueError):
 #: 不设上限的话，一个 curl 就能把 1MB 垃圾塞进库里，且每个伪造的 actor 一行。
 #: 见 docs/19-系统审计报告.md 的 P0-4。
 MAX_PREF_KEYS = 16
-MAX_WINDOW_KEYS = 12
+#: 上限是**防滥用**，不是「布局最多这么复杂」。一份完整布局现在要 11 项
+#: （4 尺寸 + 4 位置 + 2 顶边偏移 + merged），12 只剩一格富余 ——
+#: 下次加一个字段就会把正常用法卡住，而报出来的错是「windows 最多 12 项」，
+#: 看起来像医生做错了什么。`test_a_full_layout_still_fits_under_the_cap` 守着这个对账。
+MAX_WINDOW_KEYS = 16
 
 
 def _validate_windows(windows: dict) -> None:

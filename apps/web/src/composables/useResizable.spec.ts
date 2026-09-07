@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useResizable } from './useResizable'
 
@@ -202,5 +202,128 @@ describe('拉高 · 下边线', () => {
 
     r.reset()
     expect(r.style.value).toEqual({})
+  })
+})
+
+describe('边线拖拽 · 外部设定尺寸', () => {
+  /**
+   * `setSize` 是给「恢复记住的布局」用的（`useWindowMemory`）。
+   * 它必须**和拖拽走同一套钳位** —— 医生在 27 寸上把抽屉拉到 1800，
+   * 换台 13 寸打开时若照原样铺开，浮窗会把整个页面顶出去，
+   * 而他完全不会想到是「记住的布局」干的。
+   */
+  it('照常钳在 min/max 之间', () => {
+    const r = useResizable({ initial: 300, min: 260, max: 560 })
+
+    r.setSize(420)
+    expect(r.size.value).toBe(420)
+
+    r.setSize(9999)
+    expect(r.size.value).toBe(560)
+
+    r.setSize(10)
+    expect(r.size.value).toBe(260)
+  })
+
+  it('**还要受视口限制** —— 存的是大屏的值，小屏上要收回来', () => {
+    const r = useResizable({ initial: 300, min: 260, max: 1800 })
+    const original = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { value: 800, configurable: true })
+
+    r.setSize(1800)
+    expect(r.size.value).toBe(800)
+
+    Object.defineProperty(window, 'innerWidth', { value: original, configurable: true })
+  })
+
+  it('非数字一律不理 —— 库里那份是自由 JSON，不能当它一定干净', () => {
+    const r = useResizable({ initial: 300, min: 260, max: 560 })
+    r.setSize(420)
+    r.setSize(Number.NaN)
+    expect(r.size.value).toBe(420)
+  })
+})
+
+describe('边线拖拽 · 上边线', () => {
+  /**
+   * 原来只有下边线能拉，理由是「两个窗都锚在顶部，上边线拖不动」。
+   * 那条理由只在「顶边固定」这个前提下成立 —— 现在允许顶边跟着走，
+   * 医生就能从上下两头收放，而不必每次都把窗往下拽。
+   *
+   * **拖上边线时底边不动**：往下拖 = 顶边下移 + 高度变矮，两者的和恒等于
+   * 底边的位置。做不到这一点的话，拖上边线看起来像是整个窗在往下掉。
+   */
+  const drag = (r: ReturnType<typeof useResizable>, from: number, to: number) => {
+    r.onPointerDownTop({ clientY: from, preventDefault() {}, currentTarget: null } as never)
+    window.dispatchEvent(new MouseEvent('pointermove', { clientY: to }) as never)
+    window.dispatchEvent(new MouseEvent('pointerup') as never)
+  }
+
+  // jsdom 的视口高是 768，而 clamp 还要再受视口限制 —— 不放宽的话
+  // 这几条验的就变成了「撞没撞到视口上限」，而那条另有用例守着
+  let viewport = 0
+  beforeEach(() => {
+    viewport = window.innerHeight
+    Object.defineProperty(window, 'innerHeight', { value: 2000, configurable: true })
+  })
+  afterEach(() => {
+    Object.defineProperty(window, 'innerHeight', { value: viewport, configurable: true })
+  })
+
+  it('往下拖：变矮，同时顶边下移 —— 底边留在原地', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom' })
+
+    drag(r, 100, 150)
+
+    expect(r.size.value).toBe(750)
+    expect(r.offset.value).toBe(50)
+    // 顶 + 高 = 底边位置，拖前拖后一样
+    expect(r.offset.value + (r.size.value as number)).toBe(800)
+  })
+
+  it('往上拖：变高，顶边上移', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom' })
+    drag(r, 100, 150)   // 先下移 50
+    drag(r, 150, 120)   // 再上移 30
+
+    expect(r.offset.value).toBe(20)
+    expect(r.size.value).toBe(780)
+  })
+
+  it('**顶回原位就不再长高** —— 再往上拖会顶穿屏幕上沿', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom' })
+
+    drag(r, 100, -500)
+
+    expect(r.offset.value).toBe(0)
+    expect(r.size.value).toBe(800)
+  })
+
+  it('照常受 min 限制 —— 拖到比 min 还矮就停住，顶边也跟着停', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom' })
+
+    drag(r, 100, 900)
+
+    expect(r.size.value).toBe(320)
+    // 高度停在 320，顶边最多下移 480，否则底边会跟着往下跑
+    expect(r.offset.value).toBe(480)
+  })
+
+  it('双击恢复默认时**顶边一起归位** —— 只还高度会留下一条空隙', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom' })
+    drag(r, 100, 200)
+    expect(r.offset.value).toBeGreaterThan(0)
+
+    r.reset()
+
+    expect(r.size.value).toBeNull()
+    expect(r.offset.value).toBe(0)
+    expect(r.style.value).toEqual({})
+  })
+
+  it('顶边没动过时不输出 marginTop —— 免得凭空多一条外边距', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom' })
+    r.setSize(700)
+    expect(r.style.value).toEqual({ height: '700px' })
   })
 })

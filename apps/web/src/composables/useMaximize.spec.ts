@@ -141,3 +141,25 @@ describe('全屏 · ESC 退出', () => {
     expect(api.maximized.value).toBe('panel')
   })
 })
+
+describe('全屏 · 盖住上边线让出的外边距', () => {
+  /**
+   * 拖过上边线之后，窗体带着一条 `margin-top`。全屏是「铺满视口」，
+   * 那条外边距不清掉的话，全屏后顶上会留一道空白，而医生刚点的是「铺满」。
+   *
+   * 覆盖式样式的老规矩：**它要盖住的每一项都得显式写出来**，
+   * 漏一项就会以「大部分对了但有一处怪」的形式出现，最难查。
+   */
+  it('全屏时 marginTop 归零', () => {
+    const m = useMaximize()
+    m.toggle('panel')
+    expect((m.styleFor('panel').value as Record<string, string>).marginTop).toBe('0px')
+  })
+
+  it('退出全屏后不再输出 —— 原来的外边距要能回来', () => {
+    const m = useMaximize()
+    m.toggle('panel')
+    m.exit()
+    expect(m.styleFor('panel').value).toEqual({})
+  })
+})

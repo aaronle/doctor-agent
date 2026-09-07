@@ -17,8 +17,12 @@ import { useDockedWindows } from '../composables/useDockedWindows'
 import { useFontScale } from '../composables/useFontScale'
 import { useMaximize } from '../composables/useMaximize'
 import { useTelemetry } from '../composables/useTelemetry'
+import { usePreferences } from '../composables/usePreferences'
+import { useWindowMemory } from '../composables/useWindowMemory'
 
 const ws = useWorkstation()
+/** 个人配置。字号、追问模式、浮窗布局三项都从这里读 */
+const prefs = usePreferences()
 
 const TABS = ['智慧诊疗', '预警评估', '病历管理', '诊断管理', '医嘱管理', '共病管理', '健康档案', '时间轴'] as const
 type Tab = (typeof TABS)[number]
@@ -236,6 +240,22 @@ const dock = useDockedWindows()
 const drawerShell = ref<HTMLElement | null>(null)
 const panelShell = ref<HTMLElement | null>(null)
 
+/**
+ * 布局记忆：拖完自动存，进来时铺回去（规格 §4.2）。
+ *
+ * 先 `restore()` 再 `watchAndPersist()`，顺序不能反 —— 反过来会把恢复
+ * 本身当成一次改动写回库里，每次进工作站都白写一次。
+ */
+const windowMemory = useWindowMemory({
+  panelWidth: panelSize,
+  drawerWidth: drawerSize,
+  panelHeight,
+  drawerHeight,
+  dock,
+})
+windowMemory.restore()
+windowMemory.watchAndPersist()
+
 function beginDrag(key: 'drawer' | 'panel', e: PointerEvent) {
   // 标题栏里的按钮（✕ / — / Aa）不算拖 —— 否则指针被标题栏捕获，
   // 按钮收不到自己的 click。和追问提示浮框同一个坑。
@@ -261,6 +281,19 @@ function beginDrag(key: 'drawer' | 'panel', e: PointerEvent) {
  */
 const font = useFontScale()
 const fontMenuOpen = ref(false)
+
+/**
+ * 改字号要**写偏好**，不是直接调 `font.setLevel`。
+ *
+ * 那样只在当前这一屏有效：`setFontLevel` 已经改成纯应用器，
+ * 持久化归 `usePreferences` 一家管。曾经两边各写各的 key，
+ * 结果是在配置页把字号调到特大、回工作站一点没变。
+ */
+function chooseFont(key: string) {
+  fontMenuOpen.value = false
+  track('font_change', key)
+  void prefs.update({ font_level: key })
+}
 
 /**
  * 全屏（铺满视口）。ESC 退出。
@@ -1138,17 +1171,33 @@ const hintOpen = ref(false)
 const hasHints = computed(() => followUp.hasItems.value)
 
 /**
- * 自动浮出的判据：**攒够几条对话**，且清单里还有没问的。
+ * 追问提示的初始状态，来自个人配置（规格 §5）。
  *
- * 不在问诊一开始就弹：那时一条都没划掉，浮框看起来像在催人。
+ * 在此之前这一项恒为 `auto`：配置页上四个选项摆着，选哪个都一样。
+ */
+const followUpMode = computed(() => prefs.prefs.value.follow_up ?? 'auto')
+/** `off` 是**真的不算**，不是把结果藏起来 —— 那是 `manual` 和它唯一的区别 */
+const followUpEnabled = computed(() => followUpMode.value !== 'off')
+
+/**
+ * 自动浮出的判据。四档各不相同：
+ *
+ * | 档位 | 什么时候浮出 |
+ * | --- | --- |
+ * | `auto`（默认） | 攒够几条对话，且清单里还有没问的 |
+ * | `always` | 清单一到就浮 |
+ * | `manual` | 不自动浮，医生暂停时才给（`offerHints`） |
+ * | `off` | 不浮，且根本没有清单 |
+ *
+ * `auto` 不在问诊一开始就弹：那时一条都没划掉，浮框看起来像在催人。
  * 也不在「清单全划完」时弹：那时它没有任何要说的。
  */
-const shouldAutoOpen = computed(
-  () =>
-    !hintDismissed.value &&
-    voice.messages.value.length >= AUTO_OPEN_AFTER_MESSAGES &&
-    followUp.pending.value.length > 0,
-)
+const shouldAutoOpen = computed(() => {
+  if (hintDismissed.value || followUp.pending.value.length === 0) return false
+  if (followUpMode.value === 'off' || followUpMode.value === 'manual') return false
+  if (followUpMode.value === 'always') return true
+  return voice.messages.value.length >= AUTO_OPEN_AFTER_MESSAGES
+})
 
 watch(shouldAutoOpen, (ready) => {
   if (ready) {
@@ -1166,7 +1215,7 @@ watch(shouldAutoOpen, (ready) => {
 watch(
   () => voice.messages.value.length,
   (n) => {
-    if (n > 0) void followUp.advance(voice.messages.value)
+    if (n > 0 && followUpEnabled.value) void followUp.advance(voice.messages.value)
   },
 )
 
@@ -1186,7 +1235,8 @@ watch(
       hintMinimized.value = false
       return
     }
-    if (before === 'idle') void followUp.loadPlan()
+    // `off` 在这里就断掉 —— 规格 §5：off 是真的省一次模型调用
+    if (before === 'idle' && followUpEnabled.value) void followUp.loadPlan()
   },
 )
 
@@ -2344,10 +2394,21 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           </div>
         </div>
         <!--
-          下边线：拖它改高度。只有下边线能拉 —— 两个窗都锚在顶部
-          （wrapper top:15px），上边线拖不动，和「靠右停靠所以只有左边线
-          能拉宽」是同一个道理。双击恢复默认。
+          上下两条边线都能拖高度。
+          **上边线拖的时候底边不动** —— 顶边下移多少，高度就减多少，
+          医生因此可以从上下两头收放，不必每次都把整个窗往下拽。
+          双击任一条恢复默认（连顶边一起归位）。
         -->
+        <div
+          class="resize-edge-top"
+          :class="{ active: drawerHeight.resizing.value }"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="拖动调整AI 助手上边线，双击恢复默认"
+          title="拖动调整高度 · 双击恢复默认"
+          @pointerdown="drawerHeight.onPointerDownTop"
+          @dblclick="drawerHeight.reset"
+        />
         <div
           class="resize-edge-bottom"
           :class="{ active: drawerHeight.resizing.value }"
@@ -2423,7 +2484,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                   class="font-opt"
                   :class="{ on: lv.key === font.level.value.key }"
                   :style="{ fontSize: `${11 * lv.scale}px` }"
-                  @click="font.setLevel(lv.key); fontMenuOpen = false; track('font_change', lv.key)"
+                  @click="chooseFont(lv.key)"
                 >
                   <span>{{ lv.label }}</span>
                   <span class="font-opt-pct">{{ Math.round(lv.scale * 100) }}%</span>
@@ -2675,6 +2736,16 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           （wrapper top:15px），上边线拖不动，和「靠右停靠所以只有左边线
           能拉宽」是同一个道理。双击恢复默认。
         -->
+        <div
+          class="resize-edge-top"
+          :class="{ active: panelHeight.resizing.value }"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="拖动调整医生智能体上边线，双击恢复默认"
+          title="拖动调整高度 · 双击恢复默认"
+          @pointerdown="panelHeight.onPointerDownTop"
+          @dblclick="panelHeight.reset"
+        />
         <div
           class="resize-edge-bottom"
           :class="{ active: panelHeight.resizing.value }"

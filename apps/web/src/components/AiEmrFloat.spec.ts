@@ -1410,3 +1410,122 @@ describe('AI 助手收起时不挡 HIS', () => {
     expect(wrapper.find('.assistant-toggle').exists()).toBe(false)
   })
 })
+
+describe('AI 追问提示 · 初始状态跟随个人配置', () => {
+  const THREE = ['夜尿次数有增多吗？', '胸闷与活动有关吗？', '家族里有心脏病史吗？']
+
+  /**
+   * 规格 §5 的四档。在此之前这一项**恒为 auto 且读不到偏好** ——
+   * 配置页上四个选项摆着，选哪个都一样。
+   *
+   * `manual` 与 `off` 的区别在最后半句：**off 是真的省一次调用**，
+   * 不是只把结果藏起来。所以那条用例断言的是 API 没被调过，
+   * 而不是浮框没出现 —— 后者两档都成立，测不出区别。
+   */
+  async function withMode(mode: string) {
+    window.localStorage.setItem(
+      'doctor-agent:preferences',
+      JSON.stringify({ follow_up: mode }),
+    )
+    const { bootstrapPreferences } = await import('../composables/usePreferences')
+    bootstrapPreferences()
+  }
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('off：不出现，**而且不发起模型调用**', async () => {
+    await withMode('off')
+    const { api } = await import('../api')
+    const wrapper = await mountWithPatient()
+    await startInterview(wrapper, THREE)
+
+    // 等足够久 —— auto 档这时早就浮出来了
+    await new Promise((r) => setTimeout(r, 6000))
+
+    expect(wrapper.find('.hint-float').exists()).toBe(false)
+    expect(api.followUpPlan).not.toHaveBeenCalled()
+    expect(api.followUpCoverage).not.toHaveBeenCalled()
+  }, 20000)
+
+  it('off **不影响风险预警与写回门禁** —— 医生可以不看建议，不能不看危急值', async () => {
+    await withMode('off')
+    const { api } = await import('../api')
+    const wrapper = await mountWithPatient()
+    await startInterview(wrapper, THREE)
+    await new Promise((r) => setTimeout(r, 6000))
+
+    // 断言的是「哪条线断了、哪条没断」：追问断了，硬规则红线照常拉。
+    // 不去数 `.risk-alert-section` —— 桩里没有风险项，那个元素本来就不渲染，
+    // 断言它存在会因为无关的原因红，而它不存在也说明不了 off 是清白的
+    expect(api.followUpPlan).not.toHaveBeenCalled()
+    const urls = vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]))
+    expect(api.interviewInit).toHaveBeenCalled()
+    expect(urls.some((u) => u.includes('record/quality'))).toBe(true)
+  }, 20000)
+
+  it('manual：不自动弹，但**照常算** —— 医生偶尔要看时清单已经是热的', async () => {
+    await withMode('manual')
+    const { api } = await import('../api')
+    const wrapper = await mountWithPatient()
+    await startInterview(wrapper, THREE)
+
+    await vi.waitFor(() => expect(api.followUpPlan).toHaveBeenCalled(), { timeout: 12000 })
+    await new Promise((r) => setTimeout(r, 5000))
+
+    expect(wrapper.find('.hint-float').exists()).toBe(false)
+  }, 25000)
+
+  it('always：清单一到就显示，不等攒够 3 条', async () => {
+    await withMode('always')
+    const wrapper = await mountWithPatient()
+    await startInterview(wrapper, THREE)
+
+    // auto 档要 4s 以上（3 条 × 1.4s）。这里给 3s，到点了还没出就是没生效
+    await vi.waitFor(
+      () => expect(wrapper.find('.hint-float').exists()).toBe(true),
+      { timeout: 3000 },
+    )
+  }, 20000)
+})
+
+describe('浮窗高度 · 上下两条边都能拖', () => {
+  /**
+   * 原来只有下边线。两个窗都锚在顶部，要收短就只能往上拖底边 ——
+   * 而医生想让出的往往是**上面**那块（要看底下的 HIS 表头）。
+   *
+   * 这里只验「把手在位、接的是上边线那套处理」；方向与恒等式
+   * （顶边下移多少、高度就减多少）在 `useResizable.spec.ts` 里逐条钉。
+   */
+  it('两个窗各有上下两条边线把手', async () => {
+    const wrapper = await renderFloat()
+
+    expect(wrapper.findAll('.resize-edge-top')).toHaveLength(2)
+    expect(wrapper.findAll('.resize-edge-bottom')).toHaveLength(2)
+  })
+
+  it('上边线带无障碍标注 —— 一条 5px 的透明条，没有标注就等于不存在', async () => {
+    const wrapper = await renderFloat()
+    const top = wrapper.findAll('.resize-edge-top')
+
+    for (const edge of top) {
+      expect(edge.attributes('role')).toBe('separator')
+      expect(edge.attributes('aria-orientation')).toBe('horizontal')
+      expect(edge.attributes('aria-label')).toContain('上边线')
+    }
+  })
+
+  it('拖上边线时窗体真的变矮并让出顶部', async () => {
+    const wrapper = await renderFloat()
+    const top = wrapper.find('.resize-edge-top')
+
+    await top.trigger('pointerdown', { clientY: 200 })
+    window.dispatchEvent(new MouseEvent('pointermove', { clientY: 260 }) as never)
+    window.dispatchEvent(new MouseEvent('pointerup') as never)
+    await wrapper.vm.$nextTick()
+
+    const style = wrapper.find('.tips-drawer').attributes('style') ?? ''
+    expect(style).toContain('margin-top')
+  })
+})

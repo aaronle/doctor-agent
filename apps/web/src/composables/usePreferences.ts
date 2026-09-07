@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 
+import { setFontLevel } from './useFontScale'
 import {
   fetchPreferenceOptions,
   fetchPreferences,
@@ -146,10 +147,64 @@ function applyTheme(theme: string) {
   else root.removeAttribute('data-theme')
 }
 
+/**
+ * 把字号档位写到根元素上，**给移动端用**。
+ *
+ * 桌面把 `zoom` 内联挂在面板的内容区上（见 `useFontScale` 文件头：外壳要
+ * 承载拖拽坐标，不能缩放）。移动端没有那些组件，靠 `mobile.css` 里
+ * `html[data-font='x'] .m-body { zoom: … }` 这条规则。
+ *
+ * **不能图省事挂到 `.m-page` 上**：它是 `position:fixed; inset:0`，
+ * 加了 `zoom` 会给 `.m-scrim` / `.m-sheet` 造出新的包含块，
+ * 那两个「铺满屏幕」的浮层当场算错大小。
+ *
+ * 标准档不打标记 —— 和默认主题同一条道理：`zoom:1` 也会凭空造一个包含块。
+ */
+function applyFontAttr(level: string) {
+  const root = document.documentElement
+  if (level && level !== 'normal') root.setAttribute('data-font', level)
+  else root.removeAttribute('data-font')
+}
+
+/**
+ * 服务端回来的那份到底是不是一份偏好。
+ *
+ * **不能无条件 `apply(res.prefs)`。** 响应体一旦不是预期形状（网关返回空体、
+ * 代理插了一页 HTML、接口改了字段名），`prefs.value` 会被置成 `undefined` ——
+ * 然后所有读偏好的地方一起炸：追问模式、字号、布局记忆，整个浮窗白屏。
+ *
+ * 一次同步失败的合理后果是「这次没同步上」，不是「界面塌了」。
+ * 判据取 `theme` 这一项：它是必有字段，比逐项校验省事，也比 `typeof === object`
+ * 严 —— 后者连 `{}` 和数组都会放过去。
+ */
+function isPreferences(value: unknown): value is Preferences {
+  return !!value && typeof value === 'object' && typeof (value as Preferences).theme === 'string'
+}
+
 function apply(value: Preferences) {
   prefs.value = value
   writeLocal(value)
   applyTheme(value.theme)
+  applyFontAttr(value.font_level)
+  // 字号也在这里落地。**它没有第二个事实源** —— 曾经有过：配置页写这份偏好、
+  // 浮窗读 `useFontScale` 自己的旧 key，两边各管各的，于是在配置页把字号
+  // 调到特大、回工作站一点没变。
+  setFontLevel(value.font_level)
+}
+
+/**
+ * 启动时上屏。**在 `mount()` 之前调**，只读 localStorage，不发任何请求。
+ *
+ * 少了这一步，偏好就只在配置页那一刻生效：医生调成护眼，回工作站一刷新
+ * 又是蓝的，而配置页上还写着「护眼」。**设置存住了但界面没跟上，
+ * 比设置根本没存住更难查** —— 前者会让人以为是主题功能坏了。
+ *
+ * 与 `load()` 的分工：这里管「早一帧生效」，`load()` 管「跨设备同步」。
+ * `load()` 第一件事也是读本地，两者重叠且幂等。
+ */
+export function bootstrapPreferences() {
+  const local = migrateLegacyFont(readLocal() ?? {})
+  apply({ ...FALLBACK_DEFAULTS, ...local, windows: { ...(local.windows ?? {}) } })
 }
 
 export function usePreferences() {
@@ -172,8 +227,9 @@ export function usePreferences() {
         fetchPreferences(actor),
       ])
       options.value = opt
-      // 后端为准。它返回的一定是一份完整偏好（已合并默认值），直接用
-      apply(remote.prefs)
+      // 后端为准 —— 但只在它确实回了一份偏好时。回了别的就守着本地那份，
+      // 见 `isPreferences`
+      if (isPreferences(remote?.prefs)) apply(remote.prefs)
       syncError.value = ''
     } catch (error) {
       syncError.value = error instanceof Error ? error.message : String(error)
@@ -199,7 +255,9 @@ export function usePreferences() {
 
     try {
       const saved = await savePreferences(actorRef.value, patch)
-      apply(saved.prefs)
+      // 同上：回来的不是一份偏好就保留刚才那份合并结果 ——
+      // 改动已经在本机生效了，没同步上不该反过来把界面拆了
+      if (isPreferences(saved?.prefs)) apply(saved.prefs)
       syncError.value = ''
       return true
     } catch (error) {

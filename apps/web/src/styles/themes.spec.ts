@@ -145,3 +145,35 @@ describe('主题 · 不动这三样', () => {
     }
   })
 })
+
+describe('移动端字号', () => {
+  /**
+   * 桌面把 `zoom` 内联挂在内容区上；移动端没有那些内容区组件，
+   * 靠 `html[data-font]` + `.m-body` 这条 CSS 规则。
+   *
+   * **必须挂在 `.m-body` 而不是 `.m-page`。** `.m-page` 是
+   * `position:fixed; inset:0`，给它加 `zoom` 会让 `.m-scrim` / `.m-sheet`
+   * 改以它为包含块 —— 那两个「铺满屏幕」的浮层会算错大小。
+   */
+  const mobile = fs.readFileSync(path.join(STYLES, 'mobile.css'), 'utf8')
+
+  it('三个非标准档各有一条规则', () => {
+    for (const [level, zoom] of [['small', '0.9'], ['large', '1.15'], ['xlarge', '1.3']]) {
+      expect(mobile).toContain(`[data-font='${level}']`)
+      expect(mobile).toMatch(new RegExp(`\\[data-font='${level}'\\][^}]*zoom:\\s*${zoom}`, 's'))
+    }
+  })
+
+  it('**不给 normal 写规则** —— zoom:1 会凭空造一个包含块', () => {
+    expect(mobile).not.toContain("[data-font='normal']")
+  })
+
+  it('挂的是 .m-body 不是 .m-page', () => {
+    const rules = mobile.match(/\[data-font='[a-z]+'\][^{]*\{/g) ?? []
+    expect(rules.length).toBeGreaterThan(0)
+    for (const r of rules) {
+      expect(r).toContain('.m-body')
+      expect(r).not.toContain('.m-page')
+    }
+  })
+})

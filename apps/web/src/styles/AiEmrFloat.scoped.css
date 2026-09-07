@@ -1023,6 +1023,17 @@
 .resize-edge-bottom:hover,.resize-edge-bottom.active{background:var(--t-1677ff, #1677ff66)}
 .resize-edge-bottom.active{background:var(--t-1677ff, #1677ff)}
 
+/* 上边线。和下边线成对：拖上边线时顶边跟着走、底边留在原地，
+   医生可以从上下两头收放，不必每次都把整个窗往下拽。
+   贴在窗体内壁最上方，和标题栏叠在一起 —— 所以 z-index 要压过标题栏，
+   否则按下去会被标题栏的拖动接管，变成「移动窗口」而不是「改高度」。 */
+.resize-edge-top{position:absolute;left:0;right:0;top:0;height:5px;
+  cursor:row-resize;z-index:2003;touch-action:none;
+  background:transparent;transition:background .15s}
+.resize-edge-top::before{content:"";position:absolute;left:0;right:0;top:-3px;bottom:-3px}
+.resize-edge-top:hover,.resize-edge-top.active{background:var(--t-1677ff, #1677ff66)}
+.resize-edge-top.active{background:var(--t-1677ff, #1677ff)}
+
 /* 全屏钮。铺满视口，ESC 退出。
    一次只能一个窗全屏 —— 两个都铺满会互相盖住，所以另一个会收起来。
 

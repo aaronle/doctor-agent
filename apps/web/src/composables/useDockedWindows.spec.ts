@@ -232,3 +232,63 @@ describe('浮窗 · 一键还原', () => {
     expect(d.styleFor('panel').value).toEqual({})
   })
 })
+
+describe('合并分离 · 恢复上次的布局', () => {
+  /**
+   * `restore` 是给 `useWindowMemory` 用的：进工作站时把上次拖成的样子铺回去。
+   *
+   * **尺寸必须一起给。** 分离态下两个窗脱离 flex，不冻尺寸就按内容撑开
+   * （见 `size` 的注释：实测抽屉 866×985 变成 1471×1703）。
+   */
+  it('铺回分离态的位置与尺寸', () => {
+    const d = useDockedWindows()
+    // jsdom 默认视口是 1024，980 会被 clampTitleBar 正当地收回来 ——
+    // 这条要验的是「原样铺回」，所以先给一块放得下的屏
+    const original = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { value: 1920, configurable: true })
+
+    d.restore({
+      merged: false,
+      pos: { panel: { left: 980, top: 60 }, drawer: { left: 300, top: 60 } },
+      size: { panel: { width: 420, height: 700 }, drawer: { width: 1100, height: 680 } },
+    })
+
+    expect(d.merged.value).toBe(false)
+    const style = d.styleFor('panel').value as Record<string, string>
+    expect(style.left).toBe('980px')
+    expect(style.width).toBe('420px')
+    // 冻住尺寸的同时必须 flex:none，否则父容器的 flex 还会把它拉回去
+    expect(style.flex).toBe('none')
+
+    Object.defineProperty(window, 'innerWidth', { value: original, configurable: true })
+  })
+
+  it('**位置要钳回屏幕内** —— 换台小屏打开时标题栏不能在屏幕外', () => {
+    const d = useDockedWindows()
+    const original = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { value: 900, configurable: true })
+
+    d.restore({
+      merged: false,
+      pos: { panel: { left: 3000, top: 40 }, drawer: { left: 0, top: 40 } },
+      size: { panel: { width: 420, height: 700 }, drawer: null },
+    })
+
+    const left = Number((d.styleFor('panel').value as Record<string, string>).left.replace('px', ''))
+    expect(left).toBeLessThan(900)
+
+    Object.defineProperty(window, 'innerWidth', { value: original, configurable: true })
+  })
+
+  it('恢复成合并态时把冻住的尺寸释放掉，交回 CSS', () => {
+    const d = useDockedWindows()
+    d.restore({
+      merged: true,
+      pos: { panel: { left: 0, top: 0 }, drawer: { left: 0, top: 0 } },
+      size: { panel: { width: 420, height: 700 }, drawer: null },
+    })
+
+    expect(d.merged.value).toBe(true)
+    expect(d.styleFor('panel').value).toEqual({})
+  })
+})

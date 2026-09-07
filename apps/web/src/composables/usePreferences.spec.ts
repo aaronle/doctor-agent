@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { FALLBACK_DEFAULTS, THEME_SWATCHES, usePreferences } from './usePreferences'
+import { useFontScale } from './useFontScale'
+import {
+  bootstrapPreferences,
+  FALLBACK_DEFAULTS,
+  THEME_SWATCHES,
+  usePreferences,
+} from './usePreferences'
 
 /**
  * 个人配置的双写。
@@ -216,5 +222,152 @@ describe('个人配置 · 色板不进 CSS', () => {
     expect(THEME_SWATCHES.default[0]).toBe('#1677ff')
     expect(THEME_SWATCHES.eyecare[0]).toBe('#30a6e5')
     expect(THEME_SWATCHES.contrast[0]).toBe('#056dff')
+  })
+})
+
+describe('个人配置 · 启动即生效', () => {
+  /**
+   * 这一组盯的是**「读」的那一半**。
+   *
+   * 第一版只有配置页调 `load()`，于是主题只在配置页那一刻生效，刷新即丢：
+   * 医生把主题调成护眼，回工作站一刷新又变回蓝的，而配置页上还写着「护眼」。
+   * 设置存住了、界面没跟上，比设置根本没存住更难查。
+   */
+  it('**不经过配置页也要生效** —— 启动时读本地值直接上屏', () => {
+    window.localStorage.setItem(
+      'doctor-agent:preferences',
+      JSON.stringify({ theme: 'eyecare', font_level: 'large' }),
+    )
+
+    bootstrapPreferences()
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('eyecare')
+    expect(useFontScale().level.value.key).toBe('large')
+  })
+
+  it('是同步的，不发请求 —— 等一轮网络回来再上屏就是闪屏', () => {
+    window.localStorage.setItem('doctor-agent:preferences', JSON.stringify({ theme: 'contrast' }))
+    // 比增量而不是比「有没有被调过」：这些 mock 是文件级的，
+    // 前面的用例已经调过它们，`not.toHaveBeenCalled()` 会因为别人的调用而红
+    const before = vi.mocked(api.fetchPreferences).mock.calls.length
+
+    bootstrapPreferences()
+
+    // 断言不带 await：这一步必须在同一个 tick 内已经完成
+    expect(document.documentElement.getAttribute('data-theme')).toBe('contrast')
+    expect(vi.mocked(api.fetchPreferences).mock.calls.length).toBe(before)
+  })
+
+  it('本地没存过就是默认态，不打标记', () => {
+    bootstrapPreferences()
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+  })
+})
+
+describe('个人配置 · 隐私模式', () => {
+  /**
+   * 这条不变量原本钉在 `useFontScale.spec.ts`。字号的持久化收归这里之后，
+   * 它也要跟过来 —— 否则「谁写盘谁负责不崩」这件事就没人守了。
+   */
+  it('localStorage 写不进去也不能崩，本次会话内照常生效', async () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceeded')
+    })
+
+    const p = usePreferences()
+    await expect(p.load('张医生')).resolves.not.toThrow()
+    expect(p.prefs.value.theme).toBe('default')
+
+    spy.mockRestore()
+  })
+})
+
+describe('个人配置 · 字号是同一份取值', () => {
+  /**
+   * 曾经是两套：配置页写 `doctor-agent:preferences`，浮窗读
+   * `doctor-agent:font-level`。两边都「生效」，只是各管各的 ——
+   * 在配置页把字号调到特大，回工作站一点没变。
+   */
+  it('改偏好里的字号，浮窗的 zoom 跟着变', async () => {
+    const p = usePreferences()
+    await p.load('张医生')
+
+    await p.update({ font_level: 'xlarge' })
+
+    expect(useFontScale().level.value.scale).toBe(1.3)
+  })
+
+  it('后端下发的字号也要接管本地 —— 换台电脑登录同一医生名要跟过来', async () => {
+    vi.mocked(api.fetchPreferences).mockResolvedValue(remote({ font_level: 'small' }))
+
+    await usePreferences().load('张医生')
+
+    expect(useFontScale().level.value.scale).toBe(0.9)
+  })
+})
+
+describe('个人配置 · 移动端字号（AC-PREF-011）', () => {
+  /**
+   * 移动端**不能**用桌面那套内联 `zoom`：`.m-page` 自己是 `position:fixed`，
+   * 在它上面加 `zoom` 会给 `.m-scrim` / `.m-sheet` 造出一个新的包含块，
+   * 那两个「铺满屏幕」的浮层会当场算错大小。
+   *
+   * 所以走根元素属性 + 一条 CSS 规则：`zoom` 只挂在滚动内容区上，
+   * 与桌面「挂内容区不挂外壳」是同一条道理，只是换了个落点。
+   */
+  it('字号写到根元素上，移动端 CSS 据此挂 zoom', async () => {
+    const p = usePreferences()
+    await p.load('张医生')
+
+    await p.update({ font_level: 'large' })
+    expect(document.documentElement.getAttribute('data-font')).toBe('large')
+  })
+
+  it('标准档**不打标记** —— 和默认主题同一条道理，写了不起作用只会误导', async () => {
+    const p = usePreferences()
+    await p.load('张医生')
+
+    await p.update({ font_level: 'large' })
+    await p.update({ font_level: 'normal' })
+
+    expect(document.documentElement.hasAttribute('data-font')).toBe(false)
+  })
+})
+
+describe('个人配置 · 服务端回了个怪东西', () => {
+  /**
+   * 这条是被浮窗布局的自动写回逼出来的。
+   *
+   * `update()` 原来无条件 `apply(saved.prefs)`。响应体一旦不是预期形状
+   * （网关返回空体、代理插了一页 HTML、接口改了字段名），`prefs.value`
+   * 会被置成 `undefined` —— 然后**所有读偏好的地方一起炸**：
+   * 追问模式、字号、布局记忆，连带整个浮窗白屏。
+   *
+   * 一次同步失败的合理后果是「这次没同步上」，不是「界面塌了」。
+   */
+  it('保存返回的不是一份偏好时，保留本地值而不是把它冲成 undefined', async () => {
+    const p = usePreferences()
+    await p.load('张医生')
+    await p.update({ theme: 'eyecare' })
+
+    // 网关返回 200 但空体 —— 测试桩里最常见的形状，线上也真的会遇到
+    vi.mocked(api.savePreferences).mockResolvedValue({} as never)
+    await p.update({ windows: { panel_width: 320 } })
+
+    expect(p.prefs.value).toBeTruthy()
+    expect(p.prefs.value.theme).toBe('eyecare')
+    // 本地那份仍然带上了刚提交的改动
+    expect(p.prefs.value.windows.panel_width).toBe(320)
+  })
+
+  it('拉取返回怪东西时同理 —— 回落到本地值，不是 undefined', async () => {
+    window.localStorage.setItem('doctor-agent:preferences', JSON.stringify({ theme: 'contrast' }))
+    vi.mocked(api.fetchPreferences).mockResolvedValue({ actor: '张医生' } as never)
+
+    const p = usePreferences()
+    await p.load('张医生')
+
+    expect(p.prefs.value).toBeTruthy()
+    expect(p.prefs.value.theme).toBe('contrast')
   })
 })

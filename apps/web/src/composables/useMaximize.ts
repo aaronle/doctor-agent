@@ -43,6 +43,9 @@ export function useMaximize() {
             bottom: '0px',
             width: 'auto',
             height: 'auto',
+            // 上边线拖出来的那条外边距也要盖掉 —— 不清的话「铺满视口」
+            // 之后顶上会留一道空白。覆盖式样式要盖住的每一项都得显式写出来
+            marginTop: '0px',
             // 盖住底下的 HIS 门面与另一个窗（.ai-float-wrapper 是 2000）
             zIndex: 2050,
             borderRadius: '0',

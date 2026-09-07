@@ -46,6 +46,27 @@ const DEFAULT_KEY = 'normal'
 /** 模块级共享：两个浮窗必须是同一个字号，各存一份必然会漂 */
 const levelKey = ref(readStored())
 
+/**
+ * 设置档位。**只应用，不写盘。**
+ *
+ * 字号的事实源是 `usePreferences`（`doctor-agent:preferences`），
+ * 由它在 `apply()` 里调这个函数把值落到界面上。
+ *
+ * 曾经这里自己也写一份 `doctor-agent:font-level`，于是有了两个写入方：
+ * 配置页写偏好、浮窗写旧 key，两边都「生效」只是各管各的 ——
+ * 在配置页把字号调到特大，回工作站一点没变。**改字号必须走偏好**，
+ * 直接调这个函数只在当前这一屏有效。
+ *
+ * 旧 key 现在**只读不写**（`readStored` 那一次），规格 §4.1：
+ * 「写入新模型后即不再使用。不删除旧 key —— 万一要回滚，旧版本还能读到。」
+ *
+ * 模块级函数而不是放在组合式里面：`usePreferences` 要调它，那不是组件上下文。
+ */
+export function setFontLevel(key: string) {
+  if (!FONT_LEVELS.some((l) => l.key === key)) return
+  levelKey.value = key
+}
+
 function readStored(): string {
   try {
     const saved = window.localStorage?.getItem(STORAGE_KEY)
@@ -70,18 +91,5 @@ export function useFontScale() {
    */
   const style = computed(() => (level.value.scale === 1 ? {} : { zoom: level.value.scale }))
 
-  function setLevel(key: string) {
-    if (!FONT_LEVELS.some((l) => l.key === key)) return
-    levelKey.value = key
-    // **在这里存，不用 watch。** watch 默认是异步的（flush:'pre'），
-    // 「设了就该存下来」这件事没有理由等到下一个 tick；
-    // 而且用 watch 时，读代码的人要跑到文件另一头才知道谁在写盘。
-    try {
-      window.localStorage?.setItem(STORAGE_KEY, key)
-    } catch {
-      // 隐私模式下会抛。存不了就算了，本次会话内仍然生效
-    }
-  }
-
-  return { level, levelKey, style, setLevel, levels: FONT_LEVELS }
+  return { level, levelKey, style, setLevel: setFontLevel, levels: FONT_LEVELS }
 }
