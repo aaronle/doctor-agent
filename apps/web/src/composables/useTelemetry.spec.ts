@@ -145,3 +145,45 @@ describe('埋点 · props 与 patient_id', () => {
     expect(last.props.patient_id).toBeUndefined()
   })
 })
+
+describe('埋点不能拖住正经请求', () => {
+  /**
+   * 常规攒批上报**不加 `keepalive`**。
+   *
+   * `keepalive` 是给「页面正在卸载」那一次用的 —— 而那一次已经走 `sendBeacon`。
+   * 常规上报加上它没有任何好处，却要占 Chromium 的 keepalive 配额
+   * （全局 64KB，且这类请求的生命周期不跟随页面）。
+   *
+   * 走查里实测过：`telemetry/events` 与
+   * `report-summary?refresh=true` 一起挂在「在途」，而后者服务端 22 秒就返回了。
+   * **埋点是旁路，它绝不该和临床请求抢连接。**
+   */
+  it('常规上报不带 keepalive', async () => {
+    const calls: RequestInit[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
+      calls.push(init)
+      return new Response('{}', { status: 200 })
+    }))
+
+    const { track, flush } = useTelemetry()
+    track('probe', 'x')
+    flush()
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].keepalive).not.toBe(true)
+  })
+
+  it('页面卸载那一次仍然用 sendBeacon —— 那才是它该在的地方', () => {
+    const beacon = vi.fn(() => true)
+    vi.stubGlobal('navigator', { ...navigator, sendBeacon: beacon })
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { track, flush } = useTelemetry()
+    track('probe', 'y')
+    flush(true)
+
+    expect(beacon).toHaveBeenCalledTimes(1)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})

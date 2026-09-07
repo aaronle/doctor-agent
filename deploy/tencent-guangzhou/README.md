@@ -207,3 +207,32 @@ curl -sS -N https://da.aaronhealth.cn/api/emr/copilot/chat \
 
 不得重启或修改同机 `aits-app`、`aaronhealth-site` 或 `comorbidity-mvp`；
 `3400` 之外的端口不碰。
+
+
+## SQLite 走 WAL（2026-09-07 起）
+
+数据库开了 `journal_mode=WAL`。起因是一次压测：**120 个并发请求，44 个超时**，
+每个等满 30 秒 —— 打的是埋点与看板，两个都不调模型。慢的不是 AI，
+是数据库把请求排成了一条队（回滚日志模式下读挡写、写挡读，
+外加连接池只有 5+10 条而 FastAPI 的线程池有 40 条）。
+
+改完同一组压测：**0.3 秒，零失败**。
+
+### 运维上要知道的两件事
+
+**① 数据不止一个文件。** WAL 模式下库旁边会多出 `doctor-agent.db-wal`
+与 `doctor-agent.db-shm`，而且**主库文件可能长期只有几 KB，数据都在 WAL 里**
+（实测主库 4 KB / WAL 984 KB）。
+
+所以：**备份或搬迁必须三个文件一起拷，或者先做一次 checkpoint**：
+
+```sh
+sqlite3 /opt/doctor-agent/data/doctor-agent.db "PRAGMA wal_checkpoint(TRUNCATE);"
+```
+
+只拷主库文件会拿到一个近乎空的数据库，而且**不会报错** —— 它是一个合法的
+SQLite 文件，只是没有数据。
+
+**② WAL 要求本地文件系统。** 当前是 Tencent VM 的本地盘 + bind mount，成立。
+若将来把 `/opt/doctor-agent/data` 换成 NFS 之类的网络存储，WAL 会失效
+（那时也该换 Postgres 了）。

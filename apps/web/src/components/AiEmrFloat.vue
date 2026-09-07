@@ -2690,7 +2690,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
               v-else-if="allergy.status === 'unknown'"
               class="allergy-badge warn"
               title="本次就诊未采集药物过敏史，开具处方前需补问"
-            >? 过敏史未采集</span>
+            >过敏史未采集</span>
           </div>
         </div>
 

@@ -23,20 +23,42 @@ os.environ["DOCTOR_AGENT_DATABASE_URL"] = f"sqlite:///{TEST_DB}"
 os.environ["DOCTOR_AGENT_ENVIRONMENT"] = "test"
 
 
+def _drop_test_db() -> None:
+    """
+    删测试库。**连 `-wal` / `-shm` 一起删。**
+
+    改成 WAL 模式后，SQLite 会在主库旁边生成两个伴生文件。
+    只删主库、留着伴生文件，下一次跑会撞 `sqlite3.OperationalError: disk I/O error`
+    —— 报错文字完全不提 WAL，看起来像磁盘坏了。
+    """
+    # **先把连接池关掉再删文件。** 回滚日志模式下，删掉一个还被打开的库
+    # 只是把目录项摘掉，已有 fd 照常能用；WAL 模式不行 —— 伴生文件被抽走
+    # 之后，池里那些连接下一次用就是 `disk I/O error`。
+    try:
+        from app.database import engine
+
+        engine.dispose()
+    except Exception:  # noqa: BLE001 - 库还没被导入过时正常
+        pass
+
+    for suffix in ("", "-wal", "-shm"):
+        path = TEST_DB.with_name(TEST_DB.name + suffix)
+        if path.exists():
+            path.unlink()
+
+
 @pytest.fixture(scope="session")
 def client():
     from fastapi.testclient import TestClient
 
-    if TEST_DB.exists():
-        TEST_DB.unlink()
+    _drop_test_db()
 
     from app.main import app
 
     with TestClient(app) as test_client:
         yield test_client
 
-    if TEST_DB.exists():
-        TEST_DB.unlink()
+    _drop_test_db()
 
 
 @pytest.fixture(autouse=True)

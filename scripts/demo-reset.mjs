@@ -35,6 +35,21 @@ const KEY = process.env.DA_SSH_KEY || `${process.env.HOME}/.ssh/id_ed25519`;
 const DB = '/opt/doctor-agent/data/doctor-agent.db';
 const APPLY = process.argv.includes('--apply');
 
+/**
+ * **这个脚本改的是生产。** 它通过 SSH 连 `ubuntu@81.71.155.220`，
+ * 清掉线上的解锁态、问诊记录、病历草稿与演示中开的医嘱。
+ *
+ * 原来只要一个 `--apply` 就会执行 —— 于是它被另一个脚本当成
+ * 「本地重置」调用了一次，一次本地走查改掉了线上状态。
+ * 加一道显式确认：**要改生产就得说出来**。
+ */
+if (APPLY && !process.argv.includes('--yes-production') && !process.env.DA_RESET_CONFIRMED) {
+  console.error('✗ 这个脚本会重置**生产**演示状态（' + HOST + '）。');
+  console.error('  确认无误请加 --yes-production；只想看会改什么就去掉 --apply。');
+  console.error('  本地走查请用 `node scripts/full-audit.mjs`，它只碰本地库。');
+  process.exit(2);
+}
+
 // 在服务器上跑的那段 Python。写成字符串是因为容器 rootfs 只读，
 // docker cp 进不去；宿主机自带 python3，数据库就在挂载卷上。
 const script = `

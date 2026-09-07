@@ -74,3 +74,44 @@ describe('候诊列表', () => {
     expect(wrapper.findAll('.patient-card')).toHaveLength(0)
   })
 })
+
+describe('过敏标记的字形', () => {
+  /**
+   * 两种状态的标记必须**同一套字形**。
+   *
+   * 原来 confirmed 用 `⚠`（emoji，彩色渲染），unknown 用 `?`（ASCII）——
+   * 并排看像是后者的图标没加载出来。而同一个信息在科室看板和移动端
+   * 都只写文字、不带 `?`，三处对不上。
+   *
+   * 定案：**危险有图标，信息缺口没有**。`⚠` 表示的是「有过敏原，会出事」；
+   * 「没人问过」是采集缺口，不是危险，颜色（琥珀）已经把它和红色分开了。
+   */
+  /** 三种过敏状态各一位，缺一种这组用例就测不全 */
+  const stubThreeStates = () => {
+    const rows = [
+      { ...PATIENTS[0], id: 'A1', allergy: { status: 'confirmed', items: ['青霉素'] } },
+      { ...PATIENTS[0], id: 'A2', allergy: { status: 'unknown', items: [] } },
+      { ...PATIENTS[0], id: 'A3', allergy: { status: 'denied', items: [] } },
+    ]
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(rows), { status: 200 })))
+  }
+
+  it('未采集标记里不出现裸问号', async () => {
+    stubThreeStates()
+    const wrapper = await renderView()
+    const warn = wrapper.findAll('.allergy-badge.warn').map((n) => n.text())
+    expect(warn.length).toBeGreaterThan(0)
+    for (const text of warn) {
+      expect(text).not.toMatch(/^[?？]/)
+      expect(text).toContain('过敏史未采集')
+    }
+  })
+
+  it('确认有过敏的仍然带 ⚠ 并写出过敏原', async () => {
+    stubThreeStates()
+    const wrapper = await renderView()
+    const danger = wrapper.findAll('.allergy-badge.danger').map((n) => n.text())
+    expect(danger.length).toBeGreaterThan(0)
+    for (const text of danger) expect(text.startsWith('⚠')).toBe(true)
+  })
+})

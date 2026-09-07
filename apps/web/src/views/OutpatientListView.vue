@@ -132,7 +132,7 @@ onMounted(load)
                   v-else-if="patient.allergy?.status === 'unknown'"
                   class="allergy-badge warn"
                   title="尚未采集药物过敏史"
-                >? 过敏史未采集</span>
+                >过敏史未采集</span>
               </div>
               <div class="patient-meta">
                 {{ patient.gender }} · {{ patient.age }}岁 · {{ (patient.birth_date || '').slice(0, 7) }} · {{ patient.dept }}

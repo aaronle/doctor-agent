@@ -73,11 +73,20 @@ function flush(useBeacon = false) {
       navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }))
       return
     }
+    // `keepalive` **只给卸载那一次**。
+    //
+    // 页面正在卸载时（`useBeacon` 且没有 `sendBeacon` 可用）必须加，
+    // 否则请求会随页面一起被取消 —— 而那正是最想留下的一批数据。
+    //
+    // 常规攒批上报则绝不加：它要占 Chromium 的 keepalive 配额
+    // （全局 64KB，且生命周期不跟随页面）。走查里实测过埋点与
+    // `report-summary` 一起挂在「在途」，而后者服务端 22 秒就返回了。
+    // **埋点是旁路，绝不该和临床请求抢连接。**
     void fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
-      keepalive: true,
+      ...(useBeacon ? { keepalive: true } : {}),
     }).catch(() => {
       // **不重试。** 重试会在服务端不可用时把队列撑爆，
       // 而丢几条使用数据没有任何后果。
