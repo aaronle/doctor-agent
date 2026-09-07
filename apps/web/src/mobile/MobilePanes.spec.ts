@@ -307,3 +307,90 @@ describe('患者管理（移动端）', () => {
     expect(wrapper.emitted('remind')?.[0]).toEqual([['P001']])
   })
 })
+
+describe('分析页 · 与桌面端对齐（2026-09-07）', () => {
+  /**
+   * 原来「预警评估」排在八块的中间 —— 最要紧的东西被埋在目录里。
+   * 未处置红线要**置顶且默认展开**：它不是八块之一，它是别的都得等它。
+   */
+  it('未处置红线单独置顶，排在病情概要之前', async () => {
+    const wrapper = mountPane(MobileAnalysis)
+    const ws = useWorkstation()
+    ws.hardAlerts = [
+      { id: 'r1', name: '过敏冲突', level: '高风险', color: 'danger', summary: '同属青霉素类' },
+    ] as never
+    await wrapper.vm.$nextTick()
+
+    const top = wrapper.find('.m-redtop')
+    expect(top.exists()).toBe(true)
+    // 比的是**同类锚点**：红线块 vs 病情概要那一节的起始位置。
+    // 拿裸文字「病情概要」当锚点会命中更早的其它出现处，测出来的不是顺序
+    const html = wrapper.html()
+    expect(html.indexOf('m-redtop')).toBeLessThan(html.indexOf('data-sec="病情概要"'))
+  })
+
+  it('**处置完就消失** —— 判据是「未处置」不是「有没有红线」', async () => {
+    /*
+     * 第一版这条把两路来源都清空，于是 `redAlerts` 与 `openRedAlerts` 同为空，
+     * 换用哪一个都能通过 —— **空过**。变异验证当场抓出来。
+     * 现在留一条红线再把它处置掉：用错来源就会一直挂着。
+     */
+    const wrapper = mountPane(MobileAnalysis)
+    const ws = useWorkstation()
+    ws.summary = { ...SUMMARY, risk_alerts: [] } as never
+    ws.hardAlerts = [
+      { id: 'r9', name: '过敏冲突', level: '高风险', color: 'danger', summary: '同属青霉素类' },
+    ] as never
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.m-redtop').exists()).toBe(true)
+
+    ws.markAlertHandled('r9')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.m-redtop').exists()).toBe(false)
+  })
+
+  it('一条红线都没有时也不渲染空壳', async () => {
+    const wrapper = mountPane(MobileAnalysis)
+    const ws = useWorkstation()
+    ws.hardAlerts = [] as never
+    ws.summary = { ...SUMMARY, risk_alerts: [] } as never
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.m-redtop').exists()).toBe(false)
+  })
+
+  it('鉴别诊断给 critical 项挂「不能漏」标记 —— 重排了就得解释', async () => {
+    // 30% 排在 45% 上面而不给理由，看起来像排序坏了。桌面端同款标记。
+    const wrapper = mountPane(MobileAnalysis)
+    const ws = useWorkstation()
+    ws.summary = {
+      ...SUMMARY,
+      suspected_diagnoses: [
+        { name: '子宫内膜癌', severity: 'critical', confidence: 30, icd: 'C54.1', desc: '' },
+        { name: '子宫内膜息肉', severity: 'routine', confidence: 45, icd: 'N84.0', desc: '' },
+      ],
+    } as never
+    await wrapper.vm.$nextTick()
+    // 鉴别诊断默认收着 —— 不展开的话这条用例数到 0 个标记也会「通过」下一条断言
+    await openSection(wrapper, '鉴别诊断')
+
+    const tags = wrapper.findAll('.m-sev-tag')
+    expect(tags).toHaveLength(1)
+    expect(tags[0].text()).toContain('不能漏')
+    expect(tags[0].attributes('title')).toContain('漏诊后果严重')
+  })
+
+  it('**非 critical 不挂标记** —— 人人都有就等于没有', async () => {
+    const wrapper = mountPane(MobileAnalysis)
+    const ws = useWorkstation()
+    ws.summary = {
+      ...SUMMARY,
+      suspected_diagnoses: [
+        { name: '甲', severity: 'serious', confidence: 60, icd: 'X', desc: '' },
+        { name: '乙', severity: 'routine', confidence: 40, icd: 'Y', desc: '' },
+      ],
+    } as never
+    await wrapper.vm.$nextTick()
+    await openSection(wrapper, '鉴别诊断')
+    expect(wrapper.findAll('.m-sev-tag')).toHaveLength(0)
+  })
+})

@@ -20,7 +20,6 @@ const GROUPS: { title: string; cells: Cell[] }[] = [
     title: '问诊与分析',
     cells: [
       { icon: '💬', label: '问诊记录', action: { kind: 'voice' } },
-      { icon: '📄', label: '报告解读', action: { kind: 'send', text: '请解读这位患者最近一次检查与检验报告，指出异常项及其临床意义。' } },
       { icon: '🔍', label: '鉴别诊断', action: { kind: 'analysis', focus: '鉴别诊断' } },
       { icon: '⚠️', label: '预警评估', action: { kind: 'analysis', focus: '预警评估' } },
       { icon: '🫀', label: '共病管理', action: { kind: 'analysis', focus: '共病管理' } },
@@ -37,6 +36,8 @@ const GROUPS: { title: string; cells: Cell[] }[] = [
       { icon: '🧪', label: '检查检验', action: { kind: 'records', segment: '检查检验' } },
       { icon: '✅', label: '病历质控', action: { kind: 'analysis', focus: '病历质控' } },
       { icon: '👥', label: '患者管理', action: { kind: 'route', to: '/outpatient/manage' } },
+      { icon: '📋', label: '科室看板', action: { kind: 'board' } },
+      { icon: '⚙️', label: '个人配置', action: { kind: 'settings' } },
     ],
   },
   {

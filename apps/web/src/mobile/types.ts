@@ -9,6 +9,8 @@ export const RECORD_SEGMENTS = ['病历', '医嘱', '检查检验', '时间轴',
 export type RecordSegment = (typeof RECORD_SEGMENTS)[number]
 
 export type MenuAction =
+  | { kind: 'board' }
+  | { kind: 'settings' }
   | { kind: 'analysis'; focus: string }
   | { kind: 'records'; segment: RecordSegment }
   | { kind: 'voice' }

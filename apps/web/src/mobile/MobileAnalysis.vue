@@ -150,6 +150,28 @@ function riskTone(level = '') {
 <template>
   <div class="m-sections">
     <!-- 病情概要 -->
+    <!--
+      未处置红线**置顶且不折叠**。它不是八块之一 —— 它是别的都得等它。
+      原来「预警评估」排在八块中间，最要紧的东西被埋在目录里。
+      没有未处置红线时整块不渲染：空壳会让它退化成背景。
+    -->
+    <section v-if="ws.openRedAlerts.length" class="m-redtop">
+      <div class="m-redtop-head">
+        <span class="m-redtop-title">未处置红线</span>
+        <span class="m-redtop-count">{{ ws.openRedAlerts.length }}</span>
+      </div>
+      <div class="m-redtop-body">
+        <div v-for="a in ws.openRedAlerts" :key="a.id" class="m-redtop-item">
+          <i class="m-redtop-dot" />
+          <div class="m-redtop-text">
+            <b>{{ a.name }}</b>
+            <span>{{ a.suggestion || a.summary }}</span>
+          </div>
+        </div>
+      </div>
+      <p class="m-redtop-note">处置在工作站完成 —— 手机端不写 HIS/EMR。</p>
+    </section>
+
     <section class="m-sec" data-sec="病情概要">
       <button class="m-sec-head" type="button" @click="toggle('病情概要')">
         <span class="m-sec-title">病情概要</span>
@@ -203,7 +225,20 @@ function riskTone(level = '') {
         </p>
         <template v-else>
         <div v-for="(item, i) in diagnoses" :key="item.name" class="m-item">
-          <div class="m-row m-row-strong">{{ item.rank_label ?? `${i + 1}` }} {{ item.name }}</div>
+          <div class="m-row m-row-strong">
+            {{ item.rank_label ?? `${i + 1}` }}
+            <!--
+              **重排了就得解释。** 排序是「先后果、再可能性」，
+              一个 30% 的内膜癌会排在 45% 的息肉上面 —— 不给标记看起来像排序坏了。
+              与桌面端 `.dd-severity-tag` 同一份语义。
+            -->
+            <span
+              v-if="item.severity === 'critical'"
+              class="m-sev-tag"
+              title="漏诊后果严重，因此排在前面 —— 与可能性高低无关"
+            >不能漏</span>
+            {{ item.name }}
+          </div>
           <!-- ICD 与置信度另起一行：跟诊断名挤一行会把长诊断名压折 -->
           <div class="m-row-sub">
             <span v-if="item.icd">{{ item.icd }} · </span>{{ item.confidence }}%

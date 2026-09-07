@@ -1104,3 +1104,194 @@ html[data-font='xlarge'] .m-body,
 html[data-font='xlarge'] .m-sheet-body {
   zoom: 1.3;
 }
+
+/* ------------------------------------------------------ 安全条 / 字号 / 回程条
+ *
+ * 2026-09-07 移动端改版。设计稿：Figma「11 · 移动端改版」。
+ */
+
+/* 顶栏字号钮：常驻，不藏进「⋯」 */
+.m-font-btn {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue-soft, #eaf1ff);
+  color: var(--primary, #1677ff);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* 安全条：钉在顶栏之下、内容之上，不随内容滚走 */
+.m-safebar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #fef2f2;
+  border-bottom: 1px solid #fde0e0;
+}
+.m-safebar-bar { flex: 0 0 auto; width: 3px; align-self: stretch; border-radius: 2px; background: #e6191a; }
+.m-safebar-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.m-safebar-title { font-size: 13px; font-weight: 600; color: #e6191a; }
+.m-safebar-sub {
+  font-size: 11.5px; color: #d97706;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.m-safebar-go { flex: 0 0 auto; color: #e6191a; font-size: 16px; }
+
+/* 回程条：只在自动切到分析后出现，3 秒淡出 */
+.m-backbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  border: 0;
+  border-bottom: 1px solid #d9f2e2;
+  background: #f0fdf4;
+  text-align: left;
+}
+.m-backbar-ok { flex: 0 0 auto; color: #16a34a; font-weight: 700; }
+.m-backbar-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.m-backbar-text b { font-size: 13px; color: var(--ink, #1f2937); }
+.m-backbar-text i { font-size: 11.5px; color: var(--gray, #6b7280); font-style: normal; }
+.m-backbar-btn {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border: 1px solid #16a34a;
+  border-radius: 999px;
+  background: #fff;
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 字号弹层 */
+.m-font-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+}
+.m-font-opt.on { background: var(--blue-soft, #eaf1ff); }
+.m-font-ring {
+  flex: 0 0 auto; width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid #d7dbe3; background: #fff;
+}
+.m-font-opt.on .m-font-ring { border: 5px solid var(--primary, #1677ff); background: var(--primary, #1677ff); }
+.m-font-name { flex: 1 1 auto; color: var(--ink, #1f2937); }
+.m-font-opt.on .m-font-name { color: var(--primary, #1677ff); font-weight: 600; }
+.m-font-pct { flex: 0 0 auto; font-size: 12px; color: var(--gray, #6b7280); }
+.m-font-preview {
+  margin: 8px 14px 4px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: var(--bg, #f4f6fa);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.m-font-preview b { font-size: 15px; color: var(--ink, #1f2937); }
+/* 预览里这条必须是红的：当场证明状态色不随字号或主题变 */
+.m-font-risk { font-size: 12.5px; font-weight: 600; color: #e6191a; }
+
+/* 科室看板弹层 */
+.m-board-sheet { max-height: 82vh; }
+.m-board-sub { margin-left: 8px; font-size: 12px; color: var(--gray, #6b7280); font-weight: 400; }
+.m-board-stat { display: flex; gap: 8px; padding: 4px 12px 10px; }
+.m-board-cell {
+  flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 0; border: 1px solid transparent; border-radius: 10px;
+  background: var(--bg, #f4f6fa);
+}
+.m-board-cell.on { background: #fef2f2; border-color: #fecaca; }
+.m-board-cell b { font-size: 19px; color: var(--ink, #1f2937); }
+.m-board-cell b.danger { color: #e6191a; }
+.m-board-cell b.warn { color: #d97706; }
+.m-board-cell i { font-size: 11.5px; color: var(--gray, #6b7280); font-style: normal; }
+.m-board-list { display: flex; flex-direction: column; gap: 8px; padding: 0 12px 14px; }
+.m-board-empty { padding: 20px 0; text-align: center; color: var(--gray-2, #9ca3af); font-size: 13px; }
+.m-board-item {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 11px 12px; border: 0; border-radius: 10px;
+  background: var(--card, #fff); text-align: left;
+}
+.m-board-line1 { display: flex; align-items: center; gap: 7px; }
+.m-board-line1 b { flex: 0 0 auto; font-size: 14px; color: var(--ink, #1f2937); }
+.m-board-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--gray-2, #9ca3af); }
+.m-board-dot.critical { background: #e6191a; }
+.m-board-dot.warning { background: #d97706; }
+.m-board-allergy {
+  padding: 1px 6px; border-radius: 4px; background: #fef2f2;
+  color: #e6191a; font-size: 11px; font-style: normal; font-weight: 600;
+}
+.m-board-go { margin-left: auto; color: var(--gray-2, #9ca3af); font-size: 15px; }
+.m-board-line2 { display: flex; align-items: center; gap: 8px; }
+.m-board-line2 i { font-size: 12px; color: var(--gray, #6b7280); font-style: normal; }
+.m-board-progress {
+  margin-left: auto; padding: 1px 7px; border-radius: 4px;
+  background: var(--bg, #f4f6fa); color: var(--gray, #6b7280);
+  font-size: 11.5px; font-style: normal; font-weight: 600;
+}
+.m-board-progress.pending_report { background: #fffbeb; color: #d97706; }
+.m-board-progress.done { background: #f0fdf4; color: #16a34a; }
+.m-board-line3 { font-size: 12px; color: var(--gray, #6b7280); }
+.m-board-line3.critical { color: #e6191a; font-weight: 600; }
+.m-board-line3.warning { color: #d97706; }
+
+/* 未处置红线置顶块：它不是八块之一，它是别的都得等它 */
+.m-redtop {
+  margin-bottom: 8px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff;
+}
+.m-redtop-title { font-size: 14px; font-weight: 600; color: #e6191a; }
+.m-redtop-head { display: flex; align-items: center; gap: 8px; padding: 11px 13px 8px; }
+.m-redtop-count {
+  padding: 1px 7px; border-radius: 4px; background: #e6191a;
+  color: #fff; font-size: 11.5px; font-weight: 700;
+}
+.m-redtop-body { display: flex; flex-direction: column; gap: 9px; padding: 0 13px 4px; }
+.m-redtop-item { display: flex; align-items: flex-start; gap: 8px; }
+.m-redtop-dot { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: #e6191a; }
+.m-redtop-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.m-redtop-text b { font-size: 13.5px; color: #e6191a; }
+.m-redtop-text span { font-size: 12px; color: var(--gray, #6b7280); }
+.m-redtop-note { padding: 6px 13px 11px; font-size: 11.5px; color: var(--gray-2, #9ca3af); }
+
+/* 「不能漏」标记：与桌面端 .dd-severity-tag 同一份语义 */
+.m-sev-tag {
+  display: inline-block;
+  margin: 0 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #fef2f2;
+  color: #e6191a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* 开场卡重排（2026-09-07）：概要摊成要点，风险给色点 + 一行摘要 */
+.m-card-lead { margin-bottom: 8px; font-size: 14px; font-weight: 600; line-height: 1.55; color: var(--ink, #1f2937); }
+.m-card-bullet { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; }
+.m-card-dot { flex: 0 0 auto; width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; background: var(--gray-2, #9ca3af); }
+.m-card-dot.danger { background: #e6191a; }
+.m-card-dot.warning { background: #d97706; }
+.m-card-dot.success { background: #16a34a; }
+.m-card-tick { flex: 0 0 auto; margin-top: 1px; color: var(--gray-2, #9ca3af); font-style: normal; }
+.m-card-btext { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.m-card-btext b { font-size: 13px; font-weight: 500; color: var(--ink-2, #374151); }
+.m-card-bullet .m-card-dot.danger + .m-card-btext b { color: #e6191a; font-weight: 600; }
+.m-card-sub { font-size: 11.5px; color: var(--gray, #6b7280); }
+.m-card-more {
+  margin-top: 6px; padding: 0; border: 0; background: none;
+  color: var(--primary, #1677ff); font-size: 13px; font-weight: 600;
+}

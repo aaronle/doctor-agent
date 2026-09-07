@@ -8,7 +8,12 @@ import MobileMenu from './MobileMenu.vue'
 import MobileRecords from './MobileRecords.vue'
 import MobileInterviewSheet from './MobileInterviewSheet.vue'
 import type { MenuAction, RecordSegment } from './types'
+import MobileBoardSheet from './MobileBoardSheet.vue'
+import SettingsPanel from '../components/SettingsPanel.vue'
 import { useCopilotChat } from '../composables/useCopilotChat'
+import { FONT_LEVELS } from '../composables/useFontScale'
+import { usePreferences } from '../composables/usePreferences'
+import { useTelemetry } from '../composables/useTelemetry'
 import { useInterview } from '../composables/useInterview'
 import { useWorkstation } from '../stores/workstation'
 
@@ -30,8 +35,8 @@ import { useWorkstation } from '../stores/workstation'
 const ws = useWorkstation()
 const router = useRouter()
 
-type Pane = '对话' | '分析' | '记录'
-const pane = ref<Pane>('对话')
+type Pane = '医生智能体' | 'AI 助手' | '记录'
+const pane = ref<Pane>('医生智能体')
 
 const menuOpen = ref(false)
 const voiceOpen = ref(false)
@@ -68,7 +73,7 @@ watch(
   () => {
     chatMessages.value = []
     chatInput.value = ''
-    pane.value = '对话'
+    pane.value = '医生智能体'
   },
 )
 
@@ -76,6 +81,79 @@ watch(
 const analysisBadge = computed(() => ws.openRedAlerts.length)
 
 const unlocking = ref(false)
+
+const { track } = useTelemetry()
+const prefs = usePreferences()
+
+/* ------------------------------------------------------------------ 安全条
+ *
+ * 过敏与未处置红线是**永远该在场**的信息。移动端此前连过敏标记都没有 ——
+ * 而医生同样会看着这一屏开药。
+ *
+ * 钉在顶栏之下、内容之上：随内容滚走的安全提示，等于在最需要的时候不在。
+ * 两样都没有时整条不渲染 —— 留一条空壳会让它退化成背景。
+ */
+const allergyText = computed(() => {
+  const p = patient.value as { allergies?: unknown; allergy_status?: string } | null
+  const list = Array.isArray(p?.allergies) ? p!.allergies.filter(Boolean).map(String) : []
+  if (list.length) return list.join('、')
+  // 「问过、没有」与「没问过」是两件事，后者要提醒补采
+  return p?.allergy_status === 'unknown' ? '过敏史未采集' : ''
+})
+const openRedCount = computed(() => ws.openRedAlerts.length)
+const showSafeBar = computed(() => !!allergyText.value || openRedCount.value > 0)
+const safeDetail = computed(() =>
+  ws.openRedAlerts.slice(0, 2).map((a) => a.name).join(' · '),
+)
+
+/* ------------------------------------------------------------------ 字号
+ *
+ * 常驻在顶栏，不藏进「⋯」。看不清是**当场**的障碍，
+ * 多一次点击就会有人放弃，然后一直眯着眼用。
+ *
+ * 走 `usePreferences` 而不是自己写 localStorage —— 与桌面端同一份偏好，
+ * 各存各的必然会漂。
+ */
+const fontOpen = ref(false)
+const fontLevels = FONT_LEVELS
+const fontLevel = computed(() => prefs.prefs.value.font_level)
+function pickFont(key: string) {
+  void prefs.update({ font_level: key })
+  track('font_change', key, { surface: 'mobile' })
+  fontOpen.value = false
+}
+
+/* --------------------------------------------------------------- 回程条
+ *
+ * 生成完自动切到分析页，此前**没有任何交代** —— 医生只看到界面自己变了。
+ * 给一条能点回去的路标。
+ *
+ * **只在自动切换后出现。** 手动点标签是医生自己的选择，
+ * 再弹一条「回到对话」就成了常驻噪声。
+ */
+const backBarOpen = ref(false)
+let backBarTimer: ReturnType<typeof setTimeout> | null = null
+function showBackBar() {
+  backBarOpen.value = true
+  if (backBarTimer) clearTimeout(backBarTimer)
+  // 3 秒后淡出：底部标签栏一直在，路标本身不必常驻
+  backBarTimer = setTimeout(() => { backBarOpen.value = false }, 3000)
+}
+function backToChat() {
+  backBarOpen.value = false
+  if (backBarTimer) { clearTimeout(backBarTimer); backBarTimer = null }
+  switchPane('医生智能体')
+}
+
+const boardOpen = ref(false)
+const settingsOpen = ref(false)
+
+/** 切档统一走这里 —— 埋点只写一处，免得新加的入口漏记 */
+function switchPane(next: Pane) {
+  if (pane.value !== next) track('pane_switch', next)
+  pane.value = next
+  backBarOpen.value = false
+}
 
 /** 打开问诊面板并起播。多处入口共用一份，避免各写各的起播条件。 */
 function openVoice() {
@@ -118,21 +196,66 @@ async function skipInterview() {
  * 这些不是伪造的聊天记录 —— 它们是 report-summary 的真实产出，只是换了
  * 呈现位置。桌面端它们在标签页里等医生去点；手机上医生一进来就该看到。
  */
+/** 摘要截断长度。开场卡的作用是「有几件事」，不是读全文 —— 细节在「逐条查看」里 */
+const BRIEF_MAX = 22
+/** 问题清单先摊几条。三条是「一眼扫完」与「有信息量」的折中 */
+const PROBLEM_HEAD = 3
+/** 结论一句话的上限。超过就截断 —— 手机上一屏读不完的「一句话」不叫结论 */
+const LEAD_MAX = 42
+
+/**
+ * 取第一句当结论。
+ *
+ * 模型给的 `overall_conclusion.summary` 是**整段**（P009 实测 300+ 字）。
+ * 第一版把它整段放进 lead 还加了粗，实测在 390px 下铺满整屏 ——
+ * 加粗放大的是「已经太长」这件事。全文并没有丢，在「查看完整分析」里。
+ */
+function firstSentence(text = '') {
+  const t = String(text).replace(/\s+/g, ' ').trim()
+  const cut = t.indexOf('。')
+  if (cut > 0 && cut + 1 <= LEAD_MAX) return t.slice(0, cut + 1)
+  return t.length > LEAD_MAX ? `${t.slice(0, LEAD_MAX)}…` : t
+}
+
+function brief(text = '') {
+  const t = String(text).replace(/\s+/g, ' ').trim()
+  return t.length > BRIEF_MAX ? `${t.slice(0, BRIEF_MAX)}…` : t
+}
+
+/**
+ * 开场卡。
+ *
+ * **2026-09-07 重排**：原来两张卡都是纯文本行 —— 概要是一整段 300 字，
+ * 风险只有孤零零几个名字。前者在手机上没法读，后者看不出哪条更急、为什么急。
+ *
+ * 改法遵守原来那条取舍（卡片不能变长文）：
+ * 概要摊成「一句结论 + 前三条要点」，风险给**色点 + 一行截断摘要**。
+ * 色点用后端给的 `color`，不在前端另排一套映射。
+ */
 const openingCards = computed(() => {
-  const cards: { key: string; title: string; tone: string; lines: string[]; actions: { text: string; focus: string }[] }[] = []
+  type Item = { text: string; sub?: string; color?: string }
+  const cards: {
+    key: string; title: string; tone: string; lead?: string;
+    bullets: Item[]; rest: number; actions: { text: string; focus: string }[]
+  }[] = []
   const s = summary.value
   if (!s) return cards
 
   const conclusion = s.overall_conclusion ?? {}
-  const lines = [conclusion.summary, ...(conclusion.conflicts ?? []).map((c) => `信息冲突：${c}`)].filter(
-    Boolean,
-  ) as string[]
-  if (lines.length) {
+  const problems = (conclusion.problems ?? []) as string[]
+  const conflicts = (conclusion.conflicts ?? []) as string[]
+  const lead = firstSentence(conclusion.summary ?? '')
+  // 信息冲突单独成条并标红：它是**矛盾**，不是概要的一部分，
+  // 混进那段话里会被当成叙述读过去
+  const conflictItems = conflicts.map((c) => ({ text: `信息冲突：${brief(c)}`, color: 'danger' }))
+  if (lead || problems.length || conflictItems.length) {
     cards.push({
       key: 'summary',
       title: '病情概要',
       tone: conclusion.risk_level ?? '',
-      lines,
+      lead: lead || undefined,
+      bullets: [...conflictItems, ...problems.slice(0, PROBLEM_HEAD).map((t) => ({ text: brief(t) }))],
+      rest: problems.length + conflictItems.length,
       actions: [{ text: '查看完整分析', focus: '病情概要' }],
     })
   }
@@ -143,9 +266,12 @@ const openingCards = computed(() => {
       key: 'risk',
       title: '风险提示',
       tone: alerts[0]?.level ?? '高风险',
-      // 只列条目名。模型给的 summary 常有两三行，几条铺下来开场卡片就变成长文，
-      // 而开场卡片的作用是让医生一眼看到「有几件事」，细节点「逐条查看」。
-      lines: alerts.map((a) => `· ${a.name}`),
+      bullets: alerts.map((a) => ({
+        text: a.name ?? '',
+        sub: brief(a.summary ?? ''),
+        color: a.color || (String(a.level).includes('高') ? 'danger' : 'warning'),
+      })),
+      rest: 0,
       actions: [{ text: '逐条查看', focus: '预警评估' }],
     })
   }
@@ -160,18 +286,19 @@ function toneClass(level = '') {
 
 // ------------------------------------------------------------------ 导航
 
-function goAnalysis(focus: string) {
-  // 同一个目标连点两次也要能重新滚过去，所以先清空再赋值
-  analysisFocus.value = ''
-  pane.value = '分析'
-  requestAnimationFrame(() => {
-    analysisFocus.value = focus
-  })
+function goAnalysis(focus = '') {
+  analysisFocus.value = focus
+  const auto = focus === 'auto'
+  track('go_analysis', auto ? 'auto' : focus || 'card')
+  pane.value = 'AI 助手'
+  // 自动切走才给路标；手动切是医生自己的选择
+  if (auto) showBackBar()
+  else backBarOpen.value = false
 }
 
 function goRecords(segment: RecordSegment) {
   recordSegment.value = segment
-  pane.value = '记录'
+  switchPane('记录')
 }
 
 /** 接诊下一位：按候诊队列顺序切，走到队尾回候诊列表 */
@@ -193,10 +320,16 @@ const PROMPT_PRESETS = [
 
 const QUICK_ACTIONS: { icon: string; label: string; run: () => void }[] = [
   { icon: '💬', label: '问诊记录', run: openVoice },
-  { icon: '📄', label: '报告解读', run: () => void sendChat('请解读这位患者最近一次检查与检验报告，指出异常项及其临床意义。') },
   { icon: '🔍', label: '鉴别诊断', run: () => goAnalysis('鉴别诊断') },
   { icon: '➡️', label: '接诊下一位', run: nextPatient },
 ]
+
+/** 看板里点某位患者：切过去并关掉弹层 —— 看板讲的是「这一屏」，选完就该退回「这一位」 */
+function onBoardPick(patientId: string) {
+  boardOpen.value = false
+  track('board_pick', patientId)
+  if (patientId !== ws.patientId) router.push(`/outpatient/${patientId}`)
+}
 
 function onMenuPick(action: MenuAction) {
   menuOpen.value = false
@@ -217,8 +350,16 @@ function onMenuPick(action: MenuAction) {
       router.push(action.to)
       break
     case 'send':
-      pane.value = '对话'
+      pane.value = '医生智能体'
       void sendChat(action.text)
+      break
+    case 'board':
+      track('board_open', 'mobile')
+      boardOpen.value = true
+      break
+    case 'settings':
+      track('settings_open', 'mobile_menu')
+      settingsOpen.value = true
       break
   }
 }
@@ -226,7 +367,7 @@ function onMenuPick(action: MenuAction) {
 function pickPrompt(text: string) {
   chatInput.value = text
   promptsOpen.value = false
-  pane.value = '对话'
+  pane.value = '医生智能体'
 }
 
 function showDegraded() {
@@ -250,21 +391,68 @@ function showDegraded() {
       <span v-if="ws.isDegraded" class="m-tag warn" @click="showDegraded">降级 {{ ws.degradedAgents.length }}</span>
       <!-- 只读徽标常驻：不说清楚，医生会一直找「提交病历」在哪 -->
       <span class="m-ro">👁 只读</span>
-      <button class="m-more" type="button" aria-label="更多功能" @click="menuOpen = true">⋯</button>
+      <!--
+        字号。常驻在顶栏，**不藏进「⋯」** —— 看不清是当场的障碍，
+        多一次点击就会有人放弃，然后一直眯着眼用。
+      -->
+      <button class="m-font-btn" type="button" aria-label="调整字号" @click="fontOpen = true">Aa</button>
+      <button class="m-more m-more-btn" type="button" aria-label="更多功能" @click="menuOpen = true">⋯</button>
     </div>
 
+    <!--
+      安全条：过敏 + 未处置红线。钉在顶栏之下、内容之上，**不随内容滚走** ——
+      随内容滚走的安全提示，等于在最需要的时候不在。
+      两样都没有时整条不渲染：留一条空壳会让它退化成背景。
+    -->
+    <div v-if="showSafeBar" class="m-safebar" @click="goAnalysis('预警评估')">
+      <i class="m-safebar-bar" />
+      <div class="m-safebar-text">
+        <span class="m-safebar-title">
+          <template v-if="allergyText">⚠ {{ allergyText }}</template>
+          <template v-if="allergyText && openRedCount"> · </template>
+          <template v-if="openRedCount">{{ openRedCount }} 条红线未处置</template>
+        </span>
+        <span v-if="safeDetail" class="m-safebar-sub">{{ safeDetail }}</span>
+      </div>
+      <span class="m-safebar-go">›</span>
+    </div>
+
+    <!-- 回程条：只在**自动**切到分析后出现，3 秒淡出 -->
+    <button v-if="backBarOpen && pane === 'AI 助手'" class="m-backbar" type="button" @click="backToChat">
+      <span class="m-backbar-ok">✓</span>
+      <span class="m-backbar-text">
+        <b>已根据本次问诊生成分析</b>
+        <i>对话 {{ ws.interviewTurns || 0 }} 轮 · 六个岗位并发</i>
+      </span>
+      <span class="m-backbar-btn">回到对话</span>
+    </button>
+
     <!-- 对话 -->
-    <template v-if="pane === '对话'">
+    <template v-if="pane === '医生智能体'">
       <div ref="chatScrollEl" class="m-body">
         <div class="m-chat">
           <div v-for="card in openingCards" :key="card.key" class="m-msg ai">
             <span class="m-role">AI</span>
-            <div class="m-card">
+            <div class="m-card" :data-card="card.key">
               <div class="m-card-head">
                 <span class="m-card-title">{{ card.title }}</span>
                 <span v-if="card.tone" class="m-tone" :class="toneClass(card.tone)">{{ card.tone }}</span>
               </div>
-              <p v-for="(line, i) in card.lines" :key="i" class="m-card-line">{{ line }}</p>
+              <p v-if="card.lead" class="m-card-lead">{{ card.lead }}</p>
+              <div v-for="(b, i) in card.bullets" :key="i" class="m-card-bullet">
+                <i v-if="b.color" class="m-card-dot" :class="b.color" />
+                <i v-else class="m-card-tick">·</i>
+                <span class="m-card-btext">
+                  <b>{{ b.text }}</b>
+                  <span v-if="b.sub" class="m-card-sub">{{ b.sub }}</span>
+                </span>
+              </div>
+              <button
+                v-if="card.rest > card.bullets.length"
+                class="m-card-more"
+                type="button"
+                @click="goAnalysis('病情概要')"
+              >展开全部 {{ card.rest }} 项 ⌄</button>
               <div class="m-card-actions">
                 <button
                   v-for="act in card.actions"
@@ -375,7 +563,7 @@ function showDegraded() {
     </template>
 
     <!-- 分析 -->
-    <div v-else-if="pane === '分析'" class="m-body">
+    <div v-else-if="pane === 'AI 助手'" class="m-body">
       <MobileAnalysis :focus="analysisFocus" />
     </div>
 
@@ -385,14 +573,14 @@ function showDegraded() {
     </div>
 
     <div class="m-tabbar">
-      <button class="m-tab" :class="{ active: pane === '对话' }" type="button" @click="pane = '对话'">
-        <span class="m-tab-icon">💬</span><span class="m-tab-label">对话</span>
+      <button class="m-tab" :class="{ active: pane === '医生智能体' }" type="button" @click="switchPane('医生智能体')">
+        <span class="m-tab-icon">💬</span><span class="m-tab-label">医生智能体</span>
       </button>
-      <button class="m-tab" :class="{ active: pane === '分析' }" type="button" @click="pane = '分析'">
-        <span class="m-tab-icon">📊</span><span class="m-tab-label">分析</span>
+      <button class="m-tab" :class="{ active: pane === 'AI 助手' }" type="button" @click="switchPane('AI 助手')">
+        <span class="m-tab-icon">📊</span><span class="m-tab-label">AI 助手</span>
         <span v-if="analysisBadge" class="m-tab-badge">{{ analysisBadge }}</span>
       </button>
-      <button class="m-tab" :class="{ active: pane === '记录' }" type="button" @click="pane = '记录'">
+      <button class="m-tab" :class="{ active: pane === '记录' }" type="button" @click="switchPane('记录')">
         <span class="m-tab-icon">📁</span><span class="m-tab-label">记录</span>
       </button>
     </div>
@@ -413,6 +601,45 @@ function showDegraded() {
         </div>
       </div>
     </template>
+
+    <!-- 字号弹层。选项本身就用对应字号显示 —— 选之前先看见效果，与桌面端一致 -->
+    <template v-if="fontOpen">
+      <div class="m-scrim" @click="fontOpen = false" />
+      <div class="m-sheet m-font-sheet">
+        <div class="m-grab" />
+        <div class="m-sheet-head"><span class="m-sheet-title">界面字号</span></div>
+        <div class="m-sheet-body">
+          <button
+            v-for="lv in fontLevels"
+            :key="lv.key"
+            class="m-font-opt"
+            :class="{ on: lv.key === fontLevel }"
+            type="button"
+            :style="{ fontSize: `${14 * lv.scale}px` }"
+            @click="pickFont(lv.key)"
+          >
+            <i class="m-font-ring" />
+            <span class="m-font-name">{{ lv.label }}</span>
+            <span class="m-font-pct">{{ Math.round(lv.scale * 100) }}%</span>
+          </button>
+          <!--
+            预览里**必须有一条红的**：它当场证明状态色不随字号或主题变。
+            与桌面端配置页放风险条是同一条理由。
+          -->
+          <div class="m-font-preview">
+            <b>异常子宫出血致重度贫血</b>
+            <span class="m-font-risk">● 危急值在任何字号下都保持红色</span>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <MobileBoardSheet :open="boardOpen" @close="boardOpen = false" @pick="onBoardPick" />
+
+    <!-- 个人配置。与桌面端复用同一个正文组件，两处各写一份必然会漂 -->
+    <el-dialog v-model="settingsOpen" title="个人配置" width="94%" top="4vh" destroy-on-close>
+      <SettingsPanel />
+    </el-dialog>
 
     <el-dialog v-model="kbDialogOpen" :title="kbEntry?.title ?? '知识库'" width="92%">
       <div v-loading="kbLoading" class="m-kb-body">

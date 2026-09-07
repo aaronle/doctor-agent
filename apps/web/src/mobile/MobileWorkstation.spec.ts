@@ -51,13 +51,13 @@ afterEach(() => {
 })
 
 describe('移动端工作站 · 落地即对话', () => {
-  it('首屏是对话，不是表单', async () => {
+  it('首屏是医生智能体对话，不是表单', async () => {
     const wrapper = await render()
     expect(wrapper.find('.m-chat').exists()).toBe(true)
     expect(wrapper.find('.m-input-bar').exists()).toBe(true)
-    // 默认选中「对话」
+    // 默认选中「医生智能体」
     const active = wrapper.find('.m-tab.active')
-    expect(active.text()).toContain('对话')
+    expect(active.text()).toContain('医生智能体')
   })
 
   it('开场就把病情概要与风险以卡片推进对话流', async () => {
@@ -76,7 +76,7 @@ describe('移动端工作站 · 落地即对话', () => {
     const btn = wrapper.findAll('.m-cbtn').find((b) => b.text().includes('逐条查看'))
     await btn!.trigger('click')
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('.m-tab.active').text()).toContain('分析')
+    expect(wrapper.find('.m-tab.active').text()).toContain('AI 助手')
   })
 
   it('顶栏常驻只读徽标 —— 不说清楚医生会一直找「提交」在哪', async () => {
@@ -102,7 +102,7 @@ describe('移动端工作站 · 不写 HIS/EMR', () => {
 
   it('三个面板里没有任何可点的写入动作', async () => {
     const wrapper = await render()
-    for (const pane of ['对话', '分析', '记录']) {
+    for (const pane of ['医生智能体', 'AI 助手', '记录']) {
       await switchTo(wrapper, pane)
       const clickable = wrapper
         .findAll('button, a, [role="button"]')
@@ -177,7 +177,7 @@ describe('移动端工作站 · ＋ 菜单', () => {
     await new Promise((r) => requestAnimationFrame(() => r(null)))
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('.m-tab.active').text()).toContain('分析')
+    expect(wrapper.find('.m-tab.active').text()).toContain('AI 助手')
     const section = wrapper.find('[data-sec="预警评估"]')
     expect(section.find('.m-sec-body').exists()).toBe(true)
   })
@@ -187,7 +187,7 @@ describe('移动端工作站 · 快捷动作', () => {
   it('四条快捷动作都在，且能横向滚动不被裁掉', async () => {
     const wrapper = await render()
     const chips = wrapper.findAll('.m-qa-chip').map((c) => c.text())
-    expect(chips).toEqual(['💬问诊记录', '📄报告解读', '🔍鉴别诊断', '➡️接诊下一位'])
+    expect(chips).toEqual(['💬问诊记录', '🔍鉴别诊断', '➡️接诊下一位'])
   })
 
   it('「接诊下一位」按队列顺序切换患者', async () => {
@@ -345,5 +345,241 @@ describe('移动端问诊门禁', () => {
     const section = wrapper.find('[data-sec="阳性结果"]')
     await section.find('.m-sec-head').trigger('click')
     expect(wrapper.find('[data-sec="阳性结果"]').text()).toContain('双眼底照相')
+  })
+})
+
+describe('移动端 · 安全条（常驻）', () => {
+  /**
+   * 过敏与未处置红线是**永远该在场**的信息。移动端此前连过敏标记都没有 ——
+   * 桌面端有，而手机上医生同样会看着这一屏开药。
+   *
+   * 钉在顶栏之下、内容之上：随内容滚走的安全提示，等于在最需要的时候不在。
+   */
+  it('写出过敏原本身，不只是「有过敏史」', async () => {
+    const wrapper = await render()
+    const bar = wrapper.find('.m-safebar')
+    expect(bar.exists()).toBe(true)
+    expect(bar.text()).toContain('青霉素')
+  })
+
+  it('未处置红线给条数 —— 医生要知道还欠几条', async () => {
+    const wrapper = await render()
+    const ws = useWorkstation()
+    ws.hardAlerts = [
+      { id: 'a1', name: '过敏冲突', level: '高风险', color: 'danger', summary: '同属青霉素类' },
+      { id: 'a2', name: '血红蛋白危急值', level: '高风险', color: 'danger', summary: '58 g/L' },
+    ] as never
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.m-safebar').text()).toContain('2')
+  })
+
+  it('**处置完就不再报数** —— 一直挂着数字的提示会被当成背景', async () => {
+    const wrapper = await render()
+    const ws = useWorkstation()
+    ws.hardAlerts = [{ id: 'a1', name: '过敏冲突', level: '高风险', color: 'danger', summary: 'x' }] as never
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.m-safebar').text()).toContain('1 条红线')
+
+    ws.markAlertHandled('a1')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.m-safebar').text()).not.toContain('1 条红线')
+  })
+
+  it('没有过敏史也没有红线时整条不出现，不留一条空壳', async () => {
+    const wrapper = await render()
+    const ws = useWorkstation()
+    ws.patient = { ...PATIENT, allergies: [], allergy_status: 'denied' } as never
+    ws.hardAlerts = [] as never
+    // openRedAlerts 是硬规则 + 模型两路合并的，只清一路这条用例就是空过的
+    ws.summary = { ...SUMMARY, risk_alerts: [] } as never
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.m-safebar').exists()).toBe(false)
+  })
+})
+
+describe('移动端 · 字号入口', () => {
+  it('顶栏有常驻 Aa —— 不藏进「⋯」', async () => {
+    // 看不清是当场的障碍。多一次点击就会有人放弃，然后一直眯着眼用。
+    const wrapper = await render()
+    expect(wrapper.find('.m-font-btn').exists()).toBe(true)
+  })
+
+  it('点开是四档，选中的那档标出来', async () => {
+    const wrapper = await render()
+    await wrapper.find('.m-font-btn').trigger('click')
+    await wrapper.vm.$nextTick()
+    const opts = wrapper.findAll('.m-font-opt')
+    expect(opts).toHaveLength(4)
+    expect(opts.map((o) => o.text())).toEqual(
+      expect.arrayContaining([expect.stringContaining('小'), expect.stringContaining('特大')]),
+    )
+  })
+
+  it('选一档就写到根元素上 —— 与桌面端同一个机制', async () => {
+    const wrapper = await render()
+    await wrapper.find('.m-font-btn').trigger('click')
+    const big = wrapper.findAll('.m-font-opt').find((o) => o.text().includes('特大'))
+    await big!.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(document.documentElement.getAttribute('data-font')).toBe('xlarge')
+  })
+})
+
+describe('移动端 · 生成后的回程条', () => {
+  /**
+   * 生成完自动切到分析页，此前**没有任何交代** —— 医生只看到界面自己变了。
+   * 给一条能点回去的路标。
+   */
+  it('自动切到分析后出现回程条', async () => {
+    const wrapper = await render()
+    await (wrapper.vm as never as { goAnalysis: (f?: string) => void }).goAnalysis('auto')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.m-backbar').exists()).toBe(true)
+    expect(wrapper.find('.m-backbar').text()).toContain('回到对话')
+  })
+
+  it('**手动点标签不出现** —— 否则它就成了常驻噪声', async () => {
+    const wrapper = await render()
+    await switchTo(wrapper, 'AI 助手')
+    expect(wrapper.find('.m-backbar').exists()).toBe(false)
+  })
+
+  it('点回程条回到对话页', async () => {
+    const wrapper = await render()
+    await (wrapper.vm as never as { goAnalysis: (f?: string) => void }).goAnalysis('auto')
+    await wrapper.vm.$nextTick()
+    await wrapper.find('.m-backbar').trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.m-chat').exists()).toBe(true)
+  })
+})
+
+describe('移动端 · 与桌面端对齐', () => {
+  it('底部三档叫「医生智能体 / AI 助手 / 记录」，与桌面端同名', async () => {
+    // 同一个东西两处叫法不同，医生要在脑子里做一次翻译
+    const wrapper = await render()
+    expect(wrapper.findAll('.m-tab').map((t) => t.text().replace(/\d+/g, '').trim()))
+      .toEqual(expect.arrayContaining([
+        expect.stringContaining('医生智能体'),
+        expect.stringContaining('AI 助手'),
+        expect.stringContaining('记录'),
+      ]))
+  })
+
+  it('**「报告解读」已撤** —— 桌面端 2026-09-03 按一期范围撤掉了', async () => {
+    const wrapper = await render()
+    expect(wrapper.text()).not.toContain('报告解读')
+  })
+
+  it('有科室看板入口 —— 桌面端有，移动端此前没有', async () => {
+    const wrapper = await render()
+    await wrapper.find('.m-more-btn').trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(document.body.textContent).toContain('科室看板')
+  })
+
+  it('有设置入口 —— MobileSettings 此前有页面无入口', async () => {
+    const wrapper = await render()
+    await wrapper.find('.m-more-btn').trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(document.body.textContent).toContain('个人配置')
+  })
+
+  it('切标签要记埋点 —— 移动端此前零埋点，使用统计只覆盖了桌面', async () => {
+    const { useTelemetry, __resetTelemetry } = await import('../composables/useTelemetry')
+    const wrapper = await render()
+    __resetTelemetry()
+    await switchTo(wrapper, '记录')
+    expect(useTelemetry()._queue().some((e) => e.event === 'pane_switch')).toBe(true)
+  })
+})
+
+describe('移动端 · 开场卡重排', () => {
+  const withSummary = async (extra: Record<string, unknown>) => {
+    const wrapper = await render()
+    const ws = useWorkstation()
+    ws.summary = { ...SUMMARY, ...extra } as never
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('风险条目带**等级色点** —— 原来只有名字，看不出哪条更急', async () => {
+    const wrapper = await withSummary({
+      risk_alerts: [
+        { id: 'x1', name: '过敏冲突', level: '高风险', color: 'danger', summary: '在用阿莫西林克拉维酸钾，同属青霉素类' },
+        { id: 'x2', name: '超声异常', level: '中风险', color: 'warning', summary: '内膜增厚伴丰富血流' },
+      ],
+    })
+    // 收窄到风险卡：概要卡的「信息冲突」条也用色点
+    const dots = wrapper.find('[data-card="risk"]').findAll('.m-card-dot')
+    expect(dots).toHaveLength(2)
+    // 颜色用后端给的 color，不在前端另排一套映射
+    expect(dots[0].classes()).toContain('danger')
+    expect(dots[1].classes()).toContain('warning')
+  })
+
+  it('摘要**截断成一行** —— 开场卡的作用是「有几件事」，不是读全文', async () => {
+    const long = '在用阿莫西林克拉维酸钾片，与既往青霉素过敏史冲突，须立即停用并更换替代方案，记录过敏反应类型'
+    const wrapper = await withSummary({
+      risk_alerts: [{ id: 'x1', name: '过敏冲突', level: '高风险', color: 'danger', summary: long }],
+    })
+    const sub = wrapper.find('.m-card-sub')
+    expect(sub.exists()).toBe(true)
+    expect(sub.text().length).toBeLessThan(long.length)
+    expect(sub.text()).toContain('…')
+  })
+
+  it('概要卡把问题清单摊成前 3 条，不是一整段', async () => {
+    const wrapper = await withSummary({
+      overall_conclusion: {
+        risk_level: '高风险',
+        summary: '异常子宫出血致重度贫血。',
+        problems: ['血红蛋白 58 g/L', '内膜 14 mm', 'HPV16 阳性', '空腹血糖 9.4', 'CA125 38.6'],
+      },
+    })
+    // 收窄到概要卡：风险卡的条目用同一个类名，跨卡数会把它们算进来
+    const card = wrapper.find('[data-card="summary"]')
+    expect(card.findAll('.m-card-bullet')).toHaveLength(3)
+    // 还剩几条要说出来，否则医生以为只有 3 条
+    expect(card.find('.m-card-more').text()).toContain('5')
+  })
+
+  it('结论只取**第一句** —— 模型给的 summary 是整段，原样加粗只会更难读', async () => {
+    /*
+     * 第一版把 `conclusion.summary` 整段放进 lead 并加粗，实测在 390px 下
+     * 铺了 20 行、把整屏占满 —— 比改之前还糟。加粗放大的是**已经太长**的东西。
+     * 全文并没有丢：在「查看完整分析」里。
+     */
+    const wrapper = await withSummary({
+      overall_conclusion: {
+        risk_level: '高风险',
+        summary: '49岁女性，异常子宫出血致重度贫血。血红蛋白58 g/L已达危急值下限，铁蛋白6.2 ng/mL提示铁储备耗竭。经阴道超声示内膜增厚。',
+        problems: [],
+      },
+    })
+    const lead = wrapper.find('[data-card="summary"] .m-card-lead')
+    expect(lead.text()).toBe('49岁女性，异常子宫出血致重度贫血。')
+  })
+
+  it('信息冲突单独成条并标红 —— 它是矛盾，不是概要的一部分', async () => {
+    const wrapper = await withSummary({
+      overall_conclusion: {
+        risk_level: '高风险', summary: '异常子宫出血。', problems: ['血红蛋白 58'],
+        conflicts: ['医嘱含阿莫西林，与青霉素过敏史并存'],
+      },
+    })
+    const card = wrapper.find('[data-card="summary"]')
+    const first = card.findAll('.m-card-bullet')[0]
+    expect(first.text()).toContain('信息冲突')
+    expect(first.find('.m-card-dot').classes()).toContain('danger')
+  })
+
+  it('问题清单不足 3 条时不显示「展开全部」', async () => {
+    const wrapper = await withSummary({
+      overall_conclusion: { risk_level: '中风险', summary: 'x', problems: ['甲', '乙'] },
+    })
+    const card = wrapper.find('[data-card="summary"]')
+    expect(card.findAll('.m-card-bullet')).toHaveLength(2)
+    expect(card.find('.m-card-more').exists()).toBe(false)
   })
 })
