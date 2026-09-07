@@ -54,6 +54,10 @@ ROUTES: dict[str, tuple[str, str]] = {
         "交付平台 · Doctor Agent",
         f"功能线与智能体线并排：门禁逐项、部署过程、发布历史与生产指纹。{DISCLAIMER}",
     ),
+    "/settings": (
+        "个人配置 · Doctor Agent",
+        f"界面色调、字号、AI 追问初始状态与浮窗布局记忆，按医生各自保存。{DISCLAIMER}",
+    ),
 }
 
 

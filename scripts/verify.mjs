@@ -51,6 +51,13 @@ const dirSizeMb = (dir) => {
  */
 const GATES = [
   {
+    // 放在最前：它检查的是「源码有没有未收敛的品牌色」，属于源码状态，
+    // 不依赖构建产物也不依赖 dev server，失败时能最快给出结论。
+    key: 'themes', stage: '类型与单测', label: '主题收敛',
+    cmd: 'npm', args: ['run', '--silent', 'themes:check'],
+    extract: grab(/品牌色替换\s+(\d+) 处 \/ (\d+) 种/, (m) => `${m[1]} 处 · ${m[2]} 种`),
+  },
+  {
     key: 'typecheck', stage: '类型与单测', label: '类型检查',
     cmd: 'npm', args: ['run', '--silent', 'typecheck'],
     extract: (out) => (out.trim() ? lastLine(out) : 'vue-tsc 通过 · 0 error'),

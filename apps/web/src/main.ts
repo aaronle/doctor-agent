@@ -10,6 +10,10 @@ import './styles/base.css'
 import './styles/app-overrides.css'
 // 移动端样式。类名全部带 m- 前缀，只有移动端组件会挂载，桌面 DOM 里不出现。
 import './styles/mobile.css'
+// 主题变量。由 scripts/build-themes.mjs 生成。
+// **默认主题一个变量都不定义** —— 它靠 var(--t-xxx, #原值) 的回退值生效，
+// 所以引入这个文件不会改变默认态的任何一个像素，还原度门禁不受影响。
+import './styles/themes.css'
 
 import App from './App.vue'
 import { router } from './router'

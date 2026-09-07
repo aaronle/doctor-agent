@@ -1,0 +1,83 @@
+/* contrast 主题。由 scripts/build-themes.mjs 生成，请勿手工编辑。
+ *
+ * 默认主题**不在这里** —— 它靠 var(--t-xxx, #原值) 的回退值生效，
+ * 一个变量都不定义，因此计算样式与收敛前逐字节相同。
+ *
+ * 状态色（红/橙/绿）与中性色不在本表内：红色风险在任何主题下都必须是红色。
+ */
+
+:root[data-theme="contrast"] {
+  --t-0284c7: #006da5;
+  --t-0369a1: #005786;
+  --t-0958d9: #0046b9;
+  --t-0e5fd8: #004cbd;
+  --t-0f2b54: #06224b;
+  --t-102850: #071f47;
+  --t-145499: #044489;
+  --t-1665c0: #0352ad;
+  --t-1677ff: #056dff;
+  --t-1a3a6a: #0e2e5e;
+  --t-1d4ed8: #0738c2;
+  --t-1e6bd6: #0855c0;
+  --t-1f6fc0: #0b5bac;
+  --t-2b5be0: #0b48f0;
+  --t-3b6ef5: #1f5cff;
+  --t-3b82f6: #2074ff;
+  --t-3d8fd8: #1d88e7;
+  --t-4096ff: #2d8bff;
+  --t-409eff: #2d94ff;
+  --t-4a90e2: #2885f2;
+  --t-5fa3dd: #409be9;
+  --t-6e93f8: #5280ff;
+  --t-7dd3fc: #63cdff;
+  --t-93c5fd: #79b8ff;
+  --t-9db5fa: #80a0ff;
+  --t-9dc0ff: #84b0ff;
+  --t-9ec3f5: #7cb4fe;
+  --t-b7cbf2: #99b9f7;
+  --t-b8d0f0: #9bc1f4;
+  --t-bae6fd: #9edeff;
+  --t-bdd4fc: #a0c2ff;
+  --t-bfdbfe: #a3ccff;
+  --t-c5d3fc: #a7bdff;
+  --t-c7dcff: #accbff;
+  --t-c7deff: #acceff;
+  --t-c9d6f5: #acc2f8;
+  --t-d2e2fc: #c8ddff;
+  --t-d3e4f4: #b8d7f4;
+  --t-d6e8ff: #cfe4ff;
+  --t-d8e8f8: #cee5fb;
+  --t-d9e3fd: #d0ddff;
+  --t-d9e6f8: #cfe1fb;
+  --t-dbe7fb: #d1e2fe;
+  --t-dbe8ff: #d4e3ff;
+  --t-dbeafe: #d3e6ff;
+  --t-dce9f7: #d3e5f9;
+  --t-e0e7ff: #d9e1ff;
+  --t-e0ebff: #d9e6ff;
+  --t-e0ecff: #d9e8ff;
+  --t-e0f2fe: #d8efff;
+  --t-e5eefc: #dbe9fe;
+  --t-e8f0fe: #e0ebff;
+  --t-e8f0ff: #e1ebff;
+  --t-e8f2ff: #e1eeff;
+  --t-eaf1ff: #e3ecff;
+  --t-eaf3ff: #e3efff;
+  --t-edf3ff: #e6eeff;
+  --t-eef6ff: #e7f2ff;
+  --t-eff6ff: #e8f2ff;
+  --t-f0f5ff: #e9f0ff;
+  --t-f0f6ff: #e9f2ff;
+  --t-f0f7ff: #e9f3ff;
+  --t-f2f6ff: #ebf1ff;
+  --t-f4f8ff: #edf3ff;
+  --t-f5f8ff: #eef3ff;
+  --t-f5f9ff: #eef4ff;
+  --t-f7fafd: #f0f6fd;
+  --t-f8fbff: #f0f7ff;
+  --t-f9fbff: #f1f6ff;
+  --t-fafcfe: #f3f8fe;
+  --t-fafcff: #f2f7ff;
+  --t-fbfdff: #f3f9ff;
+  --t-fcfdff: #f4f8ff;
+}

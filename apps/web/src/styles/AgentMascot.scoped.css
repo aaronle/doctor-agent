@@ -11,7 +11,7 @@
      和「两个 × 都关掉就回不来」是同一类死路，只是换了个成因：
      上次是**条件**不对，这次是**层级**不对。 */
   z-index:2100;
-  color:#1677ff;                    /* SVG 全部用 currentColor，改这一处就换肤 */
+  color:var(--t-1677ff, #1677ff);                    /* SVG 全部用 currentColor，改这一处就换肤 */
   cursor:grab;
   /* 拖动时别把 SVG 当图片拖走，也别选中周围文字 */
   user-select:none;-webkit-user-drag:none;touch-action:none;
@@ -20,7 +20,7 @@
 }
 .mascot:hover{transform:translateY(-2px) scale(1.06)}
 .mascot:active{cursor:grabbing;transform:scale(1.02)}
-.mascot:focus-visible{outline:2px solid #1677ff;outline-offset:4px;border-radius:10px}
+.mascot:focus-visible{outline:2px solid var(--t-1677ff, #1677ff);outline-offset:4px;border-radius:10px}
 
 .mascot svg{display:block}
 

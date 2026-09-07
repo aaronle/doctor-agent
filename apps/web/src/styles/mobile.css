@@ -1066,7 +1066,7 @@
 }
 
 .m-version-hint .m-btn.link {
-  color: #9dc0ff;
+  color: var(--t-9dc0ff, #9dc0ff);
 }
 
 /* 面板内的操作行。不能复用 .m-toolbar —— 那个带白底和下边框，

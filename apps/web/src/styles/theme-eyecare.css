@@ -1,0 +1,83 @@
+/* eyecare 主题。由 scripts/build-themes.mjs 生成，请勿手工编辑。
+ *
+ * 默认主题**不在这里** —— 它靠 var(--t-xxx, #原值) 的回退值生效，
+ * 一个变量都不定义，因此计算样式与收敛前逐字节相同。
+ *
+ * 状态色（红/橙/绿）与中性色不在本表内：红色风险在任何主题下都必须是红色。
+ */
+
+:root[data-theme="eyecare"] {
+  --t-0284c7: #18a1b1;
+  --t-0369a1: #148190;
+  --t-0958d9: #2083c2;
+  --t-0e5fd8: #2488c2;
+  --t-0f2b54: #17394c;
+  --t-102850: #173549;
+  --t-145499: #236d8a;
+  --t-1665c0: #2985ad;
+  --t-1677ff: #30a6e5;
+  --t-1a3a6a: #234a61;
+  --t-1d4ed8: #327ac3;
+  --t-1e6bd6: #3290c2;
+  --t-1f6fc0: #318cae;
+  --t-2b5be0: #3f85cc;
+  --t-3b6ef5: #4f99e1;
+  --t-3b82f6: #50a9e1;
+  --t-3d8fd8: #4eaac7;
+  --t-4096ff: #55bbea;
+  --t-409eff: #55c1ea;
+  --t-4a90e2: #5badd1;
+  --t-5fa3dd: #6db9cf;
+  --t-6e93f8: #7db3e9;
+  --t-7dd3fc: #8be5ee;
+  --t-93c5fd: #9fd9f1;
+  --t-9db5fa: #a7cbf0;
+  --t-9dc0ff: #a8d5f4;
+  --t-9ec3f5: #a8d4eb;
+  --t-b7cbf2: #bdd8ec;
+  --t-b8d0f0: #bedbea;
+  --t-bae6fd: #c1f0f6;
+  --t-bdd4fc: #c4e1f5;
+  --t-bfdbfe: #c6e7f7;
+  --t-c5d3fc: #cbe0f6;
+  --t-c7dcff: #cde8f9;
+  --t-c7deff: #cde9f9;
+  --t-c9d6f5: #cee0f0;
+  --t-d2e2fc: #d7ebf7;
+  --t-d3e4f4: #d7eaf0;
+  --t-d6e8ff: #dbf0fa;
+  --t-d8e8f8: #dceef4;
+  --t-d9e3fd: #d8e8f8;
+  --t-d9e6f8: #dcecf5;
+  --t-dbe7fb: #daebf6;
+  --t-dbe8ff: #daedfa;
+  --t-dbeafe: #daeff9;
+  --t-dce9f7: #dfeef4;
+  --t-e0e7ff: #deebfb;
+  --t-e0ebff: #deeffb;
+  --t-e0ecff: #def0fb;
+  --t-e0f2fe: #def5fa;
+  --t-e5eefc: #e3f0f8;
+  --t-e8f0fe: #e5f2fb;
+  --t-e8f0ff: #e5f2fc;
+  --t-e8f2ff: #e5f4fc;
+  --t-eaf1ff: #e7f3fc;
+  --t-eaf3ff: #e7f5fc;
+  --t-edf3ff: #eaf4fc;
+  --t-eef6ff: #eaf7fc;
+  --t-eff6ff: #ebf7fd;
+  --t-f0f5ff: #ecf6fd;
+  --t-f0f6ff: #ecf7fd;
+  --t-f0f7ff: #ecf8fd;
+  --t-f2f6ff: #eef6fd;
+  --t-f4f8ff: #f0f8fd;
+  --t-f5f8ff: #f1f7fd;
+  --t-f5f9ff: #f1f9fd;
+  --t-f7fafd: #f3f9fb;
+  --t-f8fbff: #f3fafe;
+  --t-f9fbff: #f4fafe;
+  --t-fafcfe: #f6fafc;
+  --t-fafcff: #f5fbfe;
+  --t-fbfdff: #f6fcfe;
+  --t-fcfdff: #f7fbfe;
+}

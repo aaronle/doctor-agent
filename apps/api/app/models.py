@@ -476,3 +476,36 @@ class KnowledgeEntry(Base):
     #: 墓碑：为真时读取端跳过这个 key（内置条目也能这样「删」）
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# ---------------------------------------------------------------- 个人配置
+
+
+class UserPreference(Base):
+    """
+    医生个人配置：主题、字号、AI 追问初始状态、浮窗布局记忆。
+
+    **一行一人，不版本化。** `agent_versions` 那套草稿→发布→回滚存在的理由是
+    「配置影响所有患者的模型输出，出事要能回滚、要能追责」；个人偏好的影响半径
+    只有本人、无临床后果、且是即时生效的单人操作，套上发布流程反而是 bug。
+    同一份代码库里 `eval_dataset_states` 就是这么处理纯状态开关的。
+
+    **整体存 JSON，不一项一列。** `database.py` 唯一能做的迁移是
+    `ALTER TABLE ADD COLUMN`，每加一种偏好就加一列会把表长成一堵墙；
+    而偏好项在产品早期一定会反复增删。校验靠 `app/preferences.py` 的白名单，
+    不靠数据库列约束 —— 与 `Patient.payload`、`UsageEvent.props` 同一个取舍。
+
+    **主键 `actor` 是不可信的。** 一期没有 SSO，它存的是前端 session store 里的
+    医生名（`stores/session.ts`，默认「张医生」），任何人都能伪造。所以这张表
+    **只用于区分演示身份，绝不作为访问控制依据** —— 偏好泄露或被改写的后果
+    仅限于界面颜色和字号。接入医院 SSO 后换成真实工号，表结构不变，
+    与 `audit.DEMO_ACTOR` 是同一条演进路径。
+    """
+
+    __tablename__ = "user_preferences"
+
+    actor: Mapped[str] = mapped_column(String(64), primary_key=True)
+    #: 形状与校验见 app/preferences.py。只存与默认值不同的项，
+    #: 读取时与 DEFAULTS 合并 —— 这样改默认值能惠及所有没显式设过该项的人
+    prefs: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

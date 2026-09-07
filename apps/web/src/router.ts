@@ -20,6 +20,9 @@ const routes: RouteRecordRaw[] = [
   // 交付平台。与控制台同一类页面（面向研发与调优，不是医生端功能），
   // 同样不占用 V4.3 定义的五个医生端页面。
   { path: '/delivery', name: 'Delivery', component: () => import('./views/DeliveryView.vue'), meta: { title: '交付平台' } },
+  // 个人配置。同样不占用 V4.3 定义的五个医生端页面 ——
+  // 它不在原件里，所以 fidelity / coverage 两道界面闸不比对它，靠单测守。
+  { path: '/settings', name: 'Settings', component: () => import('./views/SettingsView.vue'), meta: { title: '个人配置' } },
   { path: '/outpatient/:patientId', name: 'OutpatientWorkstation', component: () => import('./views/WorkstationView.vue'), meta: { title: '门诊工作站' } },
 ]
 
@@ -38,6 +41,7 @@ export const router = createRouter({ history: createWebHistory(), routes })
 const DOC_TITLES: Record<string, string> = {
   '/admin': 'Agent 控制台 · Doctor Agent',
   '/delivery': '交付平台 · Doctor Agent',
+  '/settings': '个人配置 · Doctor Agent',
 }
 const DEFAULT_TITLE = 'Doctor Agent · AI 门诊工作站'
 

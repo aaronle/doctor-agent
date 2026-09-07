@@ -303,7 +303,7 @@ async function onRollback(item: DeliveryReleaseItem) {
 .delivery-title { font-size: 14px; font-weight: 700; color: #1f2329; }
 .delivery-tabs { display: flex; gap: 4px; margin-left: 12px; }
 .delivery-tab { border: 0; background: transparent; font-size: 12px; color: #8a9099; padding: 6px 10px; cursor: pointer; border-bottom: 2px solid transparent; }
-.delivery-tab.is-active { color: #1677ff; font-weight: 600; border-bottom-color: #1677ff; }
+.delivery-tab.is-active { color: var(--t-1677ff, #1677ff); font-weight: 600; border-bottom-color: var(--t-1677ff, #1677ff); }
 .delivery-spacer, .lane-spacer, .stage-spacer { flex: 1 1 auto; }
 .delivery-env { font-size: 11px; color: #16a34a; font-weight: 600; }
 .delivery-error { margin: 10px 16px 0; padding: 8px 12px; border-radius: 8px; background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; font-size: 12px; }
@@ -311,16 +311,16 @@ async function onRollback(item: DeliveryReleaseItem) {
 
 .delivery-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
 .lane-card { background: #fff; border: 1px solid #e6e8eb; border-radius: 10px; padding: 12px 14px; }
-.lane-feature { border-color: #b7cbf2; }
+.lane-feature { border-color: var(--t-b7cbf2, #b7cbf2); }
 .lane-agent { border-color: #dcdfe6; }
 .lane-head { display: flex; align-items: center; gap: 8px; }
 .lane-kind { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
-.kind-feature { background: #edf3ff; color: #1677ff; }
+.kind-feature { background: var(--t-edf3ff, #edf3ff); color: var(--t-1677ff, #1677ff); }
 .kind-agent { background: #f2f3f5; color: #6b7280; }
 .lane-status { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: #f2f3f5; color: #6b7280; }
 .st-passed, .st-deployed { background: #edfaed; color: #16a34a; }
 .st-failed, .st-blocked { background: #fff1f0; color: #cf1322; }
-.st-running { background: #edf3ff; color: #1677ff; }
+.st-running { background: var(--t-edf3ff, #edf3ff); color: var(--t-1677ff, #1677ff); }
 .lane-title { margin: 8px 0 2px; font-size: 13px; font-weight: 600; color: #1f2329; }
 .lane-sub, .lane-empty { font-size: 11px; color: #8a9099; margin: 0; line-height: 1.6; }
 .lane-empty code { background: #f2f3f5; padding: 1px 4px; border-radius: 3px; }
@@ -334,7 +334,7 @@ async function onRollback(item: DeliveryReleaseItem) {
 .stage-detail, .gate-detail { color: #8a9099; }
 .stage-time { color: #b0b5bd; font-size: 10px; }
 .tone-ok .stage-icon { color: #16a34a; }
-.tone-run .stage-icon { color: #1677ff; }
+.tone-run .stage-icon { color: var(--t-1677ff, #1677ff); }
 .tone-bad .stage-icon { color: #cf1322; }
 .tone-bad .gate-detail { color: #cf1322; }
 .tone-idle .stage-icon, .tone-mute .stage-icon { color: #c0c4cc; }
@@ -361,7 +361,7 @@ async function onRollback(item: DeliveryReleaseItem) {
 .regression-reason { font-size: 10px; color: #8a9099; line-height: 1.6; }
 
 .release-row { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid #e6e8eb; border-radius: 8px; margin-bottom: 6px; }
-.release-row.st-current { border-color: #b7cbf2; }
+.release-row.st-current { border-color: var(--t-b7cbf2, #b7cbf2); }
 .release-row.st-rolled_back { opacity: 0.7; background: #fafbfc; }
 .release-at { font-size: 10px; color: #8a9099; font-variant-numeric: tabular-nums; }
 .release-kind { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
@@ -372,7 +372,7 @@ async function onRollback(item: DeliveryReleaseItem) {
 
 .semantics { margin-top: 14px; padding: 10px 12px; background: #f7f8fa; border-radius: 8px; }
 .semantics p { font-size: 11px; color: #6b7280; margin: 4px 0; line-height: 1.6; }
-.fingerprint { margin-top: 12px; padding: 12px; border: 1px solid #b7cbf2; border-radius: 10px; }
+.fingerprint { margin-top: 12px; padding: 12px; border: 1px solid var(--t-b7cbf2, #b7cbf2); border-radius: 10px; }
 .fp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .fp-col { background: #f7f8fa; border-radius: 8px; padding: 10px 12px; }
 .fp-col-title { font-size: 11px; font-weight: 700; color: #414750; margin-bottom: 6px; }

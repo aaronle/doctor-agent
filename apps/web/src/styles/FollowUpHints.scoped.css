@@ -6,29 +6,29 @@
 .hint-float.mini{width:auto}
 
 .hf-head{display:flex;align-items:center;gap:5px;height:30px;padding:0 8px 0 10px;
-  background:#eff6ff;border:1px solid #c7dcff;border-bottom:none;border-radius:10px 10px 0 0;
+  background:var(--t-eff6ff, #eff6ff);border:1px solid var(--t-c7dcff, #c7dcff);border-bottom:none;border-radius:10px 10px 0 0;
   /* 整条头部是拖动把手 */
   cursor:grab;user-select:none;touch-action:none}
 .hf-head:active{cursor:grabbing}
 .hf-icon{font-size:11px;line-height:1}
-.hf-title{font-size:12px;font-weight:700;color:#1677ff}
+.hf-title{font-size:12px;font-weight:700;color:var(--t-1677ff, #1677ff)}
 .hf-spacer{flex:1}
 
 /* 进度 x/y。放在标题右边而不是底部：医生扫一眼就知道还剩多少 */
-.hf-progress{font-size:9.5px;font-weight:700;color:#1677ff;background:#fff;
-  border:1px solid #c7dcff;border-radius:8px;padding:1px 6px;margin-right:2px}
+.hf-progress{font-size:9.5px;font-weight:700;color:var(--t-1677ff, #1677ff);background:#fff;
+  border:1px solid var(--t-c7dcff, #c7dcff);border-radius:8px;padding:1px 6px;margin-right:2px}
 
 .hf-btn{border:none;background:transparent;color:#8a9099;cursor:pointer;
   font-size:12px;line-height:1;padding:2px 4px;border-radius:3px}
-.hf-btn:hover{background:#dbeafe;color:#1677ff}
+.hf-btn:hover{background:var(--t-dbeafe, #dbeafe);color:var(--t-1677ff, #1677ff)}
 
-.hf-body{background:#fff;border:1px solid #c7dcff;border-top:none;border-radius:0 0 10px 10px;
+.hf-body{background:#fff;border:1px solid var(--t-c7dcff, #c7dcff);border-top:none;border-radius:0 0 10px 10px;
   padding:8px 10px 7px;display:flex;flex-direction:column;gap:5px;
-  box-shadow:0 4px 14px #1454991f;max-height:250px;overflow-y:auto}
+  box-shadow:0 4px 14px var(--t-145499, #1454991f);max-height:250px;overflow-y:auto}
 
 /* 还没问的 */
 .hf-item{display:flex;gap:6px;align-items:flex-start;padding:6px 8px;border-radius:6px;
-  background:#f9fbff;border:1px solid #e5eefc}
+  background:var(--t-f9fbff, #f9fbff);border:1px solid var(--t-e5eefc, #e5eefc)}
 .hf-num{flex-shrink:0;width:15px;height:15px;border-radius:50%;background:#ff7a00;color:#fff;
   font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
   margin-top:1px}
@@ -47,9 +47,9 @@
 
 /* 缩小态：一个小胶囊 + 角标（角标是**还没问**的条数，不是总数） */
 .hf-pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;
-  background:#fff;border:1px solid #c7dcff;color:#1677ff;font-size:11px;font-weight:600;
-  cursor:pointer;box-shadow:0 2px 8px #14549924;touch-action:none}
-.hf-pill:hover{background:#f0f6ff}
+  background:#fff;border:1px solid var(--t-c7dcff, #c7dcff);color:var(--t-1677ff, #1677ff);font-size:11px;font-weight:600;
+  cursor:pointer;box-shadow:0 2px 8px var(--t-145499, #14549924);touch-action:none}
+.hf-pill:hover{background:var(--t-f0f6ff, #f0f6ff)}
 .hf-count{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;
   padding:0 4px;border-radius:8px;background:#ff7a00;color:#fff;font-size:9px;font-weight:700}
 
@@ -83,13 +83,13 @@
 .hf-more{
   display:flex;align-items:center;justify-content:center;gap:2px;
   height:22px;flex-shrink:0;
-  border:1px solid #c7dcff;border-top:1px dashed #dbe7fb;border-radius:0 0 10px 10px;
-  background:#fbfdff;color:#1677ff;font-size:9.5px;font-weight:600;cursor:pointer;
-  box-shadow:0 4px 14px #1454991f}
-.hf-more:hover{background:#f0f6ff}
+  border:1px solid var(--t-c7dcff, #c7dcff);border-top:1px dashed var(--t-dbe7fb, #dbe7fb);border-radius:0 0 10px 10px;
+  background:var(--t-fbfdff, #fbfdff);color:var(--t-1677ff, #1677ff);font-size:9.5px;font-weight:600;cursor:pointer;
+  box-shadow:0 4px 14px var(--t-145499, #1454991f)}
+.hf-more:hover{background:var(--t-f0f6ff, #f0f6ff)}
 .hf-more-arrow{font-size:11px;line-height:1;margin-top:-1px}
 
 /* 滚动条本身也让它看得见一点：默认的 overlay 滚动条在浅色背景上几乎不可见 */
 .hf-body::-webkit-scrollbar{width:5px}
-.hf-body::-webkit-scrollbar-thumb{background:#c7dcff;border-radius:3px}
-.hf-body::-webkit-scrollbar-thumb:hover{background:#9ec3f5}
+.hf-body::-webkit-scrollbar-thumb{background:var(--t-c7dcff, #c7dcff);border-radius:3px}
+.hf-body::-webkit-scrollbar-thumb:hover{background:var(--t-9ec3f5, #9ec3f5)}

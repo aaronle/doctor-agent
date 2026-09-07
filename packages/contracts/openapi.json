@@ -614,6 +614,30 @@
         }
       }
     },
+    "/api/his/board": {
+      "get": {
+        "tags": [
+          "his"
+        ],
+        "summary": "Department Board",
+        "description": "科室看板：**诊疗进度** × **风险** 两个维度。\n\n产品定义（2026-09-04 确认）：\n\n> 病人看板主要是从两个维度回顾：① 诊疗进度 —— 哪些看过了、哪些没有\n> （比如做完检查但报告还没回来的）；② 风险评估 —— 哪些有风险或危急值，\n> 哪些是普通病人。\n\n它**不是运营报表**（那面向科主任，是另一个人另一个场景），\n也**不只是「下一个看谁」的队列** —— 关键词是「回顾」，\n所以已出队、已完成的患者同样要在，否则今天回顾不了。\n\n排序是「**该我处理的排前面**」：未处置红线 > 报告已回但没看 > 其余。\n不按患者号排 —— 那个顺序对医生没有任何含义。",
+        "operationId": "department_board_api_his_board_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Department Board Api His Board Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/emr/assessment-catalog": {
       "get": {
         "tags": [
@@ -780,7 +804,7 @@
           "emr"
         ],
         "summary": "Unlock Analysis",
-        "description": "解锁 AI 分析。\n\n两条路径：问诊结束（`interview`，由 voice/complete 自动调）与\n医生显式跳过（`skipped`）。**跳过这条不能少** —— 复诊、患者不配合、\n医生已自行问完，这些情况下分析不能因此永远出不来。",
+        "description": "解锁 AI 分析。\n\n两条路径：问诊结束（`interview`，由 interview/complete 自动调）与\n医生显式跳过（`skipped`）。**跳过这条不能少** —— 复诊、患者不配合、\n医生已自行问完，这些情况下分析不能因此永远出不来。",
         "operationId": "unlock_analysis_api_emr_analysis_unlock_post",
         "requestBody": {
           "content": {
@@ -1007,6 +1031,7 @@
           "emr"
         ],
         "summary": "Generate Record Auto",
+        "description": "AI 起草病历，**并落库**。\n\n此前这里只把结果返回给前端，草稿从不落 `record_drafts` ——\n于是提交病历时 `latest_ai_draft` 找不到对照，微调语料一条都采不到。\n\n**「没落库」不会报错**：接口 200、界面正常、病历照样提交，\n只有语料表一直空着。是端到端跑一遍才看见的。\n\n每次起草都递增一版：医生可以重新生成，每一版都留痕 ——\n「他重生成了三次才用」本身就是关于这个岗位的信号。",
         "operationId": "generate_record_auto_api_emr_generate_record_auto_post",
         "requestBody": {
           "content": {
@@ -1131,14 +1156,14 @@
         }
       }
     },
-    "/api/emr/voice/init/{patient_id}": {
+    "/api/emr/interview/init/{patient_id}": {
       "get": {
         "tags": [
           "emr"
         ],
-        "summary": "Voice Init",
-        "description": "问诊开场包。一次返回播放一整场问诊所需的全部内容。\n\n**不再调模型**（2026-09-02）。原先这里会跑 `voice_plan_agent` 生成\n「AI 追问提示」与「补充观察」两份清单 —— 那两块一期已撤（没有临床知识库\n支撑时，建议错一条的代价大于不给建议），产出没有任何消费方。\n\n留着那次调用等于每点一次「开始问诊」就白花 7.3 秒和一次真实模型费用，\n换来一份直接丢掉的输出。所以整个拿掉，这个接口现在是纯数据组装。\n\n`questions` / `observations` 两个字段仍在返回体里，恒为空数组：\n前端已经不消费它们，保留字段只是为了老前端拿到的形状不变。\n等临床知识库就位、这个功能重新开启时，把 agent 调用加回来即可。",
-        "operationId": "voice_init_api_emr_voice_init__patient_id__get",
+        "summary": "Interview Init",
+        "description": "问诊开场包。一次返回播放一整场问诊所需的全部内容。\n\n**这个接口不调模型**，是纯数据组装。「开始问诊」是医生点下去要立刻有反应的\n动作，不能挂在一次 5–7 秒的模型调用上。\n\n「AI 追问提示」2026-09-04 恢复（见下面两个 followup 接口），但它**不在这里**：\n清单由 `GET /interview/followup/{patient_id}` 单独取，前端点完开始之后\n并行去拿，回来了再浮出。这样开场是瞬时的，清单晚一两秒到也不影响 ——\n浮框本来就要攒够几条对话才展开。\n\n`questions` / `observations` 两个字段仍在返回体里，恒为空数组：\n形状不变，但**不要往里填** —— 它们是老前端的兼容位，真正的清单走新接口。",
+        "operationId": "interview_init_api_emr_interview_init__patient_id__get",
         "parameters": [
           {
             "name": "patient_id",
@@ -1158,7 +1183,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Voice Init Api Emr Voice Init  Patient Id  Get"
+                  "title": "Response Interview Init Api Emr Interview Init  Patient Id  Get"
                 }
               }
             }
@@ -1176,18 +1201,18 @@
         }
       }
     },
-    "/api/emr/voice/complete": {
+    "/api/emr/interview/complete": {
       "post": {
         "tags": [
           "emr"
         ],
-        "summary": "Voice Complete",
-        "operationId": "voice_complete_api_emr_voice_complete_post",
+        "summary": "Interview Complete",
+        "operationId": "interview_complete_api_emr_interview_complete_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VoiceCompleteIn"
+                "$ref": "#/components/schemas/InterviewCompleteIn"
               }
             }
           },
@@ -1201,7 +1226,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Voice Complete Api Emr Voice Complete Post"
+                  "title": "Response Interview Complete Api Emr Interview Complete Post"
                 }
               }
             }
@@ -1219,13 +1244,14 @@
         }
       }
     },
-    "/api/emr/voice/history/{patient_id}": {
+    "/api/emr/interview/followup/{patient_id}": {
       "get": {
         "tags": [
           "emr"
         ],
-        "summary": "Voice History",
-        "operationId": "voice_history_api_emr_voice_history__patient_id__get",
+        "summary": "Interview Followup Plan",
+        "description": "AI 追问提示 · 清单。**一次问诊只该调一次。**\n\n清单是从患者档案里读出来的缺口，对话推进不会改变它 —— 会变的是\n「哪些已经问到了」，那是 coverage 的事。每轮重算清单会让条目\n在医生眼皮底下换来换去，比不给还糟。",
+        "operationId": "interview_followup_plan_api_emr_interview_followup__patient_id__get",
         "parameters": [
           {
             "name": "patient_id",
@@ -1245,7 +1271,95 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Voice History Api Emr Voice History  Patient Id  Get"
+                  "title": "Response Interview Followup Plan Api Emr Interview Followup  Patient Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/interview/followup/coverage": {
+      "post": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Interview Followup Coverage",
+        "description": "AI 追问提示 · 判定哪些已经问到了。\n\n只回「已覆盖」。没被回的自然还开着 —— 这样模型漏判的默认后果是\n**继续提醒**，而不是**不再提醒**。\n\n降级时回空清单：宁可整份停在原地，也不按关键词硬划。",
+        "operationId": "interview_followup_coverage_api_emr_interview_followup_coverage_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpCoverageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Interview Followup Coverage Api Emr Interview Followup Coverage Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emr/interview/history/{patient_id}": {
+      "get": {
+        "tags": [
+          "emr"
+        ],
+        "summary": "Interview History",
+        "operationId": "interview_history_api_emr_interview_history__patient_id__get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Interview History Api Emr Interview History  Patient Id  Get"
                 }
               }
             }
@@ -2588,6 +2702,614 @@
         }
       }
     },
+    "/api/telemetry/events": {
+      "post": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Ingest",
+        "description": "收一批埋点。\n\n**永远返回 200。** 埋点是旁路，它出问题不该让医生的操作失败 ——\n前端那边也是 fire-and-forget，不等这个响应。所以这里只做长度截断，\n不做校验拒收：一条脏数据的代价远小于「因为埋点报错，医生以为提交失败」。",
+        "operationId": "ingest_api_telemetry_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ingest Api Telemetry Events Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telemetry/usage": {
+      "get": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Usage",
+        "description": "使用情况汇总。\n\n**存的是原始事件，聚合在查询时做。** 聚合口径会变（今天想看按天、\n明天想看按科室），而原始事件只采一次 —— 反过来做的话，改口径就得重新采。",
+        "operationId": "usage_api_telemetry_usage_get",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 7,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Usage Api Telemetry Usage Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telemetry/training": {
+      "get": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Training Summary",
+        "description": "微调语料概览。\n\n最要紧的一个数是 **`edited` 的占比** —— 那是模型和医生的分歧率。\n`accepted` 高说明模型在这类病例上已经够用；`discarded` 高说明它跑偏了，\n那些行要优先拿出来看。\n\n`trainable_count` 与总数分开报：接真实 HIS 之后两者会拉开差距，\n而「有多少条能真的拿去训练」才是排期时要用的那个数。",
+        "operationId": "training_summary_api_telemetry_training_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Training Summary Api Telemetry Training Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/datasets": {
+      "get": {
+        "tags": [
+          "data-console"
+        ],
+        "summary": "List Datasets",
+        "operationId": "list_datasets_api_data_datasets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Datasets Api Data Datasets Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "data-console"
+        ],
+        "summary": "Upload Dataset",
+        "description": "上传测试集。**全对才收。**\n\n半个数据集入库、另一半报错，使用者无从知道究竟进去了哪些 ——\n而通过率正是这张表存在的理由，分母不对整张报告就是误导。\n错误逐条指到位置（`cases[2].checks[0].kind`），不能只说「格式不对」。",
+        "operationId": "upload_dataset_api_data_datasets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetUploadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Upload Dataset Api Data Datasets Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/datasets/{dataset_id}": {
+      "delete": {
+        "tags": [
+          "data-console"
+        ],
+        "summary": "Delete Dataset",
+        "description": "删除上传的测试集。**内置的删不掉** —— 文件在只读镜像里，删了下次部署又回来。",
+        "operationId": "delete_dataset_api_data_datasets__dataset_id__delete",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Dataset Api Data Datasets  Dataset Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/knowledge": {
+      "get": {
+        "tags": [
+          "data-console"
+        ],
+        "summary": "List Knowledge",
+        "description": "词条清单。**带 `content_length` 不带正文** —— 列表页不需要全文，\n而正文长度恰恰是这张表最有用的一列：现有内置词条正文全是空的，\n之前没有任何界面能看出这件事。",
+        "operationId": "list_knowledge_api_data_knowledge_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Knowledge Api Data Knowledge Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/knowledge/{key}": {
+      "get": {
+        "tags": [
+          "data-console"
+        ],
+        "summary": "Get Knowledge",
+        "operationId": "get_knowledge_api_data_knowledge__key__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Knowledge Api Data Knowledge  Key  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "data-console"
+        ],
+        "summary": "Save Knowledge",
+        "description": "新增或覆盖一条词条。正文写入前消毒（见 `knowledge.sanitize`）。",
+        "operationId": "save_knowledge_api_data_knowledge__key__put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Save Knowledge Api Data Knowledge  Key  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "data-console"
+        ],
+        "summary": "Delete Knowledge",
+        "description": "删除词条。**内置的也能删** —— 在库里写一条墓碑，读取时跳过。",
+        "operationId": "delete_knowledge_api_data_knowledge__key__delete",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Knowledge Api Data Knowledge  Key  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/knowledge/import": {
+      "post": {
+        "tags": [
+          "data-console"
+        ],
+        "summary": "Import Knowledge",
+        "description": "批量导入。和测试集同一条原则：**全对才收**。",
+        "operationId": "import_knowledge_api_data_knowledge_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeImportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Import Knowledge Api Data Knowledge Import Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences/options": {
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Get Options",
+        "description": "配置页要渲染的取值集合与默认值。\n\n**前端不要自己硬编码这几个枚举** —— 后端加了一档主题、前端没跟着改，\n界面上就永远少一个选项，且没有任何测试会失败。",
+        "operationId": "get_options_api_preferences_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Options Api Preferences Options Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences": {
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Get Preferences",
+        "operationId": "get_preferences_api_preferences_get",
+        "parameters": [
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Actor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Preferences Api Preferences Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Save Preferences",
+        "operationId": "save_preferences_api_preferences_put",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Save Preferences Api Preferences Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Reset Preferences",
+        "description": "恢复全部默认。删行而不是写一份等于默认的值 —— 这样以后改默认值这个人会跟着变。",
+        "operationId": "reset_preferences_api_preferences_delete",
+        "parameters": [
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Actor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Reset Preferences Api Preferences Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -2783,6 +3505,26 @@
         ],
         "title": "DatasetToggleIn"
       },
+      "DatasetUploadIn": {
+        "properties": {
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "uploaded_by": {
+            "type": "string",
+            "title": "Uploaded By",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "payload"
+        ],
+        "title": "DatasetUploadIn"
+      },
       "DiagnosisWriteBackIn": {
         "properties": {
           "patient_id": {
@@ -2880,6 +3622,64 @@
         "type": "object",
         "title": "EvalIn"
       },
+      "EventBatchIn": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "default": ""
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": ""
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventIn"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EventBatchIn"
+      },
+      "EventIn": {
+        "properties": {
+          "event": {
+            "type": "string",
+            "title": "Event"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "default": ""
+          },
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id",
+            "default": ""
+          },
+          "props": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Props"
+          },
+          "client_ts": {
+            "type": "integer",
+            "title": "Client Ts",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event"
+        ],
+        "title": "EventIn"
+      },
       "ExamIn": {
         "properties": {
           "patient_id": {
@@ -2914,6 +3714,32 @@
         ],
         "title": "ExamIn"
       },
+      "FollowUpCoverageIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "pending": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pending"
+          },
+          "messages": {
+            "items": {},
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "FollowUpCoverageIn"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2926,6 +3752,76 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "InterviewCompleteIn": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "conversation_summary": {
+            "type": "string",
+            "title": "Conversation Summary",
+            "default": ""
+          },
+          "messages": {
+            "items": {},
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "InterviewCompleteIn"
+      },
+      "KnowledgeImportIn": {
+        "properties": {
+          "entries": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Entries"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "title": "KnowledgeImportIn"
+      },
+      "KnowledgeIn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "title"
+        ],
+        "title": "KnowledgeIn"
       },
       "OrderIn": {
         "properties": {
@@ -2982,6 +3878,23 @@
           "patient_id"
         ],
         "title": "OrderIn"
+      },
+      "PreferencesIn": {
+        "properties": {
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": ""
+          },
+          "prefs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Prefs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PreferencesIn"
       },
       "QcReviewIn": {
         "properties": {
@@ -3333,30 +4246,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "VoiceCompleteIn": {
-        "properties": {
-          "patient_id": {
-            "type": "string",
-            "title": "Patient Id"
-          },
-          "conversation_summary": {
-            "type": "string",
-            "title": "Conversation Summary",
-            "default": ""
-          },
-          "messages": {
-            "items": {},
-            "type": "array",
-            "title": "Messages"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "patient_id"
-        ],
-        "title": "VoiceCompleteIn"
       },
       "WorkerRunIn": {
         "properties": {

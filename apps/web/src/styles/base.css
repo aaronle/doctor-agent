@@ -7,10 +7,10 @@
  */
 
 :root {
-  --blue: #3b6ef5;
-  --blue-dark: #2b5be0;
-  --blue-soft: #eaf1ff;
-  --blue-soft2: #f2f6ff;
+  --blue: var(--t-3b6ef5, #3b6ef5);
+  --blue-dark: var(--t-2b5be0, #2b5be0);
+  --blue-soft: var(--t-eaf1ff, #eaf1ff);
+  --blue-soft2: var(--t-f2f6ff, #f2f6ff);
   --ink: #1f2937;
   --ink-2: #374151;
   --gray: #6b7280;
@@ -30,13 +30,13 @@
 
 /* Element Plus 主题覆盖 */
 :root {
-  --el-color-primary: #3b6ef5;
-  --el-color-primary-light-3: #6e93f8;
-  --el-color-primary-light-5: #9db5fa;
-  --el-color-primary-light-7: #c5d3fc;
-  --el-color-primary-light-8: #d9e3fd;
-  --el-color-primary-light-9: #eaf1ff;
-  --el-color-primary-dark-2: #2b5be0;
+  --el-color-primary: var(--t-3b6ef5, #3b6ef5);
+  --el-color-primary-light-3: var(--t-6e93f8, #6e93f8);
+  --el-color-primary-light-5: var(--t-9db5fa, #9db5fa);
+  --el-color-primary-light-7: var(--t-c5d3fc, #c5d3fc);
+  --el-color-primary-light-8: var(--t-d9e3fd, #d9e3fd);
+  --el-color-primary-light-9: var(--t-eaf1ff, #eaf1ff);
+  --el-color-primary-dark-2: var(--t-2b5be0, #2b5be0);
   --el-border-radius-base: 6px;
   --el-font-size-base: 12px;
 }

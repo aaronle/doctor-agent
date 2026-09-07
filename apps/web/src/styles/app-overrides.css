@@ -5,7 +5,7 @@
 .btn.sm{padding:4px 8px;font-size:11px}
 .risk-badge.high{background:#fdecec;color:#e5484d}
 .risk-badge.mid{background:#fef3e2;color:#e08c2b}
-.risk-badge.low{background:#eaf1ff;color:var(--blue)}
+.risk-badge.low{background:var(--t-eaf1ff, #eaf1ff);color:var(--blue)}
 .toast.warn{border-left-color:var(--amber)}
 .toast.warn .toast-ico{background:var(--amber)}
 .panel-title{font-size:11px;font-weight:700}

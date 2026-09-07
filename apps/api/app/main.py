@@ -33,6 +33,7 @@ from .routers import delivery as delivery_router
 from .routers import emr as emr_router
 from .routers import his as his_router
 from .routers import orchestration as orchestration_router
+from .routers import preferences as preferences_router
 from .seed import seed_database
 from .seo import inject
 from .obs import event
@@ -116,6 +117,7 @@ app.include_router(admin_router.router)
 app.include_router(delivery_router.router)
 app.include_router(telemetry_router.router)
 app.include_router(data_console_router.router)
+app.include_router(preferences_router.router)
 
 
 @app.get("/api/health")

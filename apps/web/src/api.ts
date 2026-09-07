@@ -909,3 +909,53 @@ export async function streamSse(
     }
   }
 }
+
+// ------------------------------------------------------------------ 个人配置
+
+/** 浮窗几何。由拖拽后自动写入，不是配置页上手填的。 */
+export interface WindowPrefs {
+  panel_width?: number
+  drawer_width?: number
+  panel_height?: number
+  drawer_height?: number
+  split_ratio?: number
+  merged?: boolean
+}
+
+export interface Preferences {
+  version: number
+  theme: string
+  font_level: string
+  follow_up: string
+  remember_windows: boolean
+  windows: WindowPrefs
+}
+
+/**
+ * 配置页要渲染的取值集合。
+ *
+ * **枚举一律从这里拿，不要在前端硬编码。** 后端加了一档主题、前端没跟着改，
+ * 界面上就永远少一个选项，而且没有任何测试会失败 —— 那种缺陷只能靠人眼发现。
+ */
+export interface PreferenceOptions {
+  version: number
+  themes: string[]
+  font_levels: string[]
+  follow_up_modes: string[]
+  window_bounds: Record<string, [number, number]>
+  defaults: Preferences
+}
+
+export const fetchPreferenceOptions = () => get<PreferenceOptions>('/api/preferences/options')
+
+export const fetchPreferences = (actor: string) =>
+  get<{ actor: string; prefs: Preferences }>(`/api/preferences?actor=${encodeURIComponent(actor)}`)
+
+/** PATCH 语义：只传要改的项，没传的不动。 */
+export const savePreferences = (actor: string, prefs: Partial<Preferences>) =>
+  put<{ ok: boolean; actor: string; prefs: Preferences }>('/api/preferences', { actor, prefs })
+
+export const resetPreferences = (actor: string) =>
+  del<{ ok: boolean; actor: string; prefs: Preferences }>(
+    `/api/preferences?actor=${encodeURIComponent(actor)}`,
+  )

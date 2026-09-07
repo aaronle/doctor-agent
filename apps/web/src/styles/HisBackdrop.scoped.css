@@ -18,19 +18,19 @@
 .hb-tools{display:flex;align-items:center;gap:2px;overflow:hidden}
 .hb-tool{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:3px;
   color:#22405e;white-space:nowrap;cursor:default}
-.hb-tool:hover{background:#dce9f7}
-.hb-ti{font-style:normal;color:#1677ff;font-size:12px}
+.hb-tool:hover{background:var(--t-dce9f7, #dce9f7)}
+.hb-ti{font-style:normal;color:var(--t-1677ff, #1677ff);font-size:12px}
 .hb-caret{font-weight:400;color:#7a8fa6;font-size:9px;margin-left:1px}
 .hb-tools-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.hb-utd{background:#1665c0;color:#fff;font-weight:700;font-size:11px;padding:2px 7px;border-radius:2px}
+.hb-utd{background:var(--t-1665c0, #1665c0);color:#fff;font-weight:700;font-size:11px;padding:2px 7px;border-radius:2px}
 .hb-search{color:#7a8fa6}
 
 /* ---------------------------------------------------------------- 患者信息栏 */
 .hb-patient{position:relative;display:flex;align-items:flex-start;gap:10px;
-  padding:6px 10px;background:#f7fafd;border-bottom:1px solid #c9d8e6;flex-shrink:0}
+  padding:6px 10px;background:var(--t-f7fafd, #f7fafd);border-bottom:1px solid #c9d8e6;flex-shrink:0}
 .hb-queue{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
 .hb-queue-row{display:flex;gap:8px;color:#22405e}
-.hb-queue-row b{color:#1665c0}
+.hb-queue-row b{color:var(--t-1665c0, #1665c0)}
 .hb-queue-input{border:1px solid #b9cddf;background:#fff;padding:2px 6px;border-radius:2px;color:#5a7089}
 .hb-avatar{width:34px;height:34px;border:1px solid #b9cddf;background:#fff;border-radius:2px;
   display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
@@ -52,10 +52,10 @@
 .hb-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 
 .hb-panel-title{display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;
-  background:linear-gradient(#3d8fd8,#1f6fc0);color:#fff;font-weight:700;
+  background:linear-gradient(var(--t-3d8fd8, #3d8fd8),var(--t-1f6fc0, #1f6fc0));color:#fff;font-weight:700;
   border-radius:2px 2px 0 0;flex-shrink:0}
 .hb-panel-title i{font-style:normal}
-.hb-panel-title.sub{background:linear-gradient(#5fa3dd,#3d8fd8);margin-top:2px}
+.hb-panel-title.sub{background:linear-gradient(var(--t-5fa3dd, #5fa3dd),var(--t-3d8fd8, #3d8fd8));margin-top:2px}
 .hb-panel-title.mt{margin-top:4px}
 .hb-pt-right{margin-left:auto;cursor:pointer;opacity:.85;letter-spacing:2px}
 .hb-pt-right:hover{opacity:1}
@@ -63,7 +63,7 @@
 .hb-doc-head{display:flex;align-items:center;gap:10px;padding:4px 8px;
   background:#fff;border:1px solid #c9d8e6;border-top:none;flex-shrink:0}
 .hb-radio{cursor:pointer;color:#5a7089;white-space:nowrap}
-.hb-radio.on{color:#1665c0;font-weight:700}
+.hb-radio.on{color:var(--t-1665c0, #1665c0);font-weight:700}
 .hb-select{flex:1;min-width:0;border:1px solid #b9cddf;background:#fff;padding:1px 6px;
   color:#22405e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -71,8 +71,8 @@
   background:#f2f7fb;border:1px solid #c9d8e6;border-top:none;flex-shrink:0}
 .hb-rtf-i{min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;
   border-radius:2px;color:#3c5a75;font-size:11px}
-.hb-rtf-i:hover{background:#dce9f7}
-.hb-rtf-i.on{font-weight:800;color:#1665c0;background:#dce9f7}
+.hb-rtf-i:hover{background:var(--t-dce9f7, #dce9f7)}
+.hb-rtf-i.on{font-weight:800;color:var(--t-1665c0, #1665c0);background:var(--t-dce9f7, #dce9f7)}
 .hb-rtf-sel{border:1px solid #b9cddf;background:#fff;padding:0 5px;height:18px;
   display:inline-flex;align-items:center;color:#22405e;font-size:11px;margin:0 2px}
 
@@ -99,10 +99,10 @@
 .hb-tbl.orders{flex:1;min-height:0;display:block;overflow:auto}
 .hb-tbl.orders thead,.hb-tbl.orders tbody{display:table;width:100%;table-layout:fixed}
 .hb-tbl.orders tbody tr{cursor:pointer}
-.hb-tbl.orders tbody tr:hover{background:#eef6ff}
-.hb-tbl.orders tbody tr.picked{background:#dbeafe}
-.hb-tbl tbody tr:nth-child(even){background:#fafcfe}
-.hb-tbl tbody tr.picked:nth-child(even){background:#dbeafe}
+.hb-tbl.orders tbody tr:hover{background:var(--t-eef6ff, #eef6ff)}
+.hb-tbl.orders tbody tr.picked{background:var(--t-dbeafe, #dbeafe)}
+.hb-tbl tbody tr:nth-child(even){background:var(--t-fafcfe, #fafcfe)}
+.hb-tbl tbody tr.picked:nth-child(even){background:var(--t-dbeafe, #dbeafe)}
 .hb-sub{color:#7a8fa6}
 .hb-status{display:inline-block;padding:0 5px;border-radius:2px;font-size:10px;color:#fff}
 .hb-status.ok{background:#3aa76d}
@@ -116,7 +116,7 @@
 .hb-tabs{display:flex;align-items:center;gap:1px;background:#e4eef7;
   border:1px solid #c9d8e6;padding:2px 4px;flex-shrink:0}
 .hb-tab{padding:2px 9px;border-radius:2px 2px 0 0;color:#33506b;cursor:pointer;white-space:nowrap}
-.hb-tab:hover{background:#d3e4f4}
-.hb-tab.on{background:#fff;color:#1665c0;font-weight:700;border:1px solid #c9d8e6;border-bottom-color:#fff}
+.hb-tab:hover{background:var(--t-d3e4f4, #d3e4f4)}
+.hb-tab.on{background:#fff;color:var(--t-1665c0, #1665c0);font-weight:700;border:1px solid #c9d8e6;border-bottom-color:#fff}
 .hb-amount{margin-left:auto;color:#33506b;white-space:nowrap;padding-right:4px}
 .hb-amount b{color:#c0392b}
