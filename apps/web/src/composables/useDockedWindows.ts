@@ -204,16 +204,20 @@ export function useDockedWindows() {
   function placeBeside(
     key: WindowKey,
     anchorKey: WindowKey,
-    natural: { width: number; height: number },
+    natural: { width: number; height: number; top?: number },
   ) {
     if (merged.value || placed.value[key]) return
     const anchor = pos.value[anchorKey]
     const left = key === 'drawer'
       ? anchor.left - natural.width          // 抽屉在面板左边
       : anchor.left + (size.value[anchorKey]?.width ?? natural.width)
-    size.value = { ...size.value, [key]: { ...natural } }
+    // **对齐的是「看得见的顶」。** 锚点可能还带着上边线拖出来的一段
+    // `margin-top`，而那段不在 `pos.top` 里 —— 线上实测两个窗内联 top 都是
+    // 533、渲染出来却是 533 和 851。调用方知道那段偏移，让它给。
+    const top = natural.top ?? anchor.top
+    size.value = { ...size.value, [key]: { width: natural.width, height: natural.height } }
     // 摆的时候照样钳位：面板贴着屏幕左边时，抽屉不能整个甩到屏幕外
-    pos.value = { ...pos.value, [key]: clampTitleBar({ left, top: anchor.top }, natural.width) }
+    pos.value = { ...pos.value, [key]: clampTitleBar({ left, top }, natural.width) }
     placed.value = { ...placed.value, [key]: true }
   }
 

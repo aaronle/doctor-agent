@@ -273,12 +273,35 @@ function placeIfUndocked(key: 'drawer' | 'panel') {
     const anchor = dock.size.value[anchorKey]
     const total = drawerSize.size.value ?? 1120
     const panelW = panelSize.size.value ?? 300
-    const natural = key === 'drawer'
+    const size = key === 'drawer'
       ? { width: Math.max(640, total - panelW), height: anchor?.height ?? 800 }
       : { width: panelW, height: anchor?.height ?? 800 }
-    dock.placeBeside(key, anchorKey, natural)
+    // 对齐锚点**看得见的顶**：它可能还带着上边线拖出来的一段 margin-top，
+    // 而那段不在 dock.pos.top 里
+    const anchorOffset = (anchorKey === 'panel' ? panelHeight : drawerHeight).offset.value
+    dock.placeBeside(key, anchorKey, {
+      ...size,
+      top: dock.pos.value[anchorKey].top + anchorOffset,
+    })
   })
 }
+
+/**
+ * 分离那一刻，把上边线让出的距离**折进位置里**。
+ *
+ * `startDrag` 记的位置来自 `getBoundingClientRect()`，那个数**已经含了
+ * `margin-top`**；再把 margin 叠上去就是两头都算，窗口在分离那一刻凭空
+ * 往下跳一个 margin。线上实测：面板带着 `margin-top:318px`，
+ * 一次几乎没动的拖拽让它跳了 518px。
+ *
+ * 分离态里位置是绝对的，那段外边距本来就是多余的一层。
+ * 代价是拖回去吸附时顶边回到默认位置 —— 与「吸附 = 还原停靠」一致。
+ */
+watch(() => dock.merged.value, (merged) => {
+  if (merged) return
+  panelHeight.setOffset(0)
+  drawerHeight.setOffset(0)
+})
 
 watch(tipsOpen, (open) => { if (open) placeIfUndocked('drawer') })
 watch(panelOpen, (open) => { if (open) placeIfUndocked('panel') })

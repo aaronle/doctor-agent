@@ -415,3 +415,27 @@ describe('合并分离 · 恢复一份不完整的布局', () => {
     expect(d.styleFor('drawer').value).toEqual(before)
   })
 })
+
+describe('合并分离 · 贴边时对齐的是「看得见的顶」', () => {
+  /**
+   * 上边线拖出来的那段 `margin-top` 不在 `pos.top` 里。锚点带着 margin 时，
+   * 按 `pos.top` 对齐会差出整整一个 margin —— 线上实测两个窗内联 top 都是
+   * 533，渲染出来却是 533 和 851。
+   *
+   * 所以贴边允许调用方给一个显式的 `top`（= 锚点看得见的那个顶）。
+   */
+  const pointer = (x: number, y: number) =>
+    ({ clientX: x, clientY: y, preventDefault() {}, currentTarget: null }) as unknown as PointerEvent
+
+  it('给了 top 就用它，不用锚点的 pos.top', () => {
+    const d = useDockedWindows()
+    d.startDrag('panel', pointer(900, 30),
+      { getBoundingClientRect: () => ({ left: 800, top: 100, width: 300, height: 400 }) } as never, null)
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 850, clientY: 60 }) as never)
+    window.dispatchEvent(new MouseEvent('pointerup') as never)
+
+    d.placeBeside('drawer', 'panel', { width: 820, height: 400, top: 418 })
+
+    expect((d.styleFor('drawer').value as Record<string, string>).top).toBe('418px')
+  })
+})

@@ -1587,3 +1587,39 @@ describe('浮窗 · 拖走面板之后再打开 AI 助手', () => {
     expect(px('.tips-drawer', 'top')).toBe(px('.assistant-panel', 'top'))
   })
 })
+
+describe('浮窗 · 拖过上边线之后再拖走窗口', () => {
+  /**
+   * 上边线拖出来的是一段 `margin-top`，而分离时 `pos` 取的是**渲染位置**
+   * （`getBoundingClientRect`，已经包含那段 margin）。两头都算 =
+   * 窗口在分离那一刻凭空往下跳一个 margin 的距离。
+   *
+   * 线上实测：面板带着 `margin-top:318px`，一次几乎没动的拖拽让它跳了 518px。
+   *
+   * 分离态里位置是绝对的，`margin-top` 本来就是多余的一层 —— 折进 `pos` 即可。
+   */
+  it('分离之后不再挂着 margin-top —— 它已经折进位置里了', async () => {
+    const wrapper = await renderFloat()
+
+    // 先拖上边线制造一段 margin
+    const top = wrapper.find('.resize-edge-top')
+    await top.trigger('pointerdown', { clientY: 200 })
+    window.dispatchEvent(new MouseEvent('pointermove', { clientY: 320 }) as never)
+    window.dispatchEvent(new MouseEvent('pointerup') as never)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.tips-drawer').attributes('style') ?? '').toContain('margin-top')
+
+    // 再拖标题栏把它拖开
+    const head = wrapper.find('.panel-header')
+    await head.trigger('pointerdown', { clientX: 1400, clientY: 30 })
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 700, clientY: 500 }) as never)
+    window.dispatchEvent(new MouseEvent('pointerup') as never)
+    await wrapper.vm.$nextTick()
+
+    for (const sel of ['.tips-drawer', '.assistant-panel']) {
+      const style = wrapper.find(sel).attributes('style') ?? ''
+      expect(style).toContain('position: fixed')
+      expect(style).not.toContain('margin-top')
+    }
+  })
+})
