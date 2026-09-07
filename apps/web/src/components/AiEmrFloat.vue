@@ -256,6 +256,33 @@ const windowMemory = useWindowMemory({
 windowMemory.restore()
 windowMemory.watchAndPersist()
 
+/**
+ * 一个窗**在分离态下才被打开**时，把它贴到另一个窗旁边。
+ *
+ * 桌面端一进来只有医生智能体，AI 助手是收起的。医生把面板拖到屏幕中间、
+ * 这才点开 AI 助手 —— 抽屉这时没有自己的几何。不摆的话它会顶着面板的
+ * 尺寸落在面板的旧位置上：**300px 宽，还和面板叠在一起**（实测）。
+ *
+ * 自然宽取「组合总宽 − 面板宽」，也就是它在合并态下本来的宽度；
+ * 高度对齐另一个窗，两个窗才像还是一对。
+ */
+function placeIfUndocked(key: 'drawer' | 'panel') {
+  if (dock.merged.value || dock.placed.value[key]) return
+  nextTick(() => {
+    const anchorKey = key === 'drawer' ? 'panel' : 'drawer'
+    const anchor = dock.size.value[anchorKey]
+    const total = drawerSize.size.value ?? 1120
+    const panelW = panelSize.size.value ?? 300
+    const natural = key === 'drawer'
+      ? { width: Math.max(640, total - panelW), height: anchor?.height ?? 800 }
+      : { width: panelW, height: anchor?.height ?? 800 }
+    dock.placeBeside(key, anchorKey, natural)
+  })
+}
+
+watch(tipsOpen, (open) => { if (open) placeIfUndocked('drawer') })
+watch(panelOpen, (open) => { if (open) placeIfUndocked('panel') })
+
 function beginDrag(key: 'drawer' | 'panel', e: PointerEvent) {
   // 标题栏里的按钮（✕ / — / Aa）不算拖 —— 否则指针被标题栏捕获，
   // 按钮收不到自己的 click。和追问提示浮框同一个坑。

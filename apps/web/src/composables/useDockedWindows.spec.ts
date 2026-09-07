@@ -292,3 +292,126 @@ describe('合并分离 · 恢复上次的布局', () => {
     expect(d.styleFor('panel').value).toEqual({})
   })
 })
+
+describe('合并分离 · 另一个窗当时没开着', () => {
+  /**
+   * 桌面端一进来**只有医生智能体**，AI 助手是收起的。这时拖走面板，
+   * `startDrag` 拿不到抽屉的元素 —— 原来的写法是 `otherEl?.rect ?? selfRect`，
+   * 把自己的几何抄给了它。
+   *
+   * 后果：医生把面板拖到屏幕中间，再点把手打开 AI 助手 ——
+   * **抽屉变成 300px 宽（本该 ~820）、并且和面板叠在一起**。
+   * 实测 `width: 300px; height: 985px`，位置正好是面板拖走前的那个点。
+   *
+   * 正确语义：另一个窗没渲染时它的几何是**未知**，不是「和我一样」。
+   * 未知的那个等它真正打开时再摆（`placeBeside`）。
+   */
+  const rect = (o: Partial<DOMRect>) => ({ left: 0, top: 0, width: 300, height: 985, ...o }) as DOMRect
+  const fakeEl = (r: Partial<DOMRect>) =>
+    ({ getBoundingClientRect: () => rect(r) }) as unknown as HTMLElement
+  const pointer = (x: number, y: number) =>
+    ({ clientX: x, clientY: y, preventDefault() {}, currentTarget: null }) as unknown as PointerEvent
+
+  function undockPanelAlone() {
+    const d = useDockedWindows()
+    // 抽屉没开 → otherEl 是 null，这正是桌面端的默认状态
+    d.startDrag('panel', pointer(1400, 30), fakeEl({ left: 1300, top: 15, width: 300, height: 985 }), null)
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 800, clientY: 400 }) as never)
+    window.dispatchEvent(new MouseEvent('pointerup') as never)
+    return d
+  }
+
+  it('**不把自己的尺寸抄给没开着的那个**', () => {
+    const d = undockPanelAlone()
+    expect(d.merged.value).toBe(false)
+    expect(d.size.value.panel).toEqual({ width: 300, height: 985 })
+    // 抽屉的尺寸应当是「未知」
+    expect(d.size.value.drawer).toBeNull()
+  })
+
+  it('等它真开了再摆：贴在面板左边，用自己的宽、对齐面板的高', () => {
+    const d = undockPanelAlone()
+    const panel = d.pos.value.panel
+
+    d.placeBeside('drawer', 'panel', { width: 820, height: 985 })
+
+    const style = d.styleFor('drawer').value as Record<string, string>
+    expect(style.width).toBe('820px')
+    expect(style.height).toBe('985px')
+    // 右边线贴着面板左边线 —— 它们本来就是拼在一起的一对
+    expect(Number(style.left.replace('px', '')) + 820).toBe(panel.left)
+    expect(style.top).toBe(`${panel.top}px`)
+  })
+
+  it('已经摆过的窗不许被再摆一次 —— 医生自己拖过的位置不能被覆盖', () => {
+    const d = undockPanelAlone()
+    d.placeBeside('drawer', 'panel', { width: 820, height: 985 })
+    const first = { ...(d.styleFor('drawer').value as Record<string, string>) }
+
+    d.placeBeside('drawer', 'panel', { width: 400, height: 300 })
+
+    expect(d.styleFor('drawer').value).toEqual(first)
+  })
+
+  it('合并态下什么都不做 —— 那时位置由 CSS 停靠决定', () => {
+    const d = useDockedWindows()
+    d.placeBeside('drawer', 'panel', { width: 820, height: 985 })
+    expect(d.merged.value).toBe(true)
+    expect(d.styleFor('drawer').value).toEqual({})
+  })
+
+  it('摆的时候照样钳位 —— 面板贴着左边时，抽屉不能整个甩到屏幕外', () => {
+    const d = useDockedWindows()
+    d.startDrag('panel', pointer(200, 30), fakeEl({ left: 100, top: 15, width: 300, height: 985 }), null)
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 120, clientY: 40 }) as never)
+    window.dispatchEvent(new MouseEvent('pointerup') as never)
+
+    d.placeBeside('drawer', 'panel', { width: 820, height: 985 })
+
+    const left = Number((d.styleFor('drawer').value as Record<string, string>).left.replace('px', ''))
+    // 标题栏至少留 160px 在屏幕里（和拖拽同一条规矩）
+    expect(left + 820).toBeGreaterThanOrEqual(160)
+  })
+})
+
+describe('合并分离 · 恢复一份不完整的布局', () => {
+  /**
+   * 真浏览器里踩到的第二层：**存下来的分离态可能缺一个窗的尺寸**。
+   *
+   * 面板拖走时抽屉是关着的，于是库里只有四个坐标、没有宽高。恢复时如果
+   * 一律标成「已摆放」，`placeBeside` 就不会再管它 ——
+   * 两个窗双双失去冻结尺寸，按内容炸开（实测抽屉 900×1803、面板缩到 368）。
+   *
+   * `placed` 必须**按实际有没有尺寸来定**，不能一律 true。
+   */
+  it('缺尺寸的那个仍算「没摆放」，留给 placeBeside', () => {
+    const d = useDockedWindows()
+
+    d.restore({
+      merged: false,
+      pos: { panel: { left: 800, top: 100 }, drawer: { left: 0, top: 100 } },
+      size: { panel: { width: 300, height: 900 }, drawer: null },
+    })
+
+    expect(d.placed.value.panel).toBe(true)
+    expect(d.placed.value.drawer).toBe(false)
+
+    // 因此它还能被摆
+    d.placeBeside('drawer', 'panel', { width: 820, height: 900 })
+    expect((d.styleFor('drawer').value as Record<string, string>).width).toBe('820px')
+  })
+
+  it('尺寸齐全的两个都算摆过，不许被 placeBeside 挪动', () => {
+    const d = useDockedWindows()
+    d.restore({
+      merged: false,
+      pos: { panel: { left: 800, top: 100 }, drawer: { left: 0, top: 100 } },
+      size: { panel: { width: 300, height: 900 }, drawer: { width: 780, height: 900 } },
+    })
+
+    expect(d.placed.value.drawer).toBe(true)
+    const before = { ...(d.styleFor('drawer').value as Record<string, string>) }
+    d.placeBeside('drawer', 'panel', { width: 400, height: 300 })
+    expect(d.styleFor('drawer').value).toEqual(before)
+  })
+})

@@ -1529,3 +1529,61 @@ describe('浮窗高度 · 上下两条边都能拖', () => {
     expect(style).toContain('margin-top')
   })
 })
+
+describe('浮窗 · 拖走面板之后再打开 AI 助手', () => {
+  /**
+   * 桌面端一进来**只有医生智能体**。医生把它拖到屏幕中间，这才点把手
+   * 打开 AI 助手 —— 抽屉在分离那一刻根本没渲染，没有自己的几何。
+   *
+   * 修之前：`startDrag` 把面板的几何抄给了它，于是抽屉以
+   * `width:300px; height:985px` 落在面板拖走前的位置上 ——
+   * **300px 宽（本该 ~820）、并且和面板叠在一起**。这是在真浏览器里发现的。
+   */
+  async function undockPanelThenOpenDrawer() {
+    const wrapper = await renderFloat()
+    // renderFloat 会把抽屉展开，先收起来，回到桌面端的默认状态
+    if (wrapper.find('.tips-drawer').exists()) {
+      await wrapper.find('.tips-close').trigger('click')
+    }
+    expect(wrapper.find('.tips-drawer').exists()).toBe(false)
+
+    const head = wrapper.find('.panel-header')
+    await head.trigger('pointerdown', { clientX: 1400, clientY: 30 })
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 800, clientY: 400 }) as never)
+    window.dispatchEvent(new MouseEvent('pointerup') as never)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('.assistant-handle').trigger('click')
+    await wrapper.vm.$nextTick()
+    await new Promise((r) => setTimeout(r, 30))
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('抽屉不许套用面板的宽度', async () => {
+    const wrapper = await undockPanelThenOpenDrawer()
+    const drawer = wrapper.find('.tips-drawer')
+    expect(drawer.exists()).toBe(true)
+
+    const style = drawer.attributes('style') ?? ''
+    const width = Number(/width:\s*(\d+)px/.exec(style)?.[1] ?? 0)
+    // 面板是 300；抽屉的下限是 640（useResizable 的 min）
+    expect(width).toBeGreaterThanOrEqual(640)
+  })
+
+  it('抽屉摆到面板左侧，不是原样压在面板身上', async () => {
+    const wrapper = await undockPanelThenOpenDrawer()
+    const px = (el: string, prop: string) => {
+      const style = wrapper.find(el).attributes('style') ?? ''
+      return Number(new RegExp(`${prop}:\\s*(-?\\d+)px`).exec(style)?.[1] ?? NaN)
+    }
+
+    // **贴边的算术不在这一层验。** jsdom 里所有 getBoundingClientRect 都是 0，
+    // 面板落在 left:0，钳位（标题栏至少留 160px 在屏内）就成了主导约束，
+    // 断言「右边线严丝合缝等于面板左边线」测的是钳位不是贴边。
+    // 精确贴边由 useDockedWindows.spec.ts 验，那里几何是我给的。
+    // 这一条只证明**接线通了**：抽屉在面板左边，且没有套用面板的位置。
+    expect(px('.tips-drawer', 'left')).toBeLessThan(px('.assistant-panel', 'left'))
+    expect(px('.tips-drawer', 'top')).toBe(px('.assistant-panel', 'top'))
+  })
+})

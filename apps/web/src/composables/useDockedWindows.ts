@@ -59,6 +59,17 @@ export function useDockedWindows() {
     panel: null,
   })
 
+  /**
+   * 这个窗的几何有没有真正量过。
+   *
+   * 桌面端一进来**只有医生智能体**，AI 助手是收起的 —— 这时拖走面板，
+   * `startDrag` 拿不到抽屉的元素。原来的写法把自己的几何抄给了它，
+   * 于是医生再点开 AI 助手时，抽屉是 300px 宽、还和面板叠在一起。
+   *
+   * **没渲染 ≠ 和我一样。** 没量过就标成未摆放，等它真开了再摆（`placeBeside`）。
+   */
+  const placed = ref<Record<WindowKey, boolean>>({ drawer: true, panel: true })
+
   /** 正在拖谁 */
   const dragging = ref<WindowKey | null>(null)
   /** 松手就会吸附 —— 用来画那条虚线预告 */
@@ -112,8 +123,11 @@ export function useDockedWindows() {
       } as Record<WindowKey, WindowPos>
       size.value = {
         [key]: { width: selfRect.width, height: selfRect.height },
-        [other]: { width: otherRect.width, height: otherRect.height },
-      } as Record<WindowKey, { width: number; height: number }>
+        // **另一个窗没渲染时它的尺寸是「未知」**，不是「和我一样」——
+        // 抄过去的话，它一打开就是 300px 宽并且和我叠在一起
+        [other]: otherEl ? { width: otherRect.width, height: otherRect.height } : null,
+      } as Record<WindowKey, { width: number; height: number } | null>
+      placed.value = { ...placed.value, [key]: true, [other]: !!otherEl }
     }
 
     origin = {
@@ -157,6 +171,7 @@ export function useDockedWindows() {
     if (dragging.value && !merged.value && willSnap.value) {
       merged.value = true       // 吸附：回到 CSS 停靠，两窗重新拼成一块
       size.value = { drawer: null, panel: null }   // 冻住的尺寸一并释放
+      placed.value = { drawer: true, panel: true }
     } else if (dragging.value && merged.value) {
       // 从合并态拖出来 —— 拖动本身就是「分离」这个动作
       merged.value = false
@@ -177,6 +192,32 @@ export function useDockedWindows() {
   }
 
   /**
+   * 把一个**还没摆过**的窗贴到另一个窗旁边。
+   *
+   * 用在「面板已经拖走、医生这才点开 AI 助手」这条路径上：抽屉这时没有
+   * 自己的几何，不摆的话它会落在 (0,0) 或者顶着面板的旧尺寸。
+   * 它们本来就是拼在一起的一对，所以贴边是最不意外的落点 ——
+   * 抽屉在左、面板在右，与合并态的排布一致。
+   *
+   * **已经摆过的不动。** 医生自己拖过的位置不能被一次「打开」覆盖掉。
+   */
+  function placeBeside(
+    key: WindowKey,
+    anchorKey: WindowKey,
+    natural: { width: number; height: number },
+  ) {
+    if (merged.value || placed.value[key]) return
+    const anchor = pos.value[anchorKey]
+    const left = key === 'drawer'
+      ? anchor.left - natural.width          // 抽屉在面板左边
+      : anchor.left + (size.value[anchorKey]?.width ?? natural.width)
+    size.value = { ...size.value, [key]: { ...natural } }
+    // 摆的时候照样钳位：面板贴着屏幕左边时，抽屉不能整个甩到屏幕外
+    pos.value = { ...pos.value, [key]: clampTitleBar({ left, top: anchor.top }, natural.width) }
+    placed.value = { ...placed.value, [key]: true }
+  }
+
+  /**
    * 铺回上次记住的布局（`useWindowMemory` 在进工作站时调）。
    *
    * **位置照样要钳。** 存下来的是上次那块屏幕上的坐标；换台小屏打开，
@@ -194,8 +235,14 @@ export function useDockedWindows() {
     merged.value = state.merged
     if (state.merged) {
       size.value = { drawer: null, panel: null }
+      placed.value = { drawer: true, panel: true }
       return
     }
+    // **按实际有没有尺寸来定，不能一律 true。** 存下来的分离态可能缺一个窗的
+    // 宽高（面板拖走时抽屉是关着的），一律标成「摆过了」会让 `placeBeside`
+    // 不再管它 —— 两个窗双双失去冻结尺寸，按内容炸开
+    // （实测抽屉 900×1803、面板缩到 368）。
+    placed.value = { drawer: !!state.size.drawer, panel: !!state.size.panel }
     size.value = { ...state.size }
     pos.value = {
       drawer: clampTitleBar(state.pos.drawer, state.size.drawer?.width ?? 900),
@@ -207,9 +254,10 @@ export function useDockedWindows() {
   function resetLayout() {
     merged.value = true
     size.value = { drawer: null, panel: null }
+    placed.value = { drawer: true, panel: true }
     dragging.value = null
     willSnap.value = false
   }
 
-  return { merged, pos, size, dragging, willSnap, styleFor, startDrag, resetLayout, restore }
+  return { merged, pos, size, placed, dragging, willSnap, styleFor, startDrag, resetLayout, restore, placeBeside }
 }

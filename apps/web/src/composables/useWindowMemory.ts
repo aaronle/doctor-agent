@@ -45,6 +45,8 @@ export interface WindowPos {
 
 export interface DockSlot {
   merged: Ref<boolean>
+  /** 每个窗的几何是不是真量过。没量过的不存 —— 存了下次会被当真 */
+  placed: Ref<Record<string, boolean>>
   pos: Ref<Record<string, WindowPos>>
   size: Ref<Record<string, { width: number; height: number } | null>>
   restore: (state: {
@@ -114,20 +116,25 @@ export function useWindowMemory(parts: WindowParts) {
       panel: { left: num(w.panel_left), top: num(w.panel_top) },
       drawer: { left: num(w.drawer_left), top: num(w.drawer_top) },
     }
-    const hasPos = Object.values(pos).every((p) => p.left !== null && p.top !== null)
+    const at = (k: 'panel' | 'drawer') =>
+      pos[k].left !== null && pos[k].top !== null
+        ? { left: pos[k].left as number, top: pos[k].top as number }
+        : null
+    const dim = { panel: sizeOf(w, 'panel'), drawer: sizeOf(w, 'drawer') }
 
-    if (w.merged === false && hasPos) {
+    // 规则 ②的另一半：**至少要有一个窗是完整的**（位置 + 尺寸齐全）。
+    // 只有位置没有尺寸的分离态一恢复就是两个窗按内容炸开 ——
+    // 那份数据来自「面板拖走时抽屉还关着」，不是医生真摆成那样。
+    const anchor = (['panel', 'drawer'] as const).find((k) => at(k) && dim[k])
+
+    if (w.merged === false && anchor) {
+      const fallback = at(anchor) as { left: number; top: number }
       parts.dock.restore({
         merged: false,
-        pos: {
-          panel: { left: pos.panel.left as number, top: pos.panel.top as number },
-          drawer: { left: pos.drawer.left as number, top: pos.drawer.top as number },
-        },
-        // 规则 ②
-        size: {
-          panel: sizeOf(w, 'panel'),
-          drawer: sizeOf(w, 'drawer'),
-        },
+        // 缺位置的那个先借锚点的坐标占位 —— 它的 size 是 null，
+        // 会被标成「没摆过」，等它真打开时由 `placeBeside` 摆到正确的地方
+        pos: { panel: at('panel') ?? fallback, drawer: at('drawer') ?? fallback },
+        size: dim,
       })
     }
 
@@ -159,7 +166,10 @@ export function useWindowMemory(parts: WindowParts) {
     if (!parts.dock.merged.value) {
       for (const key of ['panel', 'drawer'] as const) {
         const p = parts.dock.pos.value[key]
-        if (!p) continue
+        // **没摆过的窗不写位置。** 它那对坐标是顺手填的，不是量出来的；
+        // 写进去下次恢复会被当真，于是恢复出一个「有位置、没尺寸」的分离态，
+        // 两个窗按内容炸开。存的东西必须是量出来的。
+        if (!p || parts.dock.placed.value[key] === false) continue
         out[`${key}_left`] = Math.round(p.left)
         // top 不允许为负 —— 标题栏跑到屏幕上方就再也抓不回来了。
         // 前端 clampTitleBar 已经钳过，这里兜一道，免得把 400 打到医生脸上

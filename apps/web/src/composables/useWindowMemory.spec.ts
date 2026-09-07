@@ -41,6 +41,7 @@ function fakeResizable(initial: number | null = null) {
 function fakeDock() {
   return {
     merged: ref(true),
+    placed: ref({ drawer: true, panel: true } as Record<string, boolean>),
     pos: ref({ drawer: { left: 0, top: 0 }, panel: { left: 0, top: 0 } }),
     size: ref<Record<string, { width: number; height: number } | null>>({ drawer: null, panel: null }),
     restore: vi.fn(),
@@ -248,5 +249,63 @@ describe('浮窗记忆 · 上边线的位置', () => {
     await nextTick()
 
     expect(update.mock.calls[0]![0].windows).not.toHaveProperty('panel_offset_top')
+  })
+})
+
+describe('浮窗记忆 · 只存真摆过的窗', () => {
+  /**
+   * 面板拖走时抽屉是关着的 —— 它没有位置也没有尺寸。原来的 `snapshot`
+   * 照样给它写了一对坐标，那是个**假坐标**：下次恢复会被当真，
+   * 于是恢复出一个「有位置、没尺寸」的分离态，两个窗按内容炸开。
+   *
+   * 存的东西必须是量出来的，不能是顺手填的。
+   */
+  it('没摆过的窗不写位置', async () => {
+    const { parts, memory } = harness()
+    // 先挂 watcher 再改状态 —— 反过来的话 watcher 看不见这些变化，
+    // 这条用例会因为「压根没触发写入」而红，测的就不是它要测的东西了
+    memory.watchAndPersist()
+    parts.dock.merged.value = false
+    parts.dock.placed.value = { panel: true, drawer: false }
+    parts.dock.pos.value = { panel: { left: 800, top: 100 }, drawer: { left: 0, top: 0 } }
+
+    await nextTick()
+    vi.advanceTimersByTime(PERSIST_DEBOUNCE_MS)
+    await nextTick()
+
+    const sent = update.mock.calls[0]![0].windows
+    expect(sent.panel_left).toBe(800)
+    expect(sent).not.toHaveProperty('drawer_left')
+    expect(sent).not.toHaveProperty('drawer_top')
+  })
+
+  it('**只有位置没有尺寸时不恢复分离态** —— 那会让两个窗按内容炸开', () => {
+    prefs.value.windows = {
+      merged: false,
+      panel_left: 240, panel_top: 556,
+      drawer_left: 700, drawer_top: 375,
+      // 宽高一个都没有 —— 正是「面板拖走时抽屉没开着」留下的那份
+    }
+
+    const { parts, memory } = harness()
+    memory.restore()
+
+    expect(parts.dock.restore).not.toHaveBeenCalled()
+  })
+
+  it('锚点那个窗齐全就照常恢复，缺的那个留给 placeBeside', () => {
+    prefs.value.windows = {
+      merged: false,
+      panel_left: 800, panel_top: 100, panel_width: 300, panel_height: 900,
+      drawer_left: 0, drawer_top: 100,
+    }
+
+    const { parts, memory } = harness()
+    memory.restore()
+
+    expect(parts.dock.restore).toHaveBeenCalledTimes(1)
+    const arg = parts.dock.restore.mock.calls[0]![0]
+    expect(arg.size.panel).toEqual({ width: 300, height: 900 })
+    expect(arg.size.drawer).toBeNull()
   })
 })
