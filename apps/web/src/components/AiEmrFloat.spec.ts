@@ -1623,3 +1623,59 @@ describe('浮窗 · 拖过上边线之后再拖走窗口', () => {
     }
   })
 })
+
+describe('医生智能体 · 设置入口', () => {
+  /**
+   * 配置页做出来了、路由也注册了，但**全仓没有任何一处跳到它** ——
+   * 只能手敲 `/settings`。等于这个功能对用户不可达。
+   *
+   * 入口放在面板头部那排（`Aa` 旁边）：字号本来就是配置页的四项之一，
+   * 两者是同一类东西，挨着最顺。
+   */
+  it('面板头部有进设置的按钮', async () => {
+    const wrapper = await renderFloat()
+    const gear = wrapper.find('.settings-btn')
+    expect(gear.exists()).toBe(true)
+    expect(gear.attributes('title')).toContain('设置')
+  })
+
+  it('**点它开对话框，不跳走** —— 医生正在看这位患者', async () => {
+    // 导航走等于把医生从诊室里拽出来：问诊播放位置、浮窗布局全丢，
+    // 回来还要重新找到这个人。与科室看板做成对话框是同一条理由。
+    const wrapper = await renderFloat()
+    const before = router.currentRoute.value.fullPath
+
+    await wrapper.find('.settings-btn').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(router.currentRoute.value.fullPath).toBe(before)
+    expect(document.querySelector('.settings-dialog')).toBeTruthy()
+  })
+
+  it('对话框里是完整的配置正文，不是另做一份精简版', async () => {
+    // 两处各写一份必然会漂移 —— 加一项设置只改了其中一处，
+    // 而没人会同时想起两个地方。
+    const wrapper = await renderFloat()
+    await wrapper.find('.settings-btn').trigger('click')
+    await vi.waitFor(() =>
+      expect(document.querySelector('.settings-dialog .settings-col')).toBeTruthy(),
+    )
+    const text = document.querySelector('.settings-dialog')?.textContent ?? ''
+    for (const group of ['外观', '医生智能体', '工作区布局']) {
+      expect(text).toContain(group)
+    }
+  })
+
+  it('点开设置要记一条埋点 —— 否则没法知道有没有人用', async () => {
+    const { useTelemetry, __resetTelemetry } = await import('../composables/useTelemetry')
+    const wrapper = await renderFloat()
+    // 队列是**模块级**的，前面用例攒下的会串进来。
+    // 先清再点，断言的才是这一次点击产生的那条
+    __resetTelemetry()
+
+    await wrapper.find('.settings-btn').trigger('click')
+
+    const queued = useTelemetry()._queue()
+    expect(queued.some((e) => e.event === 'settings_open' && e.target === 'panel_header')).toBe(true)
+  })
+})

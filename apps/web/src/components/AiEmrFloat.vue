@@ -10,6 +10,7 @@ import { useInterview } from '../composables/useInterview'
 import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '../composables/diagnosisCommands'
 import AgentMascot from './AgentMascot.vue'
 import DepartmentBoard from './DepartmentBoard.vue'
+import SettingsPanel from './SettingsPanel.vue'
 import FollowUpHints from './FollowUpHints.vue'
 import { AUTO_OPEN_AFTER_MESSAGES, useFollowUp } from '../composables/useFollowUp'
 import { useResizable } from '../composables/useResizable'
@@ -364,6 +365,17 @@ const maxi = useMaximize()
  */
 const boardOpen = ref(false)
 const boardRef = ref<InstanceType<typeof DepartmentBoard> | null>(null)
+
+/**
+ * 设置对话框。**开对话框而不是跳路由** —— 见头部齿轮那段注释。
+ * `v-if` 让正文每次打开都重新挂载：它 `onMounted` 里拉一次偏好，
+ * 常驻的话别处改了这里看到的还是旧值。
+ */
+const settingsOpen = ref(false)
+function openSettings() {
+  track('settings_open', 'panel_header')
+  settingsOpen.value = true
+}
 
 function openBoard() {
   boardOpen.value = true
@@ -1534,6 +1546,25 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
       <DepartmentBoard ref="boardRef" @open="openFromBoard" />
     </el-dialog>
 
+    <!--
+      设置。**与看板对话框平级，不能嵌在它里面** —— 嵌进去的话
+      看板不开，设置就永远不渲染（第一版就是这么写的，点齿轮毫无反应）。
+
+      `destroy-on-close`：正文 `onMounted` 里拉一次偏好，
+      常驻的话别处改了这里看到的还是旧值。
+    -->
+    <el-dialog
+      v-model="settingsOpen"
+      class="settings-dialog"
+      title="个人配置"
+      width="720px"
+      top="6vh"
+      destroy-on-close
+      append-to-body
+    >
+      <SettingsPanel />
+    </el-dialog>
+
     <div ref="wrapperEl" class="ai-float-wrapper" :style="wrapperStyle">
       <!-- ======================= AI 助手 ======================= -->
       <!--
@@ -2541,6 +2572,22 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                 </button>
               </div>
             </el-popover>
+            <!--
+              设置。挨着 `Aa` 放：字号本来就是配置页的四项之一，两者同类。
+
+              **开对话框，不跳 `/settings`。** 医生正在看这位患者，
+              导航走等于把他从诊室里拽出来 —— 问诊播放位置、浮窗布局全丢，
+              回来还要重新找到这个人。与科室看板做成对话框是同一条理由。
+              整页路由仍然保留：可深链、移动端也走它。
+            -->
+            <el-button
+              text
+              size="small"
+              class="panel-action-btn settings-btn"
+              title="设置"
+              aria-label="设置"
+              @click="openSettings"
+            >⚙</el-button>
             <!--
               **「—」不是「×」。**
               医生智能体没有「关掉就没了」这个状态 —— 缩起来的东西一直在
