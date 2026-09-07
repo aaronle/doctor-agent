@@ -93,7 +93,11 @@ function watch(page, area) {
   page.on('requestfailed', (r) => {
     // 埋点是 fire-and-forget，导航时被取消是正常的（useTelemetry 明确不重试）
     if (r.url().includes('/api/telemetry')) return;
-    if (r.url().includes('/api/')) bad(area, '接口请求失败', `${r.url().split('/api/')[1]} ${r.failure()?.errorText ?? ''}`);
+    // 导航或关页面时，在途请求被浏览器取消是**正常**的，不是接口故障。
+    // 真正的故障是连接层报错（ERR_CONNECTION_*、ERR_FAILED 之类）
+    const err = r.failure()?.errorText ?? '';
+    if (err.includes('ERR_ABORTED')) return;
+    if (r.url().includes('/api/')) bad(area, '接口请求失败', `${r.url().split('/api/')[1]} ${err}`);
   });
   page.on('request', (r) => {
     const u = r.url();
@@ -119,6 +123,20 @@ function watch(page, area) {
 await section('桌面端 1600×1000', async () => {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
   watch(page, '桌面');
+
+  // **先清个人偏好。** 走查会拖窗口、改字号，而 `remember_windows` 默认开着 ——
+  // 这些都会存进偏好，让**下一轮**的几何与上一轮不同。
+  // 线上第一次跑就栽在这：面板被上一轮记成 372px 宽，
+  // 标题栏中心于是落进了按钮排。一个不可复现的走查，第二次跑起来是在自欺。
+  await page.goto(`${BASE}/outpatient/list`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(async () => {
+    localStorage.removeItem('doctor-agent:preferences');
+    localStorage.removeItem('doctor-agent:font-level');
+    // **要 await 完再走。** 不等的话紧接着的 goto 会把这几个 DELETE 掐掉，
+    // 报成 `net::ERR_ABORTED` —— 那不是接口坏了，是我自己打断的
+    await Promise.all(['张医生', 'demo-doctor'].map((who) =>
+      fetch(`/api/preferences?actor=${encodeURIComponent(who)}`, { method: 'DELETE' }).catch(() => {})));
+  });
 
   // ---- 候诊列表
   await page.goto(`${BASE}/outpatient/list`, { waitUntil: 'networkidle' });
@@ -147,11 +165,12 @@ await section('桌面端 1600×1000', async () => {
     : bad('工作站', '首屏 AI 助手就展开了');
 
   // ---- 窗口交互：拖 / 上下边线 / 全屏 / 字号
-  const head = page.locator('.panel-header');
   const before = await page.locator('.assistant-panel').boundingBox();
-  const hb = await head.boundingBox();
-  // 从标题栏**中心**起拖。第一版拿面板左边当起点算位移，
-  // 于是把「半个面板宽」也算进了期望值，报了个假 bug
+  // **从标题文字起拖，不要用标题栏的几何中心。**
+  // 面板一变宽，中心就落进右侧那排按钮（Aa / ⚙ / ⛶ / —）——
+  // 按钮本来就不该触发拖动，于是探针量到「位移 0」，报了个假 bug。
+  // 第一版还拿面板左边当起点算位移，把半个面板宽也算进了期望值。
+  const hb = await page.locator('.panel-title').boundingBox();
   const sx = hb.x + hb.width / 2, sy = hb.y + hb.height / 2;
   await page.mouse.move(sx, sy); await page.mouse.down();
   await page.mouse.move(sx - 300, sy + 100, { steps: 8 });

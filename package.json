@@ -28,7 +28,9 @@
     "smoke": "node scripts/smoke-prod.mjs",
     "demo:reset": "node scripts/demo-reset.mjs",
     "demo:check": "node scripts/demo-check.mjs",
-    "demo:walk": "node scripts/demo-walk.mjs"
+    "demo:walk": "node scripts/demo-walk.mjs",
+    "audit": "node scripts/full-audit.mjs",
+    "audit:prod": "node scripts/full-audit.mjs --base https://da.aaronhealth.cn --reset 0"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
