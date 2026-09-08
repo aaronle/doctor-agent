@@ -205,6 +205,9 @@ def _visit_state(session: Session, patient) -> dict:
         "patient_id": patient.id,
         "interview_done": has_interview(session, patient.id),
         "analysis_unlocked": bool(unlock.get("reason")),
+        # 确认过病例没有。医生刷新一下要知道自己认没认过 ——
+        # 一个「已确认」的动作若不显示，他只会再点一次
+        "record_confirmed": bool((payload.get("record_confirmed") or {}).get("version")),
         "unlocked_by": unlock.get("reason", ""),
         "unlocked_at": unlock.get("at", ""),
         # **落库的**问诊轮数。界面横幅「对话 N 轮」原本读页面内存里的播放缓冲，
@@ -1106,6 +1109,64 @@ def stash_record(body: RecordSaveIn, session: Session = Depends(get_session)) ->
     )
     session.commit()
     return {"ok": True, "version": version, "message": "已暂存（未提交）"}
+
+
+@router.post("/record/confirm")
+def confirm_record(body: RecordSaveIn, session: Session = Depends(get_session)) -> dict:
+    """
+    确认病例：医生认下这一版病历，等价于「可以回填 HIS」。
+
+    ## 演示态：**不真的回填**
+
+    一期不触达真实 HIS（HANDOVER §5 的硬约束）。所以这里只做三件事：
+    落一版草稿、留审计、在就诊状态上打标。
+
+    **而返回体必须把这件事说出来**（`written_to_his: False`）。
+    这个仓库最不能出现的一种东西是伪造的成功文案 —— 医生看到「已回填 HIS」
+    就会停止核对，而实际什么都没发生。宁可说「已确认，尚未回填」。
+
+    ## 与确认诊断受同一道门禁
+
+    它是与回写诊断同一量级的动作，没有理由只拦一个。
+    红线未处置时 409，处置后放行 —— 走的是同一个 `_assert_red_alerts_closed`。
+    """
+    patient = _patient_or_404(session, body.patient_id)
+    if not str(body.fields.get("chief_complaint") or "").strip():
+        raise HTTPException(status_code=400, detail="主诉不能为空")
+    _assert_red_alerts_closed(session, patient, body.handled_alerts, action="确认病例")
+
+    version = _next_draft_version(session, patient.id)
+    session.add(RecordDraft(
+        patient_id=patient.id, version=version, fields=body.fields, provider="doctor-confirmed",
+    ))
+
+    payload = patient.payload or {}
+    payload["record_confirmed"] = {
+        "version": version,
+        "at": datetime.now(UTC).isoformat(),
+        # 演示态留一个显式标记：将来真接了 HIS，这里会变成回执号
+        "written_to_his": False,
+    }
+    patient.payload = payload
+    flag_modified(patient, "payload")
+
+    record_audit(
+        session,
+        action="record_confirm",
+        entity="record_confirm",
+        entity_id=f"{patient.id}#{version}",
+        patient_id=patient.id,
+        detail={"version": version, "written_to_his": False},
+    )
+    event("record_confirm", patient=patient.id, version=version)
+    session.commit()
+
+    return {
+        "ok": True,
+        "version": version,
+        "written_to_his": False,
+        "message": f"病历第 {version} 版已确认。一期不触达真实 HIS，**尚未回填** —— 接入后此处会给回执号。",
+    }
 
 
 @router.post("/record/submit")

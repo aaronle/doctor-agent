@@ -221,3 +221,71 @@ def test_record_prompt_demands_a_source_label(client):
 
     # 没填过预问诊时不要凭空多出这段 —— 提示词越长，模型越容易漏掉别的约束
     assert "患者自述" not in RecordAgent().task_instruction({})
+
+
+# ─────────────────────────────── 确认病例（2026-09-08，演示态）
+
+
+def test_confirm_record_is_blocked_by_open_red_lines(client):
+    """
+    确认病例与确认诊断**受同一道门禁**。
+
+    它是「这份病历我认了，可以回填 HIS」的意思 —— 与回写诊断同一量级的动作，
+    没有理由只拦一个。红线未处置时必须拦住。
+    """
+    client.post("/api/emr/analysis/unlock", json={"patient_id": "P009", "reason": "skipped"})
+    alerts = client.get("/api/emr/red-alerts/P009").json()
+    open_red = [a["id"] for a in alerts["alerts"] if a["level"] == "高风险"]
+    assert open_red, "P009 得有未处置红线，否则这条用例是空过的"
+
+    blocked = client.post("/api/emr/record/confirm", json={
+        "patient_id": "P009", "fields": {"chief_complaint": "阴道不规则出血"}, "handled_alerts": [],
+    })
+    assert blocked.status_code == 409
+
+    passed = client.post("/api/emr/record/confirm", json={
+        "patient_id": "P009", "fields": {"chief_complaint": "阴道不规则出血"}, "handled_alerts": open_red,
+    })
+    assert passed.status_code == 200, passed.text
+
+
+def test_confirm_record_says_it_did_not_write_to_his(client):
+    """
+    **演示态：不真的回填 HIS。**
+
+    而返回体必须说出来。这个仓库最不能出现的一种东西是伪造的成功文案 ——
+    医生看到「已回填 HIS」就会停止核对，而实际什么都没发生。
+    真接 HIS 之前，宁可说「已确认，尚未回填」。
+    """
+    client.post("/api/emr/analysis/unlock", json={"patient_id": "P003", "reason": "skipped"})
+    body = client.post("/api/emr/record/confirm", json={
+        "patient_id": "P003", "fields": {"chief_complaint": "甲状腺复诊"}, "handled_alerts": [],
+    }).json()
+
+    assert body["written_to_his"] is False
+    assert "尚未" in body["message"] or "未回填" in body["message"]
+    assert "已回填" not in body["message"]
+
+
+def test_confirm_record_leaves_an_audit_trail(client):
+    """确认是个有后果的动作，必须留痕 —— 谁、什么时候、认的哪一版。"""
+    from app.database import SessionLocal
+    from app.models import AuditLog
+
+    client.post("/api/emr/analysis/unlock", json={"patient_id": "P003", "reason": "skipped"})
+    client.post("/api/emr/record/confirm", json={
+        "patient_id": "P003", "fields": {"chief_complaint": "甲状腺复诊"}, "handled_alerts": [],
+    })
+    with SessionLocal() as session:
+        rows = session.query(AuditLog).filter_by(entity="record_confirm").all()
+    assert rows, "确认病例没留审计"
+
+
+def test_confirm_record_is_visible_afterwards(client):
+    """确认过的要能读回来，否则医生刷新一下就不知道自己认没认过。"""
+    client.post("/api/emr/analysis/unlock", json={"patient_id": "P003", "reason": "skipped"})
+    client.post("/api/emr/record/confirm", json={
+        "patient_id": "P003", "fields": {"chief_complaint": "甲状腺复诊"}, "handled_alerts": [],
+    })
+    state = client.get("/api/emr/visit-state/P003").json()
+    assert state["record_confirmed"] is True

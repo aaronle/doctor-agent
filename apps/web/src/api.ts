@@ -687,6 +687,11 @@ export const api = {
   /** 科室看板：诊疗进度 × 风险两个维度 */
   departmentBoard: () => get<BoardResponse>('/api/his/board'),
 
+  /** 确认病例。**一期不真回填 HIS**，返回体里的 `written_to_his` 会是 false */
+  confirmRecord: (body: Record<string, unknown>) =>
+    post<{ ok: boolean; version: number; written_to_his: boolean; message: string }>(
+      '/api/emr/record/confirm', body),
+
   /** 患者候诊时自己填的预问诊。医生端读，患者端另有一套写入接口 */
   preVisitAnswers: (id: string) =>
     get<{

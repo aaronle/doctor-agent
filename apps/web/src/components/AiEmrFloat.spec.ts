@@ -1891,3 +1891,37 @@ describe('标签改名（2026-09-08）', () => {
     expect(keys).toContain('健康档案')
   })
 })
+
+describe('确认病例（2026-09-08）', () => {
+  /**
+   * 「这份病历我认了，可以回填 HIS」—— 与确认诊断同一量级的动作。
+   *
+   * 一期不触达真实 HIS，所以是演示态。而**界面必须把这件事说出来**：
+   * 医生看到「已回填 HIS」就会停止核对，而实际什么都没发生。
+   */
+  async function onRecordTab() {
+    const wrapper = await mountWithPatient()
+    await vi.waitFor(() => expect(wrapper.findAll('.ttab').length).toBeGreaterThan(0))
+    await wrapper.findAll('.ttab').find((t) => t.attributes('data-tab') === '病历管理')!.trigger('click')
+    return wrapper
+  }
+
+  it('病历管理页上有「确认病例」', async () => {
+    const wrapper = await onRecordTab()
+    expect(wrapper.find('.confirm-record-btn').exists()).toBe(true)
+  })
+
+  it('**按钮旁写明「暂不回填 HIS」** —— 不写，医生会以为已经进 HIS 了', async () => {
+    const wrapper = await onRecordTab()
+    const bar = wrapper.find('.btab-writeback-bar')
+    expect(bar.text()).toContain('暂不回填')
+  })
+
+  it('确认过之后按钮变成已确认态，不再是一个可重复点的主操作', async () => {
+    const wrapper = await onRecordTab()
+    const ws = useWorkstation()
+    ws.visit = { ...(ws.visit ?? {}), record_confirmed: true } as never
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.confirm-record-btn').text()).toContain('已确认')
+  })
+})

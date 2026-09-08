@@ -106,6 +106,31 @@ async function skipInterview() {
   }
 }
 
+/**
+ * 确认病例。**一期不真回填 HIS** —— 服务端返回 `written_to_his: false`，
+ * 这里原样转述它给的话，不自己拼一句更好听的。
+ */
+const confirmingRecord = ref(false)
+const recordConfirmed = computed(() => Boolean((ws.visit as { record_confirmed?: boolean } | null)?.record_confirmed))
+async function confirmRecord() {
+  if (confirmingRecord.value || recordConfirmed.value) return
+  confirmingRecord.value = true
+  try {
+    const res = await api.confirmRecord({
+      patient_id: ws.patientId,
+      fields: ws.record,
+      handled_alerts: [...ws.handledAlertIds],
+    })
+    ElMessage.success(res.message)
+    await ws.loadVisitState()
+    track('record_confirm', '', { version: res.version })
+  } catch (error) {
+    ElMessage.error(`确认失败：${(error as Error).message}`)
+  } finally {
+    confirmingRecord.value = false
+  }
+}
+
 const activeTab = ref<Tab>('智慧诊疗')
 
 /**
@@ -2130,8 +2155,24 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                   <el-button type="success" size="small" class="writeback-primary-btn" @click="ws.acceptAllDraft()">
                     ✔ 确认并回写到病历
                   </el-button>
+                  <!--
+                    确认病例 =「这一版我认了，可以回填 HIS」，与确认诊断同一量级，
+                    受同一道红线门禁（服务端 `_assert_red_alerts_closed`）。
+
+                    **一期不触达真实 HIS**，所以旁边那句「暂不回填」不能省 ——
+                    医生看到「已回填 HIS」就会停止核对，而实际什么都没发生。
+                    伪造的成功文案是零容忍红线里最不该出现的一种。
+                  -->
+                  <el-button
+                    type="primary"
+                    size="small"
+                    class="confirm-record-btn"
+                    :disabled="recordConfirmed || confirmingRecord"
+                    :loading="confirmingRecord"
+                    @click="confirmRecord"
+                  >{{ recordConfirmed ? '✓ 已确认病例' : '确认病例' }}</el-button>
                   <span class="record-complete-badge">病历完整度 {{ quality?.completeness ?? 0 }}%</span>
-                  <span class="writeback-hint">AI 草稿需确认后才进入正式病历</span>
+                  <span class="writeback-hint">AI 草稿需确认后才进入正式病历 · 确认病例暂不回填 HIS</span>
                 </div>
                 <div
                   v-for="[key, label] in RECORD_SECTIONS"
