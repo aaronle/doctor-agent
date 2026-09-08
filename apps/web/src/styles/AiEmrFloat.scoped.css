@@ -1111,8 +1111,14 @@
 :deep(.board-dialog .el-dialog__header){padding:0;margin:0}
 :deep(.board-dialog .el-dialog__body){padding:0}
 
-/* 「不能漏」标记。排序改成「先后果、再可能性」之后，
-   一个 30% 的急性冠脉综合征会排在 55% 的冠心病上面 ——
-   不给标记的话那看起来像排序坏了。 */
+/* 「不能漏」标记。2026-09-08 排序改回纯置信度降序之后，一个 30% 的急性冠脉
+   综合征会排在 55% 的冠心病**下面** —— 「这条要紧」这条信息不再由位置承载，
+   整个压在这个标记上，所以它要足够跳。 */
 .dd-severity-tag{display:inline-block;margin-left:5px;font-size:9.5px;font-weight:700;
   color:#c0392b;background:#fdecec;border:1px solid #f5b8b8;padding:1px 6px;border-radius:3px}
+/* 置信度。**推到行尾**（`margin-left:auto`）而不是挤在名称旁边：
+   它是这一列里唯一逐条可比的量，对齐成一竖列才扫得动 ——
+   夹在名称与 ICD 之间的话，每行的起始位置都不一样，等于没法比。
+   用等宽数字（`tabular-nums`），否则 30% 和 55% 的宽度会差半个字。 */
+.dd-confidence{margin-left:auto;flex-shrink:0;font-size:11px;font-weight:700;
+  color:#5a6b85;font-variant-numeric:tabular-nums}

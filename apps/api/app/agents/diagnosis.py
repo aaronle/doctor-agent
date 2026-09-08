@@ -7,11 +7,14 @@
 
 from __future__ import annotations
 
-#: 漏诊后果由重到轻。**排序的第一关键字**（F04 L51）。
+#: 漏诊后果由重到轻。**只用来出标记，不参与排序**（2026-09-08 改，见下）。
 SEVERITY_ORDER = ("critical", "serious", "routine")
 
 #: 一屏最多几条「不能漏」。超出的降一档 ——
-#: 全标成 critical 等于没排序，那个标记会迅速贬值成噪声。
+#: 全标成 critical 等于没标，那个标记会迅速贬值成噪声。
+#:
+#: 排序不看后果之后这条**更重要了**：顺序不再承载「这条要紧」这个信息，
+#: 它整个压在了这个标记上。标记一旦贬值，那条信息就没有别的出口。
 MAX_CRITICAL = 2
 
 from .schemas import DiagnosisOut
@@ -28,6 +31,28 @@ RANK_KEYS = ("is-first", "is-second")
 
 # 可能性徽标（高 / 中 / 低），用于「需鉴别」列表里的同组候选
 LIKELIHOOD_BANDS = ((80, "高"), (55, "中"))
+
+
+def _sort(items: list[dict]) -> None:
+    """
+    **按置信度降序，唯一关键字**（2026-09-08 由用户拍板改）。
+
+    此前是 `(SEVERITY_ORDER.index(severity), -confidence)` —— 先漏诊后果、
+    再可能性，出处是原 F04 L51「不能简单等同于模型置信度排序」。改回纯置信度
+    是用户在知晓这条冲突后的明确决定，规格 L51 已同步改写。
+
+    **代价写在这里，不藏着**：10% 的主动脉夹层会排到 60% 的肋间神经痛下面。
+    承接它的是卡片上的「不能漏」红标 —— 那条信息从「位置」换成了「标记」，
+    没有消失，但确实变弱了（位置是扫一眼就有的，标记要看进去）。
+    `MAX_CRITICAL` 因此比以前更要紧，见它自己的注释。
+
+    打平时**不加第二关键字**：`list.sort` 是稳定的，保留模型给的原序。
+    随手补一个 severity 当第二关键字，等于把「后果优先」偷偷放回来一半。
+
+    模型路径与降级路径共用这一个函数。它们曾经反过一次 —— 一个按后果、
+    一个按置信度，于是网关一抖顺序就变，而界面上看不出发生过降级。
+    """
+    items.sort(key=lambda d: -d["confidence"])
 
 
 def _rank_of(index: int) -> tuple[str, str]:
@@ -106,21 +131,18 @@ class DiagnosisAgent(Agent):
                 }
             )
 
-        # **F04 L51：先按漏诊后果，再按可能性。**
-        #
-        # 纯置信度降序会把一个 10% 的主动脉夹层排在 60% 的肋间神经痛下面 ——
-        # 而两者漏诊的代价差了几个数量级。医生扫这一列时是自上而下扫的，
-        # 排序就是这一屏最强的那个信号。
-        cleaned.sort(key=lambda d: (SEVERITY_ORDER.index(d["severity"]), -d["confidence"]))
+        _sort(cleaned)
 
-        # 全标成 critical 等于没排序。**这不是校验失败，是把标记收窄** ——
+        # 全标成 critical 等于没标。**这不是校验失败，是把标记收窄** ——
         # 模型偶尔会把整屏都标成「不能漏」，那时候拒绝整份输出会让岗位降级，
         # 代价远大于把多出来的那几条降一档。
+        #
+        # 降档后**不需要重排**：排序只看置信度，档位动了顺序不动。
+        # （2026-09-08 之前这里跟着重排一次，那是「后果优先」时代的遗留。）
         crit = [d for d in cleaned if d["severity"] == "critical"]
         if len(crit) > MAX_CRITICAL:
             for d in crit[MAX_CRITICAL:]:
                 d["severity"] = "serious"
-            cleaned.sort(key=lambda d: (SEVERITY_ORDER.index(d["severity"]), -d["confidence"]))
 
         return _decorate(cleaned)
 
@@ -128,13 +150,11 @@ class DiagnosisAgent(Agent):
         """
         降级时沿用种子里的既往疑似诊断，并明确标注证据未经本次评估。
 
-        **排序与模型路径同口径**：先后果、再可能性（F04 L51）。
-        原来这里只按 confidence 排，与模型路径正相反 —— 网关一抖，
-        25% 的子宫内膜癌就被 60% 的功血顶下去，而那恰恰是那条规格要防的事。
-        降级本来就是最需要保守的时刻，不该在这里放宽。
+        **排序与模型路径同口径** —— 共用 `_sort()`，见那里的注释。
+        两条路径曾经反过一次，网关一抖顺序就变，而界面上看不出发生过降级。
 
-        种子没标 severity 的（P001–P008 就没有）一律落到最轻档，
-        于是它们的相对顺序仍旧只由 confidence 决定，既有病例不受影响。
+        种子没标 severity 的（P001–P008 就没有）一律落到最轻档 ——
+        那只影响标记，不影响顺序。
         """
         seeded = ctx.get("suspected_diagnoses") or []
         cleaned = []
@@ -157,7 +177,7 @@ class DiagnosisAgent(Agent):
                     "missing": ["需人工复核支持与反对证据"],
                 }
             )
-        cleaned.sort(key=lambda d: (SEVERITY_ORDER.index(d["severity"]), -d["confidence"]))
+        _sort(cleaned)
         return _decorate(cleaned)
 
 

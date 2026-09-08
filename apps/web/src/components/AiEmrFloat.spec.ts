@@ -1008,10 +1008,14 @@ describe('浮窗调宽', () => {
   })
 })
 
-describe('鉴别诊断「不能漏」标记', () => {
-  it('critical 的诊断带「不能漏」标记 —— **重排了就得解释**', async () => {
-    // 排序改成「先后果、再可能性」之后，一个 30% 的急性冠脉综合征
-    // 会排在 55% 的冠心病上面。不给标记的话，那看起来像排序坏了。
+describe('推荐诊断「不能漏」标记与置信度', () => {
+  /**
+   * 两条诊断：30% 的 critical 与 55% 的 routine。
+   *
+   * 这组数字是特意挑的 —— 后端按置信度降序发下来，所以 30% 那条在**后面**，
+   * 而它才是「不能漏」的那条。顺序与紧要程度反着，正是这个界面现在要处理的局面。
+   */
+  async function mountWithDiagnoses() {
     // 必须把 mount 用的那个 pinia 传给 useWorkstation ——
     // 不传会拿到**另一个 store 实例**，改了半天组件那边纹丝不动
     stubFetch()
@@ -1033,12 +1037,38 @@ describe('鉴别诊断「不能漏」标记', () => {
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
     await expandAssistant(wrapper)
     await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('critical 的诊断带「不能漏」标记 —— **顺序不再承载它，全压在这个标记上**', async () => {
+    // 2026-09-08 排序改回纯置信度之后，30% 的急性冠脉综合征排在 55% 的冠心病
+    // **下面**了。「这条要紧」这条信息因此只剩这一个出口，标记必须在。
+    const wrapper = await mountWithDiagnoses()
 
     const tags = wrapper.findAll('.dd-severity-tag')
     expect(tags).toHaveLength(1)
     expect(tags[0].text()).toBe('不能漏')
-    // 说清为什么排前面 —— 光一个红标仍然解释不了 30% 压 55%
-    expect(tags[0].attributes('title')).toContain('与可能性高低无关')
+    // **提示语不能再说「因此排在前面」** —— 排序已经不看后果了，
+    // 那句话现在是假的，而且正好指着一条与事实相反的排序
+    const title = tags[0].attributes('title') ?? ''
+    expect(title).not.toContain('排在前面')
+    expect(title).toContain('漏诊后果严重')
+  })
+
+  it('每条推荐诊断显示置信度百分比', async () => {
+    const wrapper = await mountWithDiagnoses()
+
+    const confs = wrapper.findAll('.dd-confidence')
+    expect(confs.map((c) => c.text())).toEqual(['30%', '55%'])
+  })
+
+  it('置信度是**数字本身**，不是「高/中/低」那种档 —— 医生要的是可比的量', async () => {
+    const wrapper = await mountWithDiagnoses()
+
+    // 30 与 55 同属「低」档（LIKELIHOOD_BANDS 的边界是 55/80）。
+    // 若这里渲染的是档位标签，两条会一模一样，差别就没了
+    const confs = wrapper.findAll('.dd-confidence')
+    expect(confs[0].text()).not.toBe(confs[1].text())
   })
 })
 

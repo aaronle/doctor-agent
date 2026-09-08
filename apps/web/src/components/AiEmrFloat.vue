@@ -1932,16 +1932,24 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                           <div class="dd-card-top">
                             <span class="dd-primary-tag dd-rank-tag" :class="item.rank_key">{{ item.rank_label }}</span>
                             <!--
-                              **重排了就得解释。** 排序改成「先后果、再可能性」之后，
-                              一个 30% 的急性冠脉综合征会排在 55% 的冠心病上面 ——
-                              不给标记的话，那看起来像排序坏了。
+                              **顺序不再承载「要紧」，全压在这个标记上。**
+                              2026-09-08 排序改回纯置信度降序之后，一个 30% 的
+                              急性冠脉综合征会排在 55% 的冠心病**下面** ——
+                              提示语里原来那句「因此排在前面」现在是假的，删掉了。
                             -->
                             <span
                               v-if="item.severity === 'critical'"
                               class="dd-severity-tag"
-                              title="漏诊后果严重，因此排在前面 —— 与可能性高低无关"
+                              title="漏诊后果严重 —— 与下面这个可能性高低无关，别只看百分比"
                             >不能漏</span>
                             <span class="dd-primary-name" @click="markPrimary(item.name)">{{ item.name }}</span>
+                            <!--
+                              置信度。**列表本身就是按它降序排的**，把数字摆出来，
+                              那条排序规则就是自明的，不必再去别处解释一遍。
+                            -->
+                            <span class="dd-confidence" title="模型给出的可能性 —— 列表按它从高到低排">
+                              {{ item.confidence }}%
+                            </span>
                             <em v-if="item.icd" class="dd-icd">{{ item.icd }}</em>
                           </div>
                           <p class="dd-reason">{{ item.desc }}</p>

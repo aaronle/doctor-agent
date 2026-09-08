@@ -231,15 +231,16 @@ def _dx(name, conf, sev):
             "supporting": ["a"], "opposing": [], "missing": []}
 
 
-def test_f04_orders_by_consequence_before_likelihood():
-    """F04 L51：**先按漏诊后果，再按可能性。**
+def test_f04_orders_by_confidence_desc():
+    """**置信度降序，唯一关键字**（2026-09-08 由用户拍板改）。
 
-    > 排序必须优先考虑「不能漏诊」与临床后果，再考虑常见度；
-    > 不能简单等同于模型置信度排序。
+    此前是「先漏诊后果、再可能性」（原 F04 L51）。改回纯置信度是**用户在
+    知晓冲突后的明确决定** —— 两轮里各说了一次，第二轮是在我把冲突摆出来
+    之后。规格 L51 已同步改写，这条用例是它的钉子。
 
-    纯置信度降序会把一个 10% 的主动脉夹层排在 60% 的肋间神经痛下面 ——
-    两者漏诊的代价差了几个数量级。医生扫这一列是自上而下扫的，
-    排序就是这一屏最强的那个信号。
+    代价写在这里，不藏着：10% 的主动脉夹层会排到 60% 的肋间神经痛下面。
+    承接这个代价的是**卡片上的「不能漏」红标**（`severity == "critical"`），
+    它照常出，只是不再影响顺序 —— 信号从「位置」换成了「标记」。
     """
     from app.agents.diagnosis import DiagnosisAgent
 
@@ -248,17 +249,37 @@ def test_f04_orders_by_consequence_before_likelihood():
         _dx("主动脉夹层", 10, "critical"),
         _dx("心绞痛", 40, "serious"),
     ]}, {})
-    assert [d["name"] for d in out["suspected_diagnoses"]] == ["主动脉夹层", "心绞痛", "肋间神经痛"]
+    assert [d["name"] for d in out["suspected_diagnoses"]] == ["肋间神经痛", "心绞痛", "主动脉夹层"]
 
 
-def test_f04_same_severity_still_sorts_by_confidence():
-    """同一档内仍按可能性排 —— 后果只是第一关键字，不是唯一关键字。"""
+def test_f04_critical_tag_survives_the_reordering():
+    """排序不看后果了，**标记还得在** —— 否则那条信息就整个没了。
+
+    这条和上面那条是一对：上面钉顺序，这条钉「顺序变了但标记没丢」。
+    只写上面那条的话，把 `severity` 整个删掉也能全绿。
+    """
     from app.agents.diagnosis import DiagnosisAgent
 
     out = DiagnosisAgent().validate({"suspected_diagnoses": [
-        _dx("甲", 30, "serious"), _dx("乙", 70, "serious"), _dx("丙", 50, "serious"),
+        _dx("肋间神经痛", 60, "routine"),
+        _dx("主动脉夹层", 10, "critical"),
     ]}, {})
-    assert [d["confidence"] for d in out["suspected_diagnoses"]] == [70, 50, 30]
+    by = {d["name"]: d["severity"] for d in out["suspected_diagnoses"]}
+    assert by["主动脉夹层"] == "critical"
+    assert by["肋间神经痛"] == "routine"
+
+
+def test_f04_equal_confidence_keeps_input_order():
+    """置信度打平时按原样保留 —— `sort` 稳定，不要在这里引入第二关键字。
+
+    引入了就等于偷偷把「后果优先」放回来一半，而那正是这次改掉的东西。
+    """
+    from app.agents.diagnosis import DiagnosisAgent
+
+    out = DiagnosisAgent().validate({"suspected_diagnoses": [
+        _dx("先来的", 50, "routine"), _dx("后到的", 50, "critical"),
+    ]}, {})
+    assert [d["name"] for d in out["suspected_diagnoses"]] == ["先来的", "后到的"]
 
 
 def test_f04_too_many_criticals_get_demoted_not_rejected():
@@ -289,7 +310,7 @@ def test_f04_unknown_severity_falls_to_routine_not_critical():
     ]}, {})
     by = {d["name"]: d["severity"] for d in out["suspected_diagnoses"]}
     assert by["怪东西"] == "routine"
-    assert out["suspected_diagnoses"][0]["name"] == "正常项"
+    assert by["正常项"] == "serious"
 
 
 # ------------------------------------------------------------------ P009 妇科
@@ -473,13 +494,13 @@ def test_seed_confidence_uses_the_same_unit_as_the_contract(client):
             assert c % 5 == 0, f"{patient['id']} {d['name']} 的 confidence 应取 5 的倍数：{c}"
 
 
-def test_degraded_diagnosis_keeps_consequence_ordering():
+def test_degraded_diagnosis_orders_the_same_way_as_the_model_path():
     """
-    降级时也要按「先后果、再可能性」排（F04 L51）。
+    降级与模型路径**同一个口径**：置信度降序（2026-09-08 起）。
 
-    降级分支原来只按 confidence 排，与模型路径的口径正相反 ——
-    演示时网关一抖，25% 的子宫内膜癌就会被 60% 的功血顶下去，
-    而那恰恰是这条规格要防的事。
+    两条路径的排序必须一起改。它们曾经反过一次 —— 模型路径按后果、降级按
+    置信度，于是网关一抖，同一位患者的诊断列表顺序就变了，而界面上看不出
+    发生过降级。这次改回纯置信度，两边仍然要一起改，理由没变。
     """
     from app.agents.diagnosis import DiagnosisAgent
 
@@ -490,7 +511,10 @@ def test_degraded_diagnosis_keeps_consequence_ordering():
         ]
     })
     names = [d["name"] for d in out["suspected_diagnoses"]]
-    assert names[0] == "子宫内膜癌", f"降级排序仍按置信度：{names}"
+    assert names == ["功能性出血", "子宫内膜癌"], f"降级排序应为置信度降序：{names}"
+    # 标记照常留着 —— 顺序不再承载后果，那它就全压在这个标记上了
+    by = {d["name"]: d["severity"] for d in out["suspected_diagnoses"]}
+    assert by["子宫内膜癌"] == "critical"
 
 
 def test_degraded_unknown_severity_falls_to_the_lightest_tier():
@@ -498,25 +522,25 @@ def test_degraded_unknown_severity_falls_to_the_lightest_tier():
     没标 severity 的落到**最轻**档，不是最重。
 
     与模型路径同一条理由：拿不准就往上标，「不能漏」这个标记会迅速贬值成噪声。
-    P001–P008 的种子都没有 severity，若默认成 critical，它们会集体挤到
-    标了 critical 的真危重项前面。
+    P001–P008 的种子都没有 severity，若默认成 critical，它们会集体挂上红标。
 
-    **这条用例第一版是空过的** —— 两条都不带 severity，默认值改成什么
-    相对顺序都不变，变异验证当场把它抓出来了。现在一条标了最轻档、
-    一条不标，默认值一旦调重就会分出先后。
+    **这条用例第一版是空过的** —— 那时它靠「相对顺序」来反推默认档位，而两条
+    用例都不带 severity，默认值改成什么顺序都不变。排序改成纯置信度之后
+    （2026-09-08），档位与顺序**彻底脱钩**，那种反推法再也不成立了：
+    只能直接断言档位本身。
     """
     from app.agents.diagnosis import DiagnosisAgent
 
     out = DiagnosisAgent().fallback({
         "suspected_diagnoses": [
-            # 明确标最轻、且置信度更高 —— 它应当在前
             {"name": "已标routine", "confidence": 90, "icd": "X", "severity": "routine"},
-            # 没标。若默认成 critical，它会越过上面那条
+            # 没标。默认值一旦调重，这一条的 severity 就不是 routine 了
             {"name": "未标severity", "confidence": 40, "icd": "Y"},
         ]
     })
-    assert [d["name"] for d in out["suspected_diagnoses"]] == ["已标routine", "未标severity"]
-    assert all(d["severity"] == "routine" for d in out["suspected_diagnoses"])
+    by = {d["name"]: d["severity"] for d in out["suspected_diagnoses"]}
+    assert by["未标severity"] == "routine"
+    assert by["已标routine"] == "routine"
 
 
 def test_degraded_invalid_severity_falls_to_the_lightest_tier():
@@ -533,8 +557,8 @@ def test_degraded_invalid_severity_falls_to_the_lightest_tier():
             {"name": "档位写错", "confidence": 40, "icd": "Y", "severity": "非常严重"},
         ]
     })
-    assert [d["name"] for d in out["suspected_diagnoses"]] == ["正常项", "档位写错"]
-    assert out["suspected_diagnoses"][1]["severity"] == "routine"
+    by = {d["name"]: d["severity"] for d in out["suspected_diagnoses"]}
+    assert by["档位写错"] == "routine"
 
 
 # ─────────────────────────────────────────── 多重过敏（2026-09-08）
