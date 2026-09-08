@@ -698,7 +698,10 @@
     ],
     "past_history": "",
     "allergies": [
-      "青霉素"
+      "青霉素",
+      "磺胺类",
+      "碘造影剂",
+      "阿司匹林"
     ],
     "nutrition_screening_score": 2,
     "vitals": {
@@ -773,7 +776,13 @@
     "retinopathy_grade": "",
     "primary_diagnosis": "冠心病",
     "birth_date": "1981-05-22",
-    "allergy_status": "confirmed"
+    "allergy_status": "confirmed",
+    "allergy_reactions": {
+      "青霉素": "皮疹 · 喉头水肿（曾急诊）",
+      "磺胺类": "荨麻疹",
+      "碘造影剂": "恶心 · 血压下降",
+      "阿司匹林": "哮喘发作"
+    }
   },
   {
     "id": "P003",
@@ -2010,7 +2019,10 @@
     "has_retinopathy": false,
     "retinopathy_grade": "",
     "primary_diagnosis": "双膝骨关节炎",
-    "birth_date": "1958-05-12"
+    "birth_date": "1958-05-12",
+    "allergy_reactions": {
+      "头孢": "用药后全身皮疹、瘙痒"
+    }
   },
   {
     "id": "P009",
@@ -2372,6 +2384,9 @@
     "has_retinopathy": false,
     "retinopathy_grade": "",
     "primary_diagnosis": "异常子宫出血",
-    "birth_date": "1977-03-22"
+    "birth_date": "1977-03-22",
+    "allergy_reactions": {
+      "青霉素": "全身皮疹伴喉头水肿，曾急诊处理"
+    }
   }
 ]

@@ -89,12 +89,27 @@ def allergy_view(payload: dict) -> dict:
     if isinstance(items, str):
         items = [items.strip()] if items.strip() and items.strip() not in {"无", "否认"} else []
     items = [str(a).strip() for a in items if str(a).strip()]
+
     status = str(payload.get("allergy_status") or "").strip().lower()
     if status not in {"confirmed", "denied", "unknown"}:
         # 老数据没有显式状态：有过敏原就是 confirmed，没有只能算「没人问过」。
         # **不能默认 denied** —— 那等于替医生认领了一次没发生过的问诊。
         status = "confirmed" if items else "unknown"
-    return {"status": status, "items": items}
+
+    # 反应类型放在**并行的映射**里，`allergies` 保持纯字符串数组一个字不动。
+    #
+    # 试过把它改成 `[{name, reaction}]`，一次撞红 5 条用例：硬规则的过敏比对、
+    # 病历上下文、患者全量视图、科室看板、移动端安全条，全都直接读那个原始数组。
+    # **改一个被五处直接消费的数据形状，代价永远比加一个并行字段大。**
+    #
+    # 为什么要留反应：「青霉素过敏」和「青霉素 → 喉头水肿」是两件事 ——
+    # 后者意味着连同类都不能试。只给药名，医生无从判断严重程度。
+    reactions = payload.get("allergy_reactions") or {}
+    details = [
+        {"name": name, "reaction": str(reactions.get(name) or "").strip()}
+        for name in items
+    ]
+    return {"status": status, "items": items, "details": details}
 
 
 def _list_view(patient: Patient) -> dict:

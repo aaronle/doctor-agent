@@ -864,10 +864,16 @@ async function renderWithPatient(allergy: { status: string; items: string[] }) {
 }
 
 describe('患者信息行', () => {
-  it('一行显示完：性别 · 年龄 · 出生年月 · 就诊号', async () => {
+  it('第二行只有：性别 · 出生年月', async () => {
+    /*
+     * **2026-09-08 去掉了年龄与患者号**（产品要求）。
+     * 年龄与出生年月重复 —— 后者能算出前者，前者算不出后者；
+     * 患者号是系统内部标识，医生核对身份看的是姓名和出生年月。
+     * 六项挤一行，长外文名一来就会顶掉右边的过敏标记。
+     */
     const wrapper = await renderWithPatient({ status: 'denied', items: [] })
     const meta = wrapper.find('.patient-tab-meta').text()
-    expect(meta).toBe('女 · 58岁 · 1968-03 · P001')
+    expect(meta).toBe('女 · 1968-03')
   })
 
   it('出生年月只到月 —— 门诊核对身份用不到日，写全会把这一行挤爆', async () => {
@@ -1086,12 +1092,19 @@ describe('过敏标记', () => {
     expect(badge.text()).toContain('青霉素')
   })
 
-  it('多个过敏原 → 首个 + 计数，完整清单进 title', async () => {
+  it('**3 种以上 → 只报数，一个都不点名**（改了口径，2026-09-08）', async () => {
+    /*
+     * 原来是「首个 + 计数」（`⚠ 青霉素过敏 +2`），完整清单藏在 `title` 悬停里。
+     * 两个问题：触屏没有悬停；而且**医生读到「青霉素过敏」就会停** ——
+     * 他已经拿到一个答案了，剩下两种根本不会去看。
+     *
+     * 现在只报数，逼他点开。数量本身也是信号：3 种过敏与 1 种，
+     * 用药收敛的程度完全不同。三档规则见 `allergyText`。
+     */
     const wrapper = await renderWithPatient({ status: 'confirmed', items: ['青霉素', '磺胺', '头孢'] })
     const badge = wrapper.find('.allergy-badge')
-    expect(badge.text()).toContain('青霉素')
-    expect(badge.text()).toContain('+2')
-    expect(badge.attributes('title')).toContain('磺胺')
+    expect(badge.text()).toContain('3')
+    for (const drug of ['青霉素', '磺胺', '头孢']) expect(badge.text()).not.toContain(drug)
   })
 
   it('已明确否认 → 不给任何标记，干净就是信息', async () => {
@@ -1677,5 +1690,144 @@ describe('医生智能体 · 设置入口', () => {
 
     const queued = useTelemetry()._queue()
     expect(queued.some((e) => e.event === 'settings_open' && e.target === 'panel_header')).toBe(true)
+  })
+})
+
+describe('患者信息行 · 两行式 + 过敏三档', () => {
+  /**
+   * 2026-09-08 重设计。产品要求去掉年龄与患者号，并处理两种真实情况：
+   * 国际医院的长外文名、以及一位患者有多种过敏。
+   */
+  async function withPatient(over: Record<string, unknown>) {
+    const wrapper = await renderFloat()
+    const ws = useWorkstation()
+    ws.patient = {
+      id: 'P002', name: '张某', gender: '男', age: 45, birth_date: '1981-05-22',
+      dept: '心内科', allergy: { status: 'denied', items: [], details: [] },
+      ...over,
+    } as never
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('**不显示年龄，也不显示患者号**', async () => {
+    const wrapper = await withPatient({})
+    const meta = wrapper.find('.patient-tab-meta').text()
+    expect(meta).not.toContain('45岁')
+    expect(meta).not.toContain('P002')
+    // 出生年月留着 —— 它是核对身份用的，且能算出年龄
+    expect(meta).toContain('1981-05')
+    expect(meta).toContain('男')
+  })
+
+  it('**长名字不撑破面板** —— 第一行宽度不得超过容器', async () => {
+    /*
+     * 真机实测踩到的：`.patient-tab-line1` 是 flex，但没给 `min-width:0`，
+     * 于是姓名把整行撑到 403px，而面板只有 300px —— 直接溢出。
+     * flex 子项的默认 `min-width:auto` 不会让内容收缩，必须显式打掉。
+     */
+    const css = readFileSync(
+      resolve(__dirname, '../styles/AiEmrFloat.scoped.css'), 'utf8')
+    const line1 = css.match(/\.patient-tab-line1\{([^}]*)\}/)?.[1] ?? ''
+    expect(line1, '.patient-tab-line1 缺 min-width:0，长名字会撑破面板').toContain('min-width:0')
+  })
+
+  it('**姓名的两行截断不能挂在 flex 子项上** —— 会被 blockify 掉', async () => {
+    /*
+     * `-webkit-line-clamp` 要求 `display:-webkit-box`，而 flex 子项的 display
+     * 会被 blockify（实测 computed 变成 `flow-root`），截断当场失效。
+     * 所以夹一层 wrapper：wrapper 当 flex 子项，clamp 挂在里面那层。
+     */
+    const css = readFileSync(
+      resolve(__dirname, '../styles/AiEmrFloat.scoped.css'), 'utf8')
+    expect(css, '缺少 .patient-tab-name-wrap —— clamp 挂在 flex 子项上会失效')
+      .toContain('.patient-tab-name-wrap')
+    const wrapper = await withPatient({ name: 'María José Rodríguez de la Fuente Hernández' })
+    expect(wrapper.find('.patient-tab-name-wrap').exists()).toBe(true)
+    expect(wrapper.find('.patient-tab-name-wrap .patient-tab-name').exists()).toBe(true)
+  })
+
+  it('**姓名要能换行** —— `.ctab` 继承下来的 nowrap 必须被打掉', async () => {
+    /*
+     * 真机实测：`.ctab` 是原件的类，设了 `white-space:nowrap`。
+     * 继承到姓名上，两行截断与 max-height 全部白设 ——
+     * 长外文名只显示一行然后被横向切掉，而且**不报任何错**。
+     */
+    const css = readFileSync(resolve(__dirname, '../styles/AiEmrFloat.scoped.css'), 'utf8')
+    const wrap = css.match(/\.patient-tab-name-wrap\{([^}]*)\}/)?.[1] ?? ''
+    expect(wrap, '缺 white-space:normal —— 姓名不会换行').toContain('white-space:normal')
+  })
+
+  it('姓名与元信息**分成两行** —— 长外文名不再挤掉过敏标记', async () => {
+    const wrapper = await withPatient({ name: 'María José Rodríguez de la Fuente Hernández' })
+    const row = wrapper.find('.patient-tab')
+    expect(row.find('.patient-tab-line1').exists()).toBe(true)
+    expect(row.find('.patient-tab-line2').exists()).toBe(true)
+    // 姓名和过敏在第一行，元信息在第二行
+    expect(row.find('.patient-tab-line1').text()).toContain('María')
+    expect(row.find('.patient-tab-line2').text()).toContain('1981-05')
+  })
+
+  describe('过敏三档', () => {
+    const A = (n: number) => ({
+      status: 'confirmed',
+      items: ['青霉素', '磺胺类', '碘造影剂', '阿司匹林'].slice(0, n),
+      details: [
+        { name: '青霉素', reaction: '皮疹 · 喉头水肿（曾急诊）' },
+        { name: '磺胺类', reaction: '荨麻疹' },
+        { name: '碘造影剂', reaction: '恶心 · 血压下降' },
+        { name: '阿司匹林', reaction: '哮喘发作' },
+      ].slice(0, n),
+    })
+
+    it('1 种 → 点名', async () => {
+      const wrapper = await withPatient({ allergy: A(1) })
+      expect(wrapper.find('.allergy-badge').text()).toContain('青霉素')
+    })
+
+    it('2 种 → 两个都点名', async () => {
+      const wrapper = await withPatient({ allergy: A(2) })
+      const t = wrapper.find('.allergy-badge').text()
+      expect(t).toContain('青霉素')
+      expect(t).toContain('磺胺类')
+    })
+
+    it('**≥3 种 → 只报数，一个都不点名**', async () => {
+      // 写「青霉素 +3」，医生读到「青霉素过敏」就会停 —— 他已经拿到一个答案了。
+      // 只报数，才逼他点开看全部四种。
+      const wrapper = await withPatient({ allergy: A(4) })
+      const t = wrapper.find('.allergy-badge').text()
+      expect(t).toContain('4')
+      for (const drug of ['青霉素', '磺胺类', '碘造影剂', '阿司匹林']) {
+        expect(t).not.toContain(drug)
+      }
+    })
+
+    it('点开列出全部，并**写明反应类型**', async () => {
+      // 「青霉素过敏」和「青霉素 → 喉头水肿」是两件事：后者意味着连同类都不能试
+      const wrapper = await withPatient({ allergy: A(4) })
+      await wrapper.find('.allergy-badge').trigger('click')
+      await wrapper.vm.$nextTick()
+      const pop = wrapper.find('.allergy-pop')
+      expect(pop.exists()).toBe(true)
+      for (const drug of ['青霉素', '磺胺类', '碘造影剂', '阿司匹林']) {
+        expect(pop.text()).toContain(drug)
+      }
+      expect(pop.text()).toContain('喉头水肿')
+    })
+
+    it('1–2 种时不给展开浮层 —— 已经全写在标记上了', async () => {
+      const wrapper = await withPatient({ allergy: A(2) })
+      await wrapper.find('.allergy-badge').trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.allergy-pop').exists()).toBe(false)
+    })
+
+    it('未采集仍是黄标，且不参与三档 —— 它不是「零种过敏」', async () => {
+      const wrapper = await withPatient({ allergy: { status: 'unknown', items: [], details: [] } })
+      const b = wrapper.find('.allergy-badge')
+      expect(b.classes()).toContain('warn')
+      expect(b.text()).toContain('未采集')
+    })
   })
 })

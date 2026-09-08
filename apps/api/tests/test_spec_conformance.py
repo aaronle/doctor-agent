@@ -535,3 +535,63 @@ def test_degraded_invalid_severity_falls_to_the_lightest_tier():
     })
     assert [d["name"] for d in out["suspected_diagnoses"]] == ["正常项", "档位写错"]
     assert out["suspected_diagnoses"][1]["severity"] == "routine"
+
+
+# ─────────────────────────────────────────── 多重过敏（2026-09-08）
+
+
+def test_allergy_view_carries_reactions_when_known():
+    """
+    过敏原要能带上**反应类型**。
+
+    「青霉素过敏」和「青霉素 → 喉头水肿」是两件事：后者意味着连同类都不能试。
+    只给药名，医生无从判断严重程度 —— 而严重程度决定了替代方案能选到哪一档。
+
+    `items` 保持字符串数组不动（候诊列表、看板、移动端都在读它），
+    反应放在并行的 `details` 里 —— 改形状会一次波及五处调用点。
+    """
+    from app.routers.his import allergy_view
+
+    view = allergy_view({
+        "allergy_status": "confirmed",
+        "allergies": ["青霉素", "头孢菌素类"],
+        "allergy_reactions": {"青霉素": "皮疹 · 喉头水肿（曾急诊）"},
+    })
+    assert view["items"] == ["青霉素", "头孢菌素类"], "items 必须还是纯药名，供老调用点使用"
+    assert view["details"][0] == {"name": "青霉素", "reaction": "皮疹 · 喉头水肿（曾急诊）"}
+    assert view["details"][1] == {"name": "头孢菌素类", "reaction": ""}, "没记反应的给空串，不要丢掉这一条"
+
+
+def test_allergy_view_still_works_for_plain_strings():
+    """老数据全是字符串数组，不能因为加了 details 就读不出来。"""
+    from app.routers.his import allergy_view
+
+    view = allergy_view({"allergy_status": "confirmed", "allergies": ["青霉素"]})
+    assert view["items"] == ["青霉素"]
+    assert view["details"] == [{"name": "青霉素", "reaction": ""}]
+
+
+def test_a_patient_with_many_allergies_exists_in_the_seed():
+    """
+    种子里要有一位**多重过敏**的患者。
+
+    三档规则里「≥3 种只报数」那一档，没有数据就永远走不到 ——
+    做出来的分支等于没做。与科室看板的「待报告」是同一个道理：
+    库里 21 项检查全是「已完成」时，那一档一条数据都没有。
+    """
+    import json
+    from pathlib import Path
+
+    rows = json.loads(
+        (Path(__file__).resolve().parents[3] / "references/ui-demo/extracted/fixtures/patients.json")
+        .read_text(encoding="utf-8")
+    )
+    many = [r for r in rows if len(r.get("allergies") or []) >= 3]
+    assert many, "没有任何一位患者有 3 种以上过敏，那一档分支无法演示也无法验证"
+    for r in many:
+        # 反应类型放在并行映射里，`allergies` 本身仍是纯字符串数组
+        # （改它的形状会一次波及硬规则、上下文、全量视图、看板、移动端五处）
+        reactions = r.get("allergy_reactions") or {}
+        for name in r["allergies"]:
+            assert isinstance(name, str) and name, "过敏原仍应是字符串"
+            assert reactions.get(name), f"{r['id']} 的「{name}」没有记反应类型"

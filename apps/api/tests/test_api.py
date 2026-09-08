@@ -2742,7 +2742,10 @@ def test_allergy_unknown_is_not_the_same_as_denied(client):
 
     assert allergy_view({"allergy_status": "denied", "allergies": []})["status"] == "denied"
     assert allergy_view({"allergy_status": "unknown", "allergies": []})["status"] == "unknown"
+    # 2026-09-08 加了 `details`（药名 + 反应类型）。整体相等断言比逐字段更严，
+    # 保留它 —— 多出一个字段就应该有人来看一眼是不是该多
     assert allergy_view({"allergy_status": "confirmed", "allergies": ["青霉素"]}) == {
+        "details": [{"name": "青霉素", "reaction": ""}],
         "status": "confirmed", "items": ["青霉素"],
     }
 

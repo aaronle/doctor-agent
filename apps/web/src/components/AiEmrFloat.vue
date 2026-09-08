@@ -427,19 +427,19 @@ const summary = computed(() => ws.summary)
 const patient = computed(() => ws.patient)
 
 /**
- * 患者信息行：性别 · 年龄 · 出生年月 · 就诊号，一行。
+ * 患者信息行第二行：性别 · 出生年月。
  *
- * 出生年月只到月。门诊核对身份用不到日，写全了这一行会被挤爆 ——
- * 而这一行右边还要留给过敏标记，那才是必须看见的东西。
+ * **2026-09-08 去掉了年龄与患者号。**
+ * 年龄与出生年月重复 —— 后者能算出前者，而前者算不出后者；
+ * 患者号（P001 这类）是系统内部标识，医生核对身份看的是姓名和出生年月。
+ * 六项挤一行，长外文名一来就会把右边的过敏标记顶掉，而那是必须看见的东西。
  *
- * 「就诊号」用的是 P001 这类患者 ID，**不是身份证号**。身份证号只在服务端
- * 用来推出生日期，从不下发到前端（见 his.py 的 LIST_FIELDS）。
+ * 出生年月只到月：门诊核对身份用不到日。
  */
 const patientMeta = computed(() => {
   const p = patient.value
   if (!p) return ''
-  const parts = [p.gender, p.age ? `${p.age}岁` : '', (p.birth_date || '').slice(0, 7), p.id]
-  return parts.filter(Boolean).join(' · ')
+  return [p.gender, (p.birth_date || '').slice(0, 7)].filter(Boolean).join(' · ')
 })
 
 /**
@@ -448,10 +448,50 @@ const patientMeta = computed(() => {
  * 后端把状态和过敏原包在一个对象里下发，就是为了让这里想漏都漏不掉 ——
  * 空的 items 既可能是「问过、没有」也可能是「没人问过」，只读 items 必然判错。
  */
-const allergy = computed<{ status: string; items: string[] }>(() => {
-  const a = (patient.value as { allergy?: { status?: string; items?: string[] } } | null)?.allergy
-  return { status: a?.status || 'unknown', items: a?.items || [] }
+const allergy = computed<{ status: string; items: string[]; details: { name: string; reaction: string }[] }>(() => {
+  const a = (patient.value as {
+    allergy?: { status?: string; items?: string[]; details?: { name: string; reaction: string }[] }
+  } | null)?.allergy
+  const items = a?.items || []
+  return {
+    status: a?.status || 'unknown',
+    items,
+    details: a?.details || items.map((name) => ({ name, reaction: '' })),
+  }
 })
+
+/** 三档的分界。三种起就不再点名 —— 见 `allergyText` 的注释 */
+const ALLERGY_NAME_LIMIT = 2
+
+/**
+ * 过敏标记上写什么。**三档**：
+ *
+ * | 数量 | 显示 |
+ * | --- | --- |
+ * | 1 种 | `⚠ 青霉素过敏` —— 点名。「有过敏」而不说是什么，等于没说 |
+ * | 2 种 | `⚠ 青霉素 · 磺胺类` —— 还放得下，仍然点名 |
+ * | ≥3 种 | `⚠ 4 种药物过敏` —— **一个都不点名** |
+ *
+ * 第三档反直觉，但要紧：写「青霉素 +3」，医生读到「青霉素过敏」**就会停** ——
+ * 他已经拿到一个答案了。只报数，才逼他点开看全部。
+ * 而「4 种过敏」这个数本身也是信号：用药收敛的程度和 1 种完全不同。
+ *
+ * 原来那版是 `⚠ 青霉素过敏 +3`，把 3 种藏在 `title` 悬停里 ——
+ * 而触屏根本没有悬停。
+ */
+const allergyText = computed(() => {
+  const n = allergy.value.items.length
+  if (n === 0) return ''
+  if (n === 1) return `⚠ ${allergy.value.items[0]}过敏`
+  if (n <= ALLERGY_NAME_LIMIT) return `⚠ ${allergy.value.items.join(' · ')}`
+  return `⚠ ${n} 种药物过敏`
+})
+/** 只有折叠了才需要展开 —— 1–2 种已经全写在标记上了 */
+const allergyExpandable = computed(() => allergy.value.items.length > ALLERGY_NAME_LIMIT)
+const allergyOpen = ref(false)
+function toggleAllergy() {
+  if (allergyExpandable.value) allergyOpen.value = !allergyOpen.value
+}
 
 /**
  * 两个浮层的位置。
@@ -2674,30 +2714,68 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         />
 
         <div class="copilot-tab-bar" :style="font.style.value">
-          <div class="ctab active">
-            <span class="patient-tab-name">{{ patient?.name }}</span>
-            <span class="patient-tab-meta">{{ patientMeta }}</span>
+          <div class="ctab active patient-tab">
             <!--
-              过敏标记。**红色在这个产品里只给临床风险**（F06：不得用红色表示
-              普通删除、加载失败或表单校验），所以这个位置以前挂的那个红色「语」
-              标记已经删掉 —— 它标的是「语音问诊模式」，而一期根本没有语音识别，
-              等于用最强的颜色标了一个不存在的状态。
+              **两行式（2026-09-08）。** 原来姓名、性别、年龄、出生年月、患者号、
+              过敏标记六项挤一行 —— 一个长外文名（本院是「国际医院」）进来，
+              被顶掉的要么是名字要么是过敏标记，而两样都不能丢。
 
-              三态，不是两态：
-                有过敏 → 红标 + 过敏原（**必须写出是什么**，只写「有过敏」等于没说）
-                已否认 → 不给标记，干净就是信息
-                未采集 → 黄标。这不是「没有过敏」，是没人问过。
+              第一行：姓名（可折两行）+ 过敏标记钉右上角。
+              第二行：性别 · 出生年月。
+              取舍见 Figma「13 · 患者信息行」方案 B。
             -->
-            <span
-              v-if="allergy.status === 'confirmed'"
-              class="allergy-badge danger"
-              :title="`药物过敏史：${allergy.items.join('、')}`"
-            >⚠ {{ allergy.items[0] }}过敏<template v-if="allergy.items.length > 1"> +{{ allergy.items.length - 1 }}</template></span>
-            <span
-              v-else-if="allergy.status === 'unknown'"
-              class="allergy-badge warn"
-              title="本次就诊未采集药物过敏史，开具处方前需补问"
-            >过敏史未采集</span>
+            <div class="patient-tab-line1">
+              <span class="patient-tab-name-wrap">
+                <span class="patient-tab-name" :title="patient?.name">{{ patient?.name }}</span>
+              </span>
+              <!--
+                过敏标记。**红色在这个产品里只给临床风险**（F06：不得用红色表示
+                普通删除、加载失败或表单校验）。
+
+                三态，不是两态：
+                  有过敏 → 红标（文案见 `allergyText` 的三档规则）
+                  已否认 → 不给标记，干净就是信息
+                  未采集 → 黄标。这不是「没有过敏」，是没人问过。
+              -->
+              <span
+                v-if="allergy.status === 'confirmed'"
+                class="allergy-badge danger"
+                :class="{ expandable: allergyExpandable }"
+                :title="allergyExpandable ? '点击查看全部过敏原与反应' : `药物过敏史：${allergy.items.join('、')}`"
+                @click="toggleAllergy"
+              >{{ allergyText }}<template v-if="allergyExpandable"> ⌄</template></span>
+              <span
+                v-else-if="allergy.status === 'unknown'"
+                class="allergy-badge warn"
+                title="本次就诊未采集药物过敏史，开具处方前需补问"
+              >过敏史未采集</span>
+            </div>
+            <div class="patient-tab-line2">
+              <span class="patient-tab-meta">{{ patientMeta }}</span>
+            </div>
+
+            <!--
+              展开态。**只有折叠了才有**（≥3 种）—— 1–2 种已经全写在标记上了，
+              再给一个要点开的浮层是多此一举。
+
+              反应类型必须写：「青霉素过敏」和「青霉素 → 喉头水肿」是两件事，
+              后者意味着连同类都不能试。只写药名，医生无从判断严重程度。
+            -->
+            <div v-if="allergyOpen && allergyExpandable" class="allergy-pop">
+              <div class="allergy-pop-head">
+                <span class="allergy-pop-title">⚠ 药物过敏史 · {{ allergy.items.length }} 种</span>
+                <span class="allergy-pop-close" @click="allergyOpen = false">✕</span>
+              </div>
+              <div v-for="d in allergy.details" :key="d.name" class="allergy-pop-row">
+                <i class="allergy-pop-dot" />
+                <span class="allergy-pop-body">
+                  <b>{{ d.name }}</b>
+                  <em v-if="d.reaction">{{ d.reaction }}</em>
+                  <em v-else class="muted">反应类型未记录</em>
+                </span>
+              </div>
+              <p class="allergy-pop-foot">开立医嘱与 AI 推荐用药处会再完整列一次。</p>
+            </div>
           </div>
         </div>
 

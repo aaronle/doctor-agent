@@ -91,8 +91,55 @@
 .ctab-close:hover{color:#e6191a}
 .mode-badge{font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center}
 .mode-badge.ai{background:var(--t-dbeafe, #dbeafe);color:var(--t-1677ff, #1677ff)}
-.patient-tab-name{font-weight:600;color:#1a2a4a}
+/* 患者信息行 · 两行式（2026-09-08）。取舍见 Figma「13 · 患者信息行」方案 B。
+   第一行姓名 + 过敏标记，第二行性别 · 出生年月。
+   长外文名折两行后截断 —— 切掉的是名字的尾巴，而不是右边的过敏标记。 */
+/* `align-items:stretch` 必须显式写：`.ctab` 是原件的类，它设了 `align-items:center`，
+   继承下来两个子行就不拉伸、按内容撑开 —— 实测长外文名把行撑到 391px，
+   而这个格子只有 282px。溢出的不是姓名，是整行。 */
+.patient-tab{display:flex;flex-direction:column;align-items:stretch;gap:2px;
+  position:relative;flex:1;min-width:0}
+/* `min-width:0` 不能省：flex 子项默认 `min-width:auto`，内容不会收缩。
+   实测漏了它，长外文名把这一行撑到 403px，而面板只有 300px —— 直接溢出。 */
+.patient-tab-line1{display:flex;align-items:flex-start;gap:8px;min-width:0;width:100%;box-sizing:border-box}
+.patient-tab-line2{display:flex;align-items:center}
+
+/* **两层：wrapper 当 flex 子项，截断挂在里面那层。**
+   `-webkit-line-clamp` 要求 `display:-webkit-box`，而 flex 子项的 display
+   会被 blockify —— 实测直接挂在子项上时 computed 变成 `flow-root`，截断当场失效。 */
+/* `white-space:normal` 必须显式写：`.ctab` 是原件的类，它设了 `nowrap`，
+   继承下来姓名根本不换行 —— 两行截断、max-height 全都白设，
+   实测长外文名只显示一行、被横向切掉。 */
+.patient-tab-name-wrap{flex:1 1 auto;min-width:0;overflow:hidden;white-space:normal}
+.patient-tab-name{
+  font-weight:600;color:#1a2a4a;
+  /* 最多两行，再长才截断。**一个截断的外文名可能对应两个人** ——
+     认错人的代价比看不全名字大得多，所以先给它两行的余地 */
+  /* 两行封顶用 `max-height` 兜底，不只靠 `-webkit-line-clamp` ——
+     后者的 `display:-webkit-box` 在某些层叠下会被 blockify 掉（实测 computed
+     变成 `flow-root`），截断当场失效而且不报错。max-height 是确定的。 */
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  max-height:2.7em;overflow:hidden;line-height:1.35;overflow-wrap:anywhere;white-space:normal}
 .patient-tab-meta{color:#909399;font-size:12px}
+/* 过敏标记不收缩：它是这一行里唯一「不看会出事」的东西 */
+.patient-tab-line1 .allergy-badge{flex:0 0 auto;margin-top:1px}
+.allergy-badge.expandable{cursor:pointer}
+.allergy-badge.expandable:hover{filter:brightness(0.97)}
+
+/* 展开态。只有 ≥3 种才有 —— 1–2 种已经全写在标记上了 */
+.allergy-pop{position:absolute;top:100%;right:0;z-index:30;width:270px;margin-top:6px;
+  padding:11px 12px;border-radius:10px;background:#fff;border:1px solid #fca5a5;
+  box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.allergy-pop-head{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.allergy-pop-title{flex:1;font-size:12.5px;font-weight:700;color:#dc2626}
+.allergy-pop-close{flex:0 0 auto;color:#9ca3af;font-size:11px;cursor:pointer}
+.allergy-pop-row{display:flex;align-items:flex-start;gap:8px;padding:4px 0}
+.allergy-pop-dot{flex:0 0 auto;width:5px;height:5px;margin-top:6px;border-radius:50%;background:#dc2626}
+.allergy-pop-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.allergy-pop-body b{font-size:12px;font-weight:600;color:#1a2a4a}
+.allergy-pop-body em{font-size:11px;font-style:normal;color:#6b7280;line-height:1.5}
+.allergy-pop-body em.muted{color:#b0b6c0}
+.allergy-pop-foot{margin:8px 0 0;font-size:10.5px;color:#9ca3af;line-height:1.55}
 .chat-messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:10px;min-height:80px}
 .quick-skill-area{margin-top:4px}
 .quick-skill-title{font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px}
