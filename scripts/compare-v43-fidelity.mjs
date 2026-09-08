@@ -226,7 +226,12 @@ const PAGES = [
     path: '/outpatient/P001',
     prepare: async (page) => {
       await ensureAiFloat(page);
-      await page.locator('.ttab').filter({ hasText: tab }).first().click();
+      // 先按 `data-tab` 键点，找不到再按文案 —— 重建版的标签显示名可以改
+      // （时间轴→当次就诊、健康档案→数据中心），原件没有这个属性。
+      // 只按文案：改名后这两页点不中，会被报成还原度差异而不是「没点到」
+      const byKey = page.locator(`.ttab[data-tab="${tab}"]`);
+      const target = (await byKey.count()) ? byKey : page.locator('.ttab').filter({ hasText: tab });
+      await target.first().click();
       await page.waitForTimeout(700);
       // 切标签页会触发该页自己的加载，再等一次
       await settle(page);

@@ -261,7 +261,7 @@ describe('病历质控提醒', () => {
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
   await expandAssistant(wrapper)
-    await wrapper.findAll('.ttab').find((t) => t.text().includes('病历管理'))!.trigger('click')
+    await wrapper.findAll('.ttab').find((t) => t.attributes('data-tab') === '病历管理')!.trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.rc-risk-list').exists()).toBe(true))
     return wrapper
   }
@@ -364,7 +364,7 @@ describe('诊断命令接进界面', () => {
     useWorkstation(pinia).patientId = 'P001'
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
   await expandAssistant(wrapper)
-    await wrapper.findAll('.ttab').find((t) => t.text().includes('诊断管理'))!.trigger('click')
+    await wrapper.findAll('.ttab').find((t) => t.attributes('data-tab') === '诊断管理')!.trigger('click')
     return wrapper
   }
 
@@ -541,7 +541,7 @@ describe('预警评估 · 风险色点与动作', () => {
     await useWorkstation(pinia).selectPatient('P001')
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
   await expandAssistant(wrapper)
-    await wrapper.findAll('.ttab').find((t) => t.text().includes('预警评估'))!.trigger('click')
+    await wrapper.findAll('.ttab').find((t) => t.attributes('data-tab') === '预警评估')!.trigger('click')
     await vi.waitFor(() => expect(wrapper.findAll('.risk-card').length).toBe(3))
     return wrapper
   }
@@ -683,7 +683,7 @@ describe('问诊门禁', () => {
   }
 
   const goTab = async (wrapper: ReturnType<typeof mount>, tab: string) => {
-    await wrapper.findAll('.ttab').find((t) => t.text().includes(tab))!.trigger('click')
+    await wrapper.findAll('.ttab').find((t) => t.attributes('data-tab') === tab)!.trigger('click')
     await wrapper.vm.$nextTick()
   }
 
@@ -696,8 +696,10 @@ describe('问诊门禁', () => {
   it('客观数据那四页不锁 —— 尤其预警评估', async () => {
     // 让医生在不知道危急值的情况下问完一整轮，是不能接受的
     const wrapper = await openLocked()
-    const all = wrapper.findAll('.ttab').map((t) => t.text().replace('🔒', ''))
-    const locked = new Set(wrapper.findAll('.ttab.locked').map((t) => t.text().replace('🔒', '')))
+    // **按 `data-tab` 键找，不按显示文案。** 文案会改（时间轴→当次就诊、
+    // 健康档案→数据中心），键不会 —— 用文案定位，改一次名就假红一片
+    const all = wrapper.findAll('.ttab').map((t) => t.attributes('data-tab'))
+    const locked = new Set(wrapper.findAll('.ttab.locked').map((t) => t.attributes('data-tab')))
     for (const tab of ['预警评估', '医嘱管理', '健康档案', '时间轴']) {
       expect(all).toContain(tab)
       expect(locked.has(tab), `${tab} 不该被锁`).toBe(false)
@@ -998,7 +1000,7 @@ describe('病历草稿要能改', () => {
     ws.record = { chief_complaint: 'AI 写的主诉', present_illness: 'AI 写的现病史' } as never
     await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
     await expandAssistant(wrapper)
-    await wrapper.findAll('.ttab').find((t) => t.text().includes('病历管理'))!.trigger('click')
+    await wrapper.findAll('.ttab').find((t) => t.attributes('data-tab') === '病历管理')!.trigger('click')
     await wrapper.vm.$nextTick()
     return { wrapper, ws }
   }
@@ -1859,5 +1861,33 @@ describe('2026-09-08 三条产品调整', () => {
     const wrapper = await mountWithPatient()
     await vi.waitFor(() => expect(wrapper.find('.dd-title').exists()).toBe(true))
     expect(wrapper.find('.dd-title').text()).toBe('推荐诊断')
+  })
+})
+
+describe('标签改名（2026-09-08）', () => {
+  /**
+   * 「时间轴」→「当次就诊」、「健康档案」→「数据中心」。
+   *
+   * 与「鉴别诊断→推荐诊断」同一条做法：**只改显示文案，段落键不动**。
+   * ＋菜单的 focus 跳转、埋点的 target、移动端的段落定位全按键走，
+   * 跟着文案改会让那几处一起跳不过来。
+   */
+  it('标签栏上显示的是新名字', async () => {
+    const wrapper = await renderFloat()
+    await expandAssistant(wrapper)
+    const labels = wrapper.findAll('.ttab').map((t) => t.text().replace(/[\d🔒\s]/g, ''))
+    expect(labels).toContain('当次就诊')
+    expect(labels).toContain('数据中心')
+    expect(labels).not.toContain('时间轴')
+    expect(labels).not.toContain('健康档案')
+  })
+
+  it('**内部键仍是旧名** —— 跳转与埋点按键走', async () => {
+    const wrapper = await renderFloat()
+    await expandAssistant(wrapper)
+    // data-sec / data-tab 之类的定位属性不跟着文案改
+    const keys = wrapper.findAll('.ttab').map((t) => t.attributes('data-tab'))
+    expect(keys).toContain('时间轴')
+    expect(keys).toContain('健康档案')
   })
 })

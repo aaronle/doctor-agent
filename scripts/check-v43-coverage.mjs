@@ -216,7 +216,17 @@ async function classesPerTab(page, gotoPatient) {
   await gotoPatient();
   await ensureFloat(page);
   for (const tab of TABS) {
-    await page.locator('.ttab').filter({ hasText: tab }).first().click().catch(() => {});
+    // **这个函数两侧共用**：原件页与重建版都走它。
+    //
+    // 重建版的标签显示名可以改（时间轴→当次就诊、健康档案→数据中心），
+    // 所以优先按 `data-tab` 键点；原件没有这个属性，回退到按文案点。
+    //
+    // 只按文案：改一次名这两页就采不到，表现是「缺失 53 个类名」，
+    // 看起来像整块没做。只按键：原件那侧一个都点不中，572 个全缺。
+    // 两次都踩过，所以这里写成「先键后文案」。
+    const byKey = page.locator(`.ttab[data-tab="${tab}"]`);
+    const target = (await byKey.count()) ? byKey : page.locator('.ttab').filter({ hasText: tab });
+    await target.first().click().catch(() => {});
     await page.waitForTimeout(700);
     await settle(page);
     if (tab === '智慧诊疗') await ensureAssessmentVisible(page);

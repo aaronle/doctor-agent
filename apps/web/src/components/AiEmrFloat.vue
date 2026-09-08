@@ -27,6 +27,18 @@ const ws = useWorkstation()
 const prefs = usePreferences()
 
 const TABS = ['智慧诊疗', '预警评估', '病历管理', '诊断管理', '医嘱管理', '共病管理', '健康档案', '时间轴'] as const
+
+/**
+ * 标签的**显示文案**。键不在这张表里的，显示名就是键本身。
+ *
+ * **只改文案，键一律不动**（2026-09-08）：＋菜单的 focus 跳转、埋点的 target、
+ * 移动端的段落定位全按键走 —— 跟着文案改会让那几处一起跳不过来。
+ * 与「鉴别诊断→推荐诊断」同一条做法。
+ */
+const TAB_LABELS: Partial<Record<(typeof TABS)[number], string>> = {
+  时间轴: '当次就诊',
+  健康档案: '数据中心',
+}
 type Tab = (typeof TABS)[number]
 
 /**
@@ -1716,11 +1728,12 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
             v-for="tab in TABS"
             :key="tab"
             class="ttab"
+            :data-tab="tab"
             :class="{ active: activeTab === tab, locked: tabLocked(tab) }"
             :title="tabLocked(tab) ? '待问诊结束后生成' : ''"
             @click="activeTab = tab; track('tab_switch', tab)"
           >
-            <span v-if="tabLocked(tab)" class="ttab-lock">🔒</span>{{ tab }}
+            <span v-if="tabLocked(tab)" class="ttab-lock">🔒</span>{{ TAB_LABELS[tab] ?? tab }}
             <span v-if="tab === '诊断管理' && summary?.suspected_diagnoses?.length" class="ttab-dot primary">
               {{ summary.suspected_diagnoses.length }}
             </span>
