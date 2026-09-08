@@ -493,8 +493,10 @@ await section('移动端 390×844', async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   watch(page, '移动');
   // `networkidle` 在这里是等不到的：埋点 keepalive 让网络一直不闲。
-  // 下一行本来就在等 `.m-page`，那才是「移动端 IA 生效」的判据
-  await page.goto(`${BASE}/outpatient/P009`, { waitUntil: 'domcontentloaded' });
+  // 下一行本来就在等 `.m-page`，那才是「移动端 IA 生效」的判据。
+  // 超时要单独给：`setDefaultTimeout(8000)` 对公网首字节太紧，
+  // 而这一段整个包在 `section()` 里 —— 一超时，移动端十几项全部作废。
+  await page.goto(`${BASE}/outpatient/P009`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.locator('.m-page').waitFor({ timeout: 15000 });
   ok('移动端 IA 生效');
 
