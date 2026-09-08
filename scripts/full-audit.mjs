@@ -164,6 +164,37 @@ await section('桌面端 1600×1000', async () => {
     ? ok('首屏只有医生智能体（AI 助手收起）')
     : bad('工作站', '首屏 AI 助手就展开了');
 
+  // ---- 默认布局：两个窗必须是「连在一起、完整看得见」的一整块
+  //
+  // 这是演示第一眼看到的东西，也是最容易悄悄坏掉的东西 —— 布局记忆会把上一次
+  // 拖成什么样原样铺回来。线上实测过一次全坏的：两窗互相压着，右边和底边
+  // 一起甩出屏幕（抽屉 right=1805 / bottom=1264，视口 1600×1000）。
+  await page.locator('.assistant-handle').click();
+  await page.locator('.tips-drawer').waitFor({ timeout: 5000 });
+  await page.waitForTimeout(500);
+  {
+    const d = await page.locator('.tips-drawer').boundingBox();
+    const p = await page.locator('.assistant-panel').boundingBox();
+    const vp = page.viewportSize();
+    const seam = p.x - (d.x + d.width);
+    Math.abs(seam) < 1
+      ? ok('默认布局：两窗之间没有缝')
+      : bad('浮窗', '两窗之间有缝', `${seam.toFixed(1)}px —— 底下的 HIS 会透上来`);
+    Math.abs(d.y - p.y) < 1 && Math.abs(d.height - p.height) < 1
+      ? ok('默认布局：两窗顶边齐、等高')
+      : bad('浮窗', '两窗没对齐', `顶边 ${Math.round(d.y)}/${Math.round(p.y)}，高 ${Math.round(d.height)}/${Math.round(p.height)}`);
+    const out = [['抽屉', d], ['面板', p]].filter(
+      ([, b]) => b.x < 0 || b.y < 0 || b.x + b.width > vp.width + 1 || b.y + b.height > vp.height + 1,
+    );
+    out.length === 0
+      ? ok('默认布局：整块都在视口里')
+      : bad('浮窗', '默认布局有窗出屏', out.map(([n, b]) =>
+          `${n} 右${Math.round(b.x + b.width)}/底${Math.round(b.y + b.height)}`).join('，'));
+  }
+  // 收回去，后面几条是从「只有医生智能体」这个状态起测的
+  await page.locator('.tips-close').click();
+  await page.waitForTimeout(400);
+
   // ---- 窗口交互：拖 / 上下边线 / 全屏 / 字号
   const before = await page.locator('.assistant-panel').boundingBox();
   // **从标题文字起拖，不要用标题栏的几何中心。**

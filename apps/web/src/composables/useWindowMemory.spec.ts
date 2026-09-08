@@ -59,9 +59,20 @@ function harness() {
   return { parts, memory: useWindowMemory(parts) }
 }
 
+/**
+ * 恢复分离态现在要校验「整块在不在视口里」，所以每条用例都得有个视口。
+ * jsdom 缺省 1024×768 装不下这些用例里的坐标 —— 不给个大屏的话，
+ * 验的就全变成「出屏被拒」了。
+ */
+function viewport(width: number, height: number) {
+  Object.defineProperty(window, 'innerWidth', { value: width, configurable: true })
+  Object.defineProperty(window, 'innerHeight', { value: height, configurable: true })
+}
+
 beforeEach(() => {
   update.mockClear()
   prefs.value = { remember_windows: true, windows: {} }
+  viewport(1920, 1080)
   vi.useFakeTimers()
 })
 
@@ -293,6 +304,22 @@ describe('浮窗记忆 · 只存真摆过的窗', () => {
     expect(parts.dock.restore).not.toHaveBeenCalled()
   })
 
+  it('缺尺寸的那个不参与「装不装得下」的判断 —— 它压根还没摆', () => {
+    // 只有面板是完整的，抽屉等 placeBeside。拿一个不存在的矩形去判出屏，
+    // 会把一份好数据当成坏的丢掉。
+    viewport(1280, 800)
+    prefs.value.windows = {
+      merged: false,
+      panel_left: 900, panel_top: 20, panel_width: 300, panel_height: 700,
+      drawer_left: 0, drawer_top: 20,
+    }
+
+    const { parts, memory } = harness()
+    memory.restore()
+
+    expect(parts.dock.restore).toHaveBeenCalledTimes(1)
+  })
+
   it('锚点那个窗齐全就照常恢复，缺的那个留给 placeBeside', () => {
     prefs.value.windows = {
       merged: false,
@@ -307,5 +334,107 @@ describe('浮窗记忆 · 只存真摆过的窗', () => {
     const arg = parts.dock.restore.mock.calls[0]![0]
     expect(arg.size.panel).toEqual({ width: 300, height: 900 })
     expect(arg.size.drawer).toBeNull()
+  })
+})
+
+describe('浮窗记忆 · 铺回来的必须是完整能看见的一块', () => {
+  /**
+   * 线上实测（视口 1600×1000，`da.aaronhealth.cn` 一进来就是这样）：
+   *
+   * | | left | top | 宽 | 高 | 右边 | 底边 |
+   * | --- | --- | --- | --- | --- | --- | --- |
+   * | 抽屉 | 399 | 303 | 1406 | 961 | **1805** | **1264** |
+   * | 面板 | 1440 | 72 | 319 | 967 | 1759 | 1039 |
+   *
+   * 两个窗互相压着，右边和底边都甩出屏幕。演示一打开就是这个样子。
+   * 三条独立的错凑出来的，各修各的。
+   */
+
+  it('**抽屉的自有宽 = 组合总宽 − 面板宽** —— drawer_width 存的是整块的宽', () => {
+    // 抽屉是 flex:1，它的左边线就是整块的左边线，所以那条边拖的是**组合总宽**。
+    // 原样当成抽屉自己的宽度铺回去，抽屉就正好宽出一个面板，
+    // 整个压在面板身上、右边线甩出屏幕（上表 1805）。
+    prefs.value.windows = {
+      merged: false,
+      panel_left: 1200, panel_top: 20, panel_width: 320, panel_height: 900,
+      drawer_left: 100, drawer_top: 20, drawer_width: 1420, drawer_height: 900,
+    }
+
+    const { parts, memory } = harness()
+    memory.restore()
+
+    const arg = parts.dock.restore.mock.calls[0]![0]
+    expect(arg.size.drawer).toEqual({ width: 1100, height: 900 })
+  })
+
+  it('分离态铺回来时顶边偏移清零 —— 位置是绝对的，margin 是多余的一层', () => {
+    // 实时拖拽路径上 `watch(dock.merged)` 就是这么做的（分离那一刻把 offset 折进位置）。
+    // 恢复路径漏了这一条，于是 `top:15` 的窗渲染在 72，两个窗错开 57px。
+    prefs.value.windows = {
+      merged: false,
+      panel_left: 1200, panel_top: 20, panel_width: 320, panel_height: 900,
+      drawer_left: 100, drawer_top: 20, drawer_width: 1420, drawer_height: 900,
+      panel_offset_top: 57, drawer_offset_top: 288,
+    }
+
+    const { parts, memory } = harness()
+    memory.restore()
+
+    expect(parts.panelHeight.offset.value).toBe(0)
+    expect(parts.drawerHeight.offset.value).toBe(0)
+  })
+
+  it('合并态照常保留顶边偏移 —— 那是医生从上方收短的，不是分离的残留', () => {
+    prefs.value.windows = { panel_height: 700, panel_offset_top: 60 }
+
+    const { parts, memory } = harness()
+    memory.restore()
+
+    expect(parts.panelHeight.offset.value).toBe(60)
+  })
+
+  it('**有一条边出屏就整份作废，回默认合并** —— 默认必须是完整看得见的一块', () => {
+    viewport(1600, 1000)
+    prefs.value.windows = {
+      merged: false,
+      panel_left: 1440, panel_top: 72, panel_width: 319, panel_height: 967,
+      drawer_left: 399, drawer_top: 303, drawer_width: 1406, drawer_height: 961,
+    }
+
+    const { parts, memory } = harness()
+    memory.restore()
+
+    expect(parts.dock.restore).not.toHaveBeenCalled()
+  })
+
+  it('作废的是这一次的铺放，**不擦掉库里那份** —— 换回大屏还得用它', () => {
+    // 医生在 27 寸上摆好，回家开笔记本装不下 —— 这次回默认，
+    // 但不能顺手把 27 寸上那份删了。
+    viewport(1280, 800)
+    prefs.value.windows = {
+      merged: false,
+      panel_left: 2000, panel_top: 40, panel_width: 320, panel_height: 900,
+      drawer_left: 400, drawer_top: 40, drawer_width: 1920, drawer_height: 900,
+    }
+
+    const { memory } = harness()
+    memory.restore()
+
+    vi.advanceTimersByTime(PERSIST_DEBOUNCE_MS * 2)
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('整块都在视口里就照常铺', () => {
+    viewport(1600, 1000)
+    prefs.value.windows = {
+      merged: false,
+      panel_left: 1200, panel_top: 15, panel_width: 320, panel_height: 900,
+      drawer_left: 120, drawer_top: 15, drawer_width: 1400, drawer_height: 900,
+    }
+
+    const { parts, memory } = harness()
+    memory.restore()
+
+    expect(parts.dock.restore).toHaveBeenCalledTimes(1)
   })
 })

@@ -34,6 +34,15 @@ export interface WindowPos {
 /** 吸附距离。太小吸不上，太大会在还想分开的时候硬把它拽回去 */
 export const SNAP_PX = 40
 
+/**
+ * AI 助手抽屉的最窄宽度。
+ *
+ * 三个地方要用同一个数：拖左边线的下限、分离态下打开时的落位（`placeIfUndocked`）、
+ * 恢复记住的布局时算抽屉自有宽（`useWindowMemory.sizeOf`）。
+ * 散在三处写 640，改一处就漂一处。
+ */
+export const DRAWER_MIN_WIDTH = 640
+
 /** 标题栏高度。钳位时至少要留这么多在屏幕里 */
 const HEADER_H = 44
 

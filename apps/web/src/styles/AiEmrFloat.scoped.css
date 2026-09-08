@@ -1025,6 +1025,21 @@
 .resize-edge:hover,.resize-edge.active{background:var(--t-1677ff, #1677ff66)}
 .resize-edge.active{background:var(--t-1677ff, #1677ff)}
 
+/* 夹在两个窗**中间**的那一条：宽度归零。
+
+   上面那条「平时不画东西」只做到了透明，而透明不等于看不见 —— 它占着 5px
+   的位置，两块之间就真有一条 5px 的缝，底下的 HIS 从缝里透上来
+   （实测 `elementFromPoint(1297,400)` 穿过边线打到 `.hb-tbl`）。
+   接缝的圆角、边框、阴影全是特意削掉的，为的是让人读成「一整块中间的一道折痕」，
+   而一条真的缝把这些努力一次抵消。
+
+   宽度归零之后命中区与高亮都交给 ::before：它跨骑在接缝上、左右各 5px，
+   对一条分隔条来说这本来就是更自然的判据。 */
+.resize-edge.seam{flex-basis:0}
+.resize-edge.seam::before{left:-5px;right:-5px;transition:background .15s}
+.resize-edge.seam:hover::before{background:var(--t-1677ff, #1677ff66)}
+.resize-edge.seam.active::before{background:var(--t-1677ff, #1677ff)}
+
 /* 拖动中禁掉宽度过渡：边线跟手是这个交互的全部体感，
    慢半拍跟在指针后面手感立刻变糊 */
 .resize-edge.active~.tips-drawer,.resize-edge.active+.assistant-panel{transition:none!important}

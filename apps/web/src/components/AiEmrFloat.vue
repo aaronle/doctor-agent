@@ -14,8 +14,8 @@ import SettingsPanel from './SettingsPanel.vue'
 import PreVisitCard from './PreVisitCard.vue'
 import FollowUpHints from './FollowUpHints.vue'
 import { AUTO_OPEN_AFTER_MESSAGES, useFollowUp } from '../composables/useFollowUp'
-import { useResizable } from '../composables/useResizable'
-import { useDockedWindows } from '../composables/useDockedWindows'
+import { linkResizables, useResizable } from '../composables/useResizable'
+import { DRAWER_MIN_WIDTH, useDockedWindows } from '../composables/useDockedWindows'
 import { useFontScale } from '../composables/useFontScale'
 import { useMaximize } from '../composables/useMaximize'
 import { useTelemetry } from '../composables/useTelemetry'
@@ -256,26 +256,32 @@ const panelSize = useResizable({ initial: 300, min: 260, max: 560 })
 const wrapperEl = ref<HTMLElement | null>(null)
 const drawerSize = useResizable({
   initial: () => wrapperEl.value?.getBoundingClientRect().width || 900,
-  min: 640,
+  min: DRAWER_MIN_WIDTH,
   max: 1800,
 })
 
 /**
- * 两个浮窗的**高度**。拖各自的下边线。
+ * 浮窗组合的顶边离视口顶多远。
  *
- * 只有下边线能拉：两个窗都锚在顶部（wrapper `top:15px`），上边线拖不动 ——
- * 和「靠右停靠所以只有左边线能拉宽」是同一个道理。
+ * 和 `AiEmrFloat.scoped.css` 里 `.ai-float-wrapper{top:15px}` 是同一个数。
+ * 高度上限要减掉它，否则「拉到视口高」算出来的底边正好压在视口下沿之外，
+ * 而那 15px 是**看不见的**，医生只会觉得窗口被截了一截。
+ */
+const FLOAT_TOP = 15
+
+/**
+ * 两个浮窗的**高度**。拖各自的下边线。
  *
  * 下限 320：再矮连患者信息行加两条气泡都放不下，只剩个标题栏。
  * 上限交给视口（见 `useResizable` 的 clamp）—— 比屏幕还高没有意义。
  */
 const panelHeight = useResizable({
   initial: () => panelShell.value?.getBoundingClientRect().height || 800,
-  min: 320, max: 2000, edge: 'bottom',
+  min: 320, max: 2000, edge: 'bottom', anchor: FLOAT_TOP,
 })
 const drawerHeight = useResizable({
   initial: () => drawerShell.value?.getBoundingClientRect().height || 800,
-  min: 320, max: 2000, edge: 'bottom',
+  min: 320, max: 2000, edge: 'bottom', anchor: FLOAT_TOP,
 })
 
 /* ===================== 合并 / 分离，与字号 ===================== */
@@ -305,6 +311,22 @@ windowMemory.restore()
 windowMemory.watchAndPersist()
 
 /**
+ * 合并态下两个窗共用一份高度与顶边 —— **拼成一整块的东西不该有两个高度**。
+ *
+ * 接缝那侧的圆角、边框、阴影都是特意去掉的，为的是让人读成「一块，中间一道折痕」。
+ * 而高度原本各存各的：拖一个的下边线，底边就裂出一道台阶；拖上边线，标题栏错开一层。
+ *
+ * 面板放在第一个参数：抽屉可以收起来，面板一直在 —— 对齐时按它。
+ *
+ * **必须挂在 `restore()` 之后。** 恢复是按 `panel_height` → `drawer_height`
+ * 一条条落地的，那时 `merged` 还是初值 `true`：挂在前面的话，两个数会在落地过程中
+ * 互相镜像，最后一条盖掉前一条 —— 而分离态下 `panelHeight` 是真的会用上的
+ * （它排在 `dock.styleFor` 之后，覆盖冻结高度），面板会拿到抽屉的高度。
+ * 挂在后面则是从**已经铺好的状态**起联动，`linkResizables` 自己会当场对齐一次。
+ */
+linkResizables(panelHeight, drawerHeight, () => dock.merged.value)
+
+/**
  * 一个窗**在分离态下才被打开**时，把它贴到另一个窗旁边。
  *
  * 桌面端一进来只有医生智能体，AI 助手是收起的。医生把面板拖到屏幕中间、
@@ -322,7 +344,7 @@ function placeIfUndocked(key: 'drawer' | 'panel') {
     const total = drawerSize.size.value ?? 1120
     const panelW = panelSize.size.value ?? 300
     const size = key === 'drawer'
-      ? { width: Math.max(640, total - panelW), height: anchor?.height ?? 800 }
+      ? { width: Math.max(DRAWER_MIN_WIDTH, total - panelW), height: anchor?.height ?? 800 }
       : { width: panelW, height: anchor?.height ?? 800 }
     // 对齐锚点**看得见的顶**：它可能还带着上边线拖出来的一段 margin-top，
     // 而那段不在 dock.pos.top 里
@@ -370,6 +392,24 @@ watch(
   { immediate: true },
 )
 watch(panelOpen, (open) => { if (open) placeIfUndocked('panel') })
+
+/**
+ * 双击标题栏：回到默认布局。
+ *
+ * **不只是回到停靠位置。** 标题栏上写的就是「双击恢复默认布局」，而宽、高、
+ * 顶边偏移同样是布局的一部分 —— 只还停靠的话，一个被拖成 611px 高、顶边
+ * 让出 80px 的窗双击之后还是那个样子（实测），医生只会以为这个功能坏了。
+ *
+ * 这是「拖乱了怎么回去」的唯一一条路：布局记忆里那份要到下次进工作站才生效，
+ * 手里这一屏没有别的出口。
+ */
+function resetLayout() {
+  dock.resetLayout()
+  panelSize.reset()
+  drawerSize.reset()
+  panelHeight.reset()
+  drawerHeight.reset()
+}
 
 function beginDrag(key: 'drawer' | 'panel', e: PointerEvent) {
   // 标题栏里的按钮（✕ / — / Aa）不算拖 —— 否则指针被标题栏捕获，
@@ -1731,7 +1771,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           class="tips-header"
           title="拖动移动窗口 · 双击恢复默认布局"
           @pointerdown="beginDrag('drawer', $event)"
-          @dblclick="dock.resetLayout"
+          @dblclick="resetLayout"
         >
           <span class="tips-title"><span class="panel-ai-dot" />AI 助手</span>
           <div class="tips-header-actions">
@@ -2652,10 +2692,13 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
         医生智能体的调宽边线。
         它和抽屉把手（.assistant-handle）在同一条边上 —— 把手贴在**面板内壁**、
         占中间 52px 且 z-index 更高，这条边线在它外侧，两者不抢同一块区域。
+
+        `seam`：这一条夹在**两个窗中间**，所以宽度必须归零（见样式里的注释）。
+        另一条在整块的最外侧，占不占位都不隔开谁。
       -->
       <div
         v-if="panelOpen && !maxi.maximized.value"
-        class="resize-edge"
+        class="resize-edge seam"
         :class="{ active: panelSize.resizing.value }"
         role="separator"
         aria-orientation="vertical"
@@ -2676,7 +2719,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           class="panel-header"
           title="拖动移动窗口 · 双击恢复默认布局"
           @pointerdown="beginDrag('panel', $event)"
-          @dblclick="dock.resetLayout"
+          @dblclick="resetLayout"
         >
           <span class="panel-title"><span class="panel-ai-dot" />医生智能体</span>
           <div class="panel-header-actions">

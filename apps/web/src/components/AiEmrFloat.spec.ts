@@ -896,6 +896,18 @@ describe('浮窗调宽', () => {
     expect(wrapper.findAll('.resize-edge-bottom')).toHaveLength(2)
   })
 
+  it('**夹在两个窗中间那条标 seam** —— 它不许占位，否则两块之间真有一条缝', async () => {
+    // 占 5px 的话，合并态下底下的 HIS 会从缝里透上来（实测 elementFromPoint
+    // 穿过边线打到 .hb-tbl），而接缝的圆角、边框、阴影全是特意削掉的。
+    // 宽度归零由 CSS 承担，这里钉住的是「哪一条该归零」——
+    // 最外侧那条隔不开谁，占不占位都无所谓。
+    const wrapper = await renderFloat()
+    const edges = wrapper.findAll('.resize-edge')
+    expect(edges[0].classes()).not.toContain('seam')
+    expect(edges[1].classes()).toContain('seam')
+    expect(edges[1].attributes('aria-label')).toContain('医生智能体')
+  })
+
   it('**往下拖是拉高** —— 窗锚在顶部，下边线远离锚点就是变高', async () => {
     const wrapper = await renderFloat()
     const edge = wrapper.findAll('.resize-edge-bottom')[1].element   // 医生智能体那条
@@ -905,9 +917,52 @@ describe('浮窗调宽', () => {
     await wrapper.vm.$nextTick()
 
     // jsdom 里量不到真高度，回落默认 800；往下 60 → 860，
-    // 但视口高 768 会把它钳住 —— 钳到 768 正是期望行为
+    // 但视口会把它钳住 —— 钳住正是期望行为。
+    //
+    // 上限是 **768 − 15**：浮窗停靠在 `.ai-float-wrapper{top:15px}` 里，
+    // 顶边不在 0 上。按整个视口高钳，算出来的底边正好落在视口下沿之外，
+    // 而那 15px 是看不见的 —— 医生只会觉得窗口被截了一截。
     const style = wrapper.find('.assistant-panel').attributes('style') ?? ''
-    expect(style).toMatch(/height:\s*768px/)
+    expect(style).toMatch(/height:\s*753px/)
+  })
+
+  /** 拖某个窗的下边线到 clientY=760（起点 700）。jsdom 量不到真高度，回落默认 800 */
+  async function dragBottom(wrapper: VueWrapper, index: number) {
+    const edge = wrapper.findAll('.resize-edge-bottom')[index].element
+    edge.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 500, clientY: 700 }))
+    window.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 500, clientY: 760 }))
+    window.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 500, clientY: 760 }))
+    await wrapper.vm.$nextTick()
+  }
+
+  it('**合并态下拖一个窗的下边线，另一个跟着走** —— 一块砖不该有两个高度', async () => {
+    // 接缝那侧的圆角、边框、阴影都是特意削掉的，为的是让人读成「一整块」。
+    // 高度各存各的，底边就裂出一道台阶，前面那些努力一次抵消。
+    const wrapper = await renderFloat()
+    await dragBottom(wrapper, 1)   // 医生智能体那条
+
+    expect(wrapper.find('.assistant-panel').attributes('style')).toMatch(/height:\s*753px/)
+    expect(wrapper.find('.tips-drawer').attributes('style')).toMatch(/height:\s*753px/)
+  })
+
+  it('反过来拖 AI 助手那条也一样', async () => {
+    const wrapper = await renderFloat()
+    await dragBottom(wrapper, 0)
+
+    expect(wrapper.find('.assistant-panel').attributes('style')).toMatch(/height:\s*753px/)
+  })
+
+  it('**双击标题栏把宽高一起还原** —— 标题栏上写的是「恢复默认布局」', async () => {
+    // 只还停靠位置的话，一个被拖矮的窗双击之后还是那么矮，
+    // 而这是「拖乱了怎么回去」的唯一一条路：布局记忆要到下次进工作站才生效。
+    const wrapper = await renderFloat()
+    await dragBottom(wrapper, 1)
+    expect(wrapper.find('.assistant-panel').attributes('style')).toMatch(/height:/)
+
+    await wrapper.find('.panel-header').trigger('dblclick')
+
+    expect(wrapper.find('.assistant-panel').attributes('style') ?? '').not.toMatch(/height:/)
+    expect(wrapper.find('.tips-drawer').attributes('style') ?? '').not.toMatch(/height:/)
   })
 
   it('拉高的边线要能被读屏软件认出来是**横向**分隔条', async () => {

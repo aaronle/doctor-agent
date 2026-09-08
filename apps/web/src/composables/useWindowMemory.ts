@@ -1,5 +1,6 @@
 import { watch, type Ref } from 'vue'
 
+import { DRAWER_MIN_WIDTH } from './useDockedWindows'
 import { usePreferences } from './usePreferences'
 
 /**
@@ -25,6 +26,19 @@ import { usePreferences } from './usePreferences'
  *
  * **④ 恢复不算改动。** 恢复本身会改 ref，watch 会跟着触发 —— 不挡住的话
  * 每次进工作站都白写一次库，而写进去的和读出来的是同一份东西。
+ *
+ * ## 铺回来的必须是「完整看得见的一块」
+ *
+ * 上面四条都成立，铺出来的东西仍然可以是残的。线上实测（视口 1600×1000）：
+ *
+ * | | left | top | 宽 | 高 | 右边 | 底边 |
+ * | --- | --- | --- | --- | --- | --- | --- |
+ * | 抽屉 | 399 | 303 | 1406 | 961 | **1805** | **1264** |
+ * | 面板 | 1440 | 72 | 319 | 967 | 1759 | 1039 |
+ *
+ * 两个窗互相压着，右边和底边一起甩出屏幕 —— 演示一打开就是这个样子。
+ * 三条独立的错凑出来的，见 `sizeOf`（抽屉宽用错了数）、`restore` 里的
+ * 清零（顶边偏移在分离态是多余的一层）与 `fitsOnScreen`（兜底）。
  */
 
 /** 攒这么久没有新变化才写一次。一次拖拽的抬手间隔远小于它 */
@@ -127,7 +141,7 @@ export function useWindowMemory(parts: WindowParts) {
     // 那份数据来自「面板拖走时抽屉还关着」，不是医生真摆成那样。
     const anchor = (['panel', 'drawer'] as const).find((k) => at(k) && dim[k])
 
-    if (w.merged === false && anchor) {
+    if (w.merged === false && anchor && fitsOnScreen(at, dim)) {
       const fallback = at(anchor) as { left: number; top: number }
       parts.dock.restore({
         merged: false,
@@ -136,6 +150,11 @@ export function useWindowMemory(parts: WindowParts) {
         pos: { panel: at('panel') ?? fallback, drawer: at('drawer') ?? fallback },
         size: dim,
       })
+      // **分离态里顶边偏移是多余的一层。** `pos.top` 是绝对坐标，再叠一段
+      // `margin-top` 就是两头都算：存的 `top:15` 会渲染在 72，两个窗错开 57px。
+      // 实时拖拽路径上 `watch(dock.merged)` 就是这么清的，恢复路径漏了这一条。
+      parts.panelHeight.setOffset?.(0)
+      parts.drawerHeight.setOffset?.(0)
     }
 
     // 让恢复引发的那一轮 watch 先跑完再放开
@@ -147,7 +166,47 @@ export function useWindowMemory(parts: WindowParts) {
   function sizeOf(w: Record<string, unknown>, key: 'panel' | 'drawer') {
     const width = num(w[`${key}_width`])
     const height = num(w[`${key}_height`])
-    return width !== null && height !== null ? { width, height } : null
+    if (width === null || height === null) return null
+    if (key === 'panel') return { width, height }
+    // **`drawer_width` 存的是「组合总宽」，不是抽屉自己的宽。**
+    //
+    // 抽屉是 `flex:1`，它没有自己的宽度 —— 那条左边线就是整块的左边线，
+    // 拖它调的是**面板 + 抽屉**的总宽（见 AiEmrFloat 里 `drawerSize` 的注释）。
+    // 而 `dock.size.drawer` 要的是抽屉自己那一块。
+    //
+    // 原样铺回去，抽屉就正好宽出一个面板：整个压在面板身上，右边线甩出屏幕。
+    // 线上那份 1406 = 1087（抽屉）+ 319（面板），右边线因此落在 1805，
+    // 而视口只有 1600。`placeIfUndocked` 走的是同一个算式，两处必须一致。
+    const panel = num(w.panel_width) ?? 0
+    return { width: Math.max(DRAWER_MIN_WIDTH, width - panel), height }
+  }
+
+  /**
+   * 这份记忆铺出来还看得全吗。
+   *
+   * **默认必须是完整看得见的一块** —— 一条边出屏，那就不再是「记住的布局」，
+   * 而是一个医生够不着也修不好的残局（浮窗没有「窗口 → 整理」菜单）。
+   * 有一条边出屏就整份作废，回默认合并停靠。
+   *
+   * **作废的只是这一次的铺放，不擦库里那份。** 医生在 27 寸上摆好、回家开
+   * 笔记本装不下，这次回默认是对的；顺手把 27 寸上那份删掉就不对了。
+   *
+   * 缺尺寸的那个不参与判断：它压根还没摆（`placeBeside` 稍后才给它位置），
+   * 拿一个不存在的矩形去判出屏，会把一份好数据当成坏的丢掉。
+   */
+  function fitsOnScreen(
+    at: (k: 'panel' | 'drawer') => WindowPos | null,
+    dim: Record<'panel' | 'drawer', { width: number; height: number } | null>,
+  ) {
+    for (const key of ['panel', 'drawer'] as const) {
+      const p = at(key)
+      const s = dim[key]
+      if (!p || !s) continue
+      if (p.left < 0 || p.top < 0) return false
+      if (p.left + s.width > window.innerWidth) return false
+      if (p.top + s.height > window.innerHeight) return false
+    }
+    return true
   }
 
   /** 当前布局的快照。**没拖过的边不写** —— `null` 是「交给 CSS」，不是一个尺寸 */

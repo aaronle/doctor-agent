@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 /**
  * 浮窗的边线拖拽改尺寸。
@@ -33,7 +33,17 @@ export interface ResizableOptions {
   max: number
   /** 拉哪条边。缺省左边线（改宽度） */
   edge?: 'left' | 'bottom'
+  /**
+   * 这个窗的**默认顶边离视口顶多远**（px）。只有竖轴用得上。
+   *
+   * 浮窗停靠在 `.ai-float-wrapper` 里，那个容器 `top:15px` —— 所以「高度上限」
+   * 是视口高**减去这 15px**，不是视口高本身。差这一点的后果不是少 15px，
+   * 而是「完整显示」这句话不成立：底边正好压在视口下沿外。
+   */
+  anchor?: number
 }
+
+export type Resizable = ReturnType<typeof useResizable>
 
 export function useResizable(opts: ResizableOptions) {
   const vertical = opts.edge === 'bottom'
@@ -66,11 +76,35 @@ export function useResizable(opts: ResizableOptions) {
 
   const initialSize = () => (typeof opts.initial === 'function' ? opts.initial() : opts.initial)
 
-  function clamp(v: number) {
+  /** 这条轴上，尺寸最多能有多大 */
+  function limit() {
     // max 还要再受视口限制：屏幕比 max 小时按屏幕来，
     // 否则小屏上拉到 max 会把整个页面顶出去
-    const limit = Math.min(opts.max, vertical ? window.innerHeight : window.innerWidth)
-    return Math.round(Math.min(Math.max(opts.min, v), Math.max(opts.min, limit)))
+    return Math.min(
+      opts.max,
+      vertical ? window.innerHeight - (opts.anchor ?? 0) : window.innerWidth,
+    )
+  }
+
+  function clamp(v: number) {
+    const cap = limit()
+    return Math.round(Math.min(Math.max(opts.min, v), Math.max(opts.min, cap)))
+  }
+
+  /**
+   * 让 `offset + size` 落回视口里。
+   *
+   * **两个数各自都合法，和可以不合法。** 线上实测：面板 `offset_top=57` +
+   * `height=967`，视口 1000 —— 底边落在 1039，最下面 39px 医生永远看不到，
+   * 而两个数分别过钳位都没问题。
+   *
+   * 拖上边线那条路径上有恒等式护着（`offset + size` 恒等于底边位置），
+   * 所以只会在**分别落地**的恢复路径上出问题。收敛时动的是 `offset` 而不是
+   * `size`：把窗往上拉回来，比替医生把窗压矮更接近他原来要的东西。
+   */
+  function fit() {
+    if (!vertical || size.value === null) return
+    offset.value = Math.max(0, Math.min(offset.value, limit() - size.value))
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -144,12 +178,14 @@ export function useResizable(opts: ResizableOptions) {
   function setSize(v: number) {
     if (typeof v !== 'number' || !isFinite(v)) return
     size.value = clamp(v)
+    fit()
   }
 
   /** 同上，设顶边让出的距离。负值忽略：顶边不能跑到默认位置上方 */
   function setOffset(v: number) {
     if (typeof v !== 'number' || !isFinite(v) || v < 0) return
     offset.value = Math.round(v)
+    fit()
   }
 
   /** 双击边线：恢复默认尺寸 */
@@ -163,4 +199,51 @@ export function useResizable(opts: ResizableOptions) {
 
   // `width` 是旧名，保留是为了不动既有调用点；新代码用 `size`
   return { size, width: size, offset, style, resizing, onPointerDown, onPointerDownTop, reset, setSize, setOffset }
+}
+
+/**
+ * 把两个窗的高度绑成一个。
+ *
+ * 合并态下两个浮窗拼成**一整块**：接缝那侧的圆角、边框、阴影全都去掉了，
+ * 为的就是让人读成「一个东西中间的一道折痕」。可高度是两份各存各的 ——
+ * 拖一个的下边线，底边就裂出一道台阶；拖上边线，标题栏错开一层。
+ * **一块砖不该有两个高度**，否则「连接在一起」只是句口号。
+ *
+ * 分离之后立刻各归各的 —— 分开了就是两个窗，那正是分离的意思。
+ * 拖回去重新吸附时按 `a` 对齐（调用方把面板放在 `a`：抽屉可以收起来，
+ * 面板一直在，拿一个可能不在场的窗当基准没有意义）。
+ *
+ * `flush:'sync'` 不是随手加的：镜像靠 `syncing` 这个同步标记防回环，
+ * 默认的 pre-flush 会把回调推迟到标记复位之后，两个 watcher 就互相喂招了。
+ */
+export function linkResizables(a: Resizable, b: Resizable, linked: () => boolean) {
+  let syncing = false
+
+  function copy(from: Resizable, to: Resizable) {
+    if (syncing) return
+    syncing = true
+    if (from.size.value === null) to.reset()
+    else to.setSize(from.size.value)
+    to.setOffset(from.offset.value)
+    syncing = false
+  }
+
+  const mirror = (from: Resizable, to: Resizable) =>
+    watch(
+      [from.size, from.offset],
+      () => {
+        if (linked()) copy(from, to)
+      },
+      { flush: 'sync' },
+    )
+
+  mirror(a, b)
+  mirror(b, a)
+  // 重新合并那一刻两边多半已经不一样了，对齐一次
+  watch(linked, (on) => {
+    if (on) copy(a, b)
+  }, { flush: 'sync' })
+  // 挂上来的时候可能就已经不一样了 —— 布局记忆先跑，它是一条条落地的，
+  // 两条高度来自库里的两个数，谁也不保证相等
+  if (linked()) copy(a, b)
 }

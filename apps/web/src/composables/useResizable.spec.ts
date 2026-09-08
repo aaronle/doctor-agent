@@ -1,6 +1,7 @@
+import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useResizable } from './useResizable'
+import { linkResizables, useResizable } from './useResizable'
 
 /**
  * 浮窗左边线拖拽调宽。
@@ -325,5 +326,146 @@ describe('边线拖拽 · 上边线', () => {
     const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom' })
     r.setSize(700)
     expect(r.style.value).toEqual({ height: '700px' })
+  })
+})
+
+describe('边线拖拽 · 顶边与高度的和不许出屏', () => {
+  /**
+   * 两个数各自合法，和不合法。
+   *
+   * 线上实测：面板 `offset_top=57` + `height=967`，视口 1000 —— 底边落在 1039，
+   * 最下面 39px 医生永远看不到，而**两个数分别看都通过了钳位**。
+   * 拖拽路径上有「offset + size 恒等于底边」护着，恢复路径上两个数是分别落地的，
+   * 没人管它们的和。
+   */
+  const H = 1000
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerHeight', { value: H, configurable: true })
+  })
+
+  it('高度上限是「视口 − 锚点」—— 浮窗顶边停在 15px，不是贴着 0', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom', anchor: 15 })
+    r.setSize(9999)
+    expect(r.size.value).toBe(H - 15)
+  })
+
+  it('恢复记住的布局时，顶边偏移要为高度让路', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom', anchor: 15 })
+    r.setSize(967)
+    r.setOffset(57)
+
+    expect(r.offset.value + (r.size.value as number)).toBeLessThanOrEqual(H - 15)
+  })
+
+  it('顺序反过来也一样 —— 先给顶边再给高度', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom', anchor: 15 })
+    r.setOffset(57)
+    r.setSize(967)
+
+    expect(r.offset.value + (r.size.value as number)).toBeLessThanOrEqual(H - 15)
+  })
+
+  it('放得下就一个数都不动 —— 收敛只在真的出屏时发生', () => {
+    const r = useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom', anchor: 15 })
+    r.setSize(700)
+    r.setOffset(120)
+
+    expect(r.size.value).toBe(700)
+    expect(r.offset.value).toBe(120)
+  })
+})
+
+describe('两个浮窗的高度联动', () => {
+  /**
+   * 合并态下两个窗拼成一整块（接缝的圆角和边框都去掉了）。
+   * **一块砖不该有两个高度** —— 各拖各的会在底边留一道台阶，
+   * 顶边各让各的会在标题栏错开一层，那时「连接在一起」就只是句口号。
+   *
+   * 分离之后各归各的：分开了就是两个窗，那正是分离的意思。
+   */
+  const make = () => useResizable({ initial: 800, min: 320, max: 2000, edge: 'bottom', anchor: 15 })
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerHeight', { value: 2000, configurable: true })
+  })
+
+  it('合并态下改一个的高度，另一个跟着走', () => {
+    const merged = ref(true)
+    const a = make(); const b = make()
+    linkResizables(a, b, () => merged.value)
+
+    a.setSize(700)
+    expect(b.size.value).toBe(700)
+  })
+
+  it('反方向同样联动 —— 抽屉那条下边线也拖得动整块', () => {
+    const merged = ref(true)
+    const a = make(); const b = make()
+    linkResizables(a, b, () => merged.value)
+
+    b.setSize(640)
+    expect(a.size.value).toBe(640)
+  })
+
+  it('**顶边偏移一起联动** —— 只同步高度会让两块的顶边错开一层', () => {
+    const merged = ref(true)
+    const a = make(); const b = make()
+    linkResizables(a, b, () => merged.value)
+
+    a.setSize(700)
+    a.setOffset(60)
+    expect(b.offset.value).toBe(60)
+  })
+
+  it('双击恢复默认时对方一起归位', () => {
+    const merged = ref(true)
+    const a = make(); const b = make()
+    linkResizables(a, b, () => merged.value)
+    a.setSize(700)
+
+    a.reset()
+    expect(b.size.value).toBeNull()
+    expect(b.offset.value).toBe(0)
+  })
+
+  it('分离之后各归各的', () => {
+    const merged = ref(true)
+    const a = make(); const b = make()
+    linkResizables(a, b, () => merged.value)
+    a.setSize(700)
+
+    merged.value = false
+    a.setSize(600)
+    expect(b.size.value).toBe(700)
+  })
+
+  it('**挂上来时若已是合并态，当场对齐一次** —— 布局记忆先跑，两条高度来自库里两个数', () => {
+    // 恢复是一条条落地的：`panel_height` 一个数、`drawer_height` 另一个数，
+    // 谁也不保证它们相等。不当场对齐的话，进工作站看到的就是一块带台阶的砖，
+    // 而要等医生拖一下才会正过来。
+    const merged = ref(true)
+    const a = make(); const b = make()
+    a.setSize(967)
+    b.setSize(961)
+
+    linkResizables(a, b, () => merged.value)
+
+    expect(b.size.value).toBe(967)
+  })
+
+  it('**拖回去重新合并时对齐** —— 分离期间各拖各的，合回来必须还是一块砖', () => {
+    const merged = ref(true)
+    const a = make(); const b = make()
+    linkResizables(a, b, () => merged.value)
+
+    merged.value = false
+    a.setSize(600)
+    a.setOffset(40)
+    b.setSize(900)
+
+    merged.value = true
+    expect(b.size.value).toBe(600)
+    expect(b.offset.value).toBe(40)
   })
 })
