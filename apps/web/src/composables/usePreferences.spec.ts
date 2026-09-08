@@ -157,24 +157,51 @@ describe('个人配置 · 枚举来自后端', () => {
 })
 
 describe('个人配置 · 浮窗几何', () => {
-  it('几何是逐项累积的，改宽度不该把记住的高度抹掉', async () => {
+  /**
+   * 这一组验的是 `update()` 在本机**当场合出来的那份**，所以要让同步失败。
+   *
+   * 让 `savePreferences` 正常返回的话，`apply(saved.prefs)` 会拿响应体盖掉
+   * 本机那份 —— 于是测的其实是 mock 的合并方式，不是 `update()` 的。
+   * 这种「测桩不测码」的绿最难看出来。
+   */
+  function offline() {
+    vi.mocked(api.savePreferences).mockRejectedValue(new Error('网络不可达'))
+  }
+
+  it('**几何是整份快照，不是逐项累积** —— 上一份里的旧键不许复活', async () => {
+    // `useWindowMemory.snapshot()` 每次都整份写下当前布局，并且刻意不写某些键
+    // （没拖过的边、没摆过的窗）。逐项合并会把它们一次次复活：线上那份就同时
+    // 挂着 `merged:false` 与 `panel_offset_top:57`，两个不同时刻的布局凑一起。
     const p = usePreferences()
     await p.load('张医生')
+    offline()
 
-    vi.mocked(api.savePreferences).mockImplementation(async (_a, patch) => ({
-      ok: true,
-      actor: '张医生',
-      prefs: {
-        ...p.prefs.value,
-        ...patch,
-        windows: { ...p.prefs.value.windows, ...(patch.windows ?? {}) },
-      },
-    }))
-
+    await p.update({ windows: { panel_width: 320, panel_offset_top: 57 } })
     await p.update({ windows: { panel_width: 320 } })
-    await p.update({ windows: { panel_height: 600 } })
 
-    expect(p.prefs.value.windows).toEqual({ panel_width: 320, panel_height: 600 })
+    expect(p.prefs.value.windows).toEqual({ panel_width: 320 })
+  })
+
+  it('「清除布局记忆」要真的清掉 —— 合并语义下它是空转的', async () => {
+    const p = usePreferences()
+    await p.load('张医生')
+    offline()
+    await p.update({ windows: { panel_width: 320, panel_height: 600 } })
+
+    await p.resetWindows()
+
+    expect(p.prefs.value.windows).toEqual({})
+  })
+
+  it('补丁里没有 windows 就不动布局 —— 只改主题不该顺手把它抹了', async () => {
+    const p = usePreferences()
+    await p.load('张医生')
+    offline()
+    await p.update({ windows: { panel_width: 320 } })
+
+    await p.update({ theme: 'eyecare' })
+
+    expect(p.prefs.value.windows).toEqual({ panel_width: 320 })
   })
 
   it('没记住任何布局时摘要是空的 —— 界面据此禁用「恢复默认布局」', async () => {

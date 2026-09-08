@@ -291,7 +291,10 @@ export function usePreferences() {
     const merged: Preferences = {
       ...before,
       ...patch,
-      windows: { ...before.windows, ...(patch.windows ?? {}) },
+      // `windows` **整份替换**，与后端同一口径（见 routers/preferences.py 的注释）：
+      // 它是一份快照而不是补丁，逐项合并会让「刻意不写」的旧键一次次复活，
+      // 也会让配置页那颗「清除布局记忆」变成空转。
+      windows: patch.windows ?? before.windows,
     }
     apply(merged)
 

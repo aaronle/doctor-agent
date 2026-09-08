@@ -928,6 +928,13 @@ export async function streamSse(
 // ------------------------------------------------------------------ 个人配置
 
 /** 浮窗几何。由拖拽后自动写入，不是配置页上手填的。 */
+/**
+ * 记住的浮窗几何。键集与后端 `preferences.py` 的 `WINDOW_BOUNDS` 一一对应。
+ *
+ * 分离态下的位置与顶边偏移原先没写进类型 —— `snapshot()` 返回的是
+ * `Record<string, number | boolean>`，从没跟这个接口对过账，于是它少了六个键
+ * 也一直没人发现。
+ */
 export interface WindowPrefs {
   panel_width?: number
   drawer_width?: number
@@ -935,6 +942,14 @@ export interface WindowPrefs {
   drawer_height?: number
   split_ratio?: number
   merged?: boolean
+  /** 分离态下各自的位置。`left` 可以为负（窗体左半部分允许出屏），`top` 不行 */
+  panel_left?: number
+  panel_top?: number
+  drawer_left?: number
+  drawer_top?: number
+  /** 拖上边线让出的距离 */
+  panel_offset_top?: number
+  drawer_offset_top?: number
 }
 
 export interface Preferences {

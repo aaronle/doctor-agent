@@ -71,14 +71,58 @@ def test_only_the_diff_is_stored(client):
     assert strip_defaults(dict(DEFAULTS)) == {}
 
 
-def test_windows_merge_instead_of_replace(client):
-    """浮窗几何是逐项累积的，改宽度不该把记住的高度抹掉。"""
+def test_windows_is_replaced_wholesale(client):
+    """
+    浮窗几何是**整份快照**，不是逐项累积。
+
+    前端 `useWindowMemory.snapshot()` 每次都把当前布局整份写下来，而且**刻意
+    不写**某些键：没拖过的边不写（`null` 是「交给 CSS」，不是一个尺寸），
+    没摆过的窗不写位置（那对坐标是顺手填的，不是量出来的）。
+
+    逐项合并会把这些「刻意不写」的旧值一次次复活。线上那份就是这么攒出来的：
+    `merged:false` 与 `panel_offset_top:57` 同时在场 —— 前者是分离态、后者是
+    合并态下从上边线收短留下的，两个不同时刻的布局凑在一起，铺出来是个残局。
+    """
     actor = "王医生"
+    client.put(
+        "/api/preferences",
+        json={"actor": actor, "prefs": {"windows": {"panel_width": 320, "panel_offset_top": 57}}},
+    )
     client.put("/api/preferences", json={"actor": actor, "prefs": {"windows": {"panel_width": 320}}})
-    client.put("/api/preferences", json={"actor": actor, "prefs": {"windows": {"panel_height": 600}}})
 
     windows = client.get("/api/preferences", params={"actor": actor}).json()["prefs"]["windows"]
-    assert windows == {"panel_width": 320, "panel_height": 600}
+    assert windows == {"panel_width": 320}
+
+
+def test_empty_windows_clears_the_memory(client):
+    """
+    配置页那颗「清除布局记忆」靠的就是这一条。
+
+    合并语义下它是**空转**的：`{**已有, **{}}` 永远等于已有，点了毫无反应 ——
+    而这正是医生把浮窗拖乱之后唯一的退路。
+    """
+    actor = "李医生"
+    client.put(
+        "/api/preferences",
+        json={"actor": actor, "prefs": {"windows": {"panel_width": 320, "panel_height": 600}}},
+    )
+
+    client.put("/api/preferences", json={"actor": actor, "prefs": {"windows": {}}})
+
+    windows = client.get("/api/preferences", params={"actor": actor}).json()["prefs"]["windows"]
+    assert windows == {}
+
+
+def test_patch_without_windows_leaves_the_layout_alone(client):
+    """只改主题时不能顺手把布局抹了 —— 补丁里没有 `windows` 就不动它。"""
+    actor = "赵医生"
+    client.put("/api/preferences", json={"actor": actor, "prefs": {"windows": {"panel_width": 320}}})
+
+    client.put("/api/preferences", json={"actor": actor, "prefs": {"theme": "eyecare"}})
+
+    prefs = client.get("/api/preferences", params={"actor": actor}).json()["prefs"]
+    assert prefs["windows"] == {"panel_width": 320}
+    assert prefs["theme"] == "eyecare"
 
 
 def test_reset_deletes_the_row_rather_than_writing_defaults(client):

@@ -113,9 +113,18 @@ def save_preferences(body: PreferencesIn, session: Session = Depends(get_session
 
     row = session.get(UserPreference, actor)
     current = merge(row.prefs if row else None)
+    # `windows` **整份替换**，不逐项合并（补丁里没有它就照常不动）。
+    #
+    # 前端 `useWindowMemory.snapshot()` 每次都把当前布局整份写下来，并且**刻意
+    # 不写**某些键：没拖过的边不写（`null` 是「交给 CSS」，不是一个尺寸），
+    # 没摆过的窗不写位置（那对坐标是顺手填的，不是量出来的）。
+    #
+    # 合并语义会把这些「刻意不写」的旧值一次次复活。线上那份就是这么攒出来的：
+    # `merged:false` 与 `panel_offset_top:57` 同时在场 —— 前者是分离态、后者是
+    # 合并态下从上边线收短留下的，两个不同时刻的布局凑在一起铺出来是个残局。
+    # 顺带，合并语义下配置页那颗「清除布局记忆」是空转的：`{**已有, **{}}`
+    # 永远等于已有，而那是医生把浮窗拖乱之后唯一的退路。
     merged = {**current, **body.prefs}
-    if "windows" in body.prefs:
-        merged["windows"] = {**current["windows"], **body.prefs["windows"]}
     diff = strip_defaults(merged)
 
     if row is None:
