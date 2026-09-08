@@ -172,7 +172,6 @@ class RecordFields(ToolCallModel):
     personal_history: str = Field(description="个人史")
     physical_exam: str = Field(description="体格检查")
     auxiliary_exam: str = Field(description="辅助检查")
-    preliminary_diagnosis: str = Field(description="初步诊断")
 
 
 class RecordOut(ToolCallModel):

@@ -12,7 +12,6 @@ export const RECORD_SECTIONS = [
   ['personal_history', '个人史'],
   ['physical_exam', '体格检查'],
   ['auxiliary_exam', '辅助检查'],
-  ['preliminary_diagnosis', '初步诊断'],
 ] as const
 
 export type RecordField = (typeof RECORD_SECTIONS)[number][0]

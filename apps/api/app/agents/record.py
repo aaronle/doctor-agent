@@ -12,7 +12,14 @@ import re
 from .schemas import RecordFieldOut, RecordOut
 from .base import Agent, require_dict
 
-# 病历七段，顺序即界面展示与流式下发顺序
+# 病历六段，顺序即界面展示与流式下发顺序。
+#
+# **2026-09-08 去掉了「初步诊断」。** 诊断的唯一入口是「诊断管理」——
+# 在那里勾选、标主诊断、回写，并受红线门禁约束。病历里再放一段自由文本的
+# 初步诊断，等于给同一件事开了第二个出口，而那个出口**不受任何门禁**。
+#
+# 代价很具体：模型在病历里写的诊断，与医生在诊断管理里勾选的那几条，
+# 谁也不保证一致；打印出来的病历以哪一份为准，没人说得清。
 RECORD_SECTIONS: tuple[tuple[str, str], ...] = (
     ("chief_complaint", "主诉"),
     ("present_illness", "现病史"),
@@ -20,7 +27,6 @@ RECORD_SECTIONS: tuple[tuple[str, str], ...] = (
     ("personal_history", "个人史"),
     ("physical_exam", "体格检查"),
     ("auxiliary_exam", "辅助检查"),
-    ("preliminary_diagnosis", "初步诊断"),
 )
 SECTION_KEYS = tuple(key for key, _ in RECORD_SECTIONS)
 SECTION_LABELS = dict(RECORD_SECTIONS)
@@ -193,7 +199,6 @@ class RecordAgent(Agent):
                 "personal_history": UNCOLLECTED,
                 "physical_exam": vital_text or UNCOLLECTED,
                 "auxiliary_exam": lab_text or UNCOLLECTED,
-                "preliminary_diagnosis": ctx.get("primary_diagnosis") or UNCOLLECTED,
             }
         }
 

@@ -245,11 +245,11 @@ def check_uncollected_marked(data: dict, ctx: dict) -> tuple[bool, str]:
 # 规范对复诊只要求「病史」，不单列既往史。
 SPEC_FIELDS_FIRST_VISIT = (
     "chief_complaint", "present_illness", "past_history",
-    "physical_exam", "auxiliary_exam", "preliminary_diagnosis",
+    "physical_exam", "auxiliary_exam",
 )
 SPEC_FIELDS_RETURN_VISIT = (
     "chief_complaint", "present_illness",
-    "physical_exam", "auxiliary_exam", "preliminary_diagnosis",
+    "physical_exam", "auxiliary_exam",
 )
 
 

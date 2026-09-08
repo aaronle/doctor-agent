@@ -31,9 +31,6 @@ EXPECTED_POINTS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
     "physical_exam": (
         ("生命体征", ("血压", "体温", "脉搏", "心率")),
     ),
-    "preliminary_diagnosis": (
-        ("主要诊断", ()),
-    ),
 }
 
 
@@ -41,24 +38,37 @@ def _pct(numerator: int, denominator: int) -> int:
     return round(numerator / denominator * 100) if denominator else 0
 
 
-def evaluate(fields: dict[str, str], *, dialog_text: str = "") -> dict:
+def evaluate(
+    fields: dict[str, str], *, dialog_text: str = "", diagnoses: list[str] | None = None
+) -> dict:
     """
     对一份病历草稿做质控。
 
-    dialog_text 是本次问诊的对话全文，用于判断「否认」类表述是不是真的问过 ——
+    `dialog_text` 是本次问诊的对话全文，用于判断「否认」类表述是不是真的问过 ——
     问过再写是规范记录，没问过写出来才是伪造。
+
+    `diagnoses` 是医生在**诊断管理**里已选的诊断。
+    2026-09-08 病历去掉了「初步诊断」那一段之后，一致性检查改从这里取源 ——
+    诊断只应有一个出口，质控也该照着那一个出口去比对。
+    传空表示还没选诊断，此时一致性不适用（报 `None`，不是 0%）——
+    **报 0% 会被读成「一条都对不上」，那是另一回事。**
     """
     filled = {key: str(fields.get(key) or "").strip() for key in SECTION_KEYS}
 
     structural = sum(1 for v in filled.values() if v)
     informational = sum(1 for v in filled.values() if v and v != UNCOLLECTED)
 
-    # 逻辑一致性：初步诊断里的疾病名，去掉括注后取主干，看能否在其他段找到
-    diagnosis_text = filled.get("preliminary_diagnosis", "")
-    others = "".join(v for k, v in filled.items() if k != "preliminary_diagnosis")
-    names = [n.strip() for n in re.split(r"[；;、\n\d.]+", re.sub(r"[（(].*?[)）]", "", diagnosis_text)) if n.strip()]
-    supported = sum(1 for n in names if n[:3] and n[:3] in others)
-    consistency = _pct(supported, len(names)) if names else 0
+    # 逻辑一致性：已选诊断里的病名，去掉括注后取主干，看能否在病历里找到依据。
+    # 诊断名来自**诊断管理**（见函数签名的说明），不再来自病历段落。
+    picked = [str(d).strip() for d in (diagnoses or []) if str(d).strip()]
+    body_text = "".join(filled.values())
+    names = [
+        n.strip()
+        for d in picked
+        for n in re.split(r"[；;、\n\d.]+", re.sub(r"[（(].*?[)）]", "", d))
+        if n.strip()
+    ]
+    consistency = _pct(sum(1 for n in names if n[:3] and n[:3] in body_text), len(names)) if names else None
 
     # 用语规范性：出现否定表述但对话里没问过，即为不规范
     unverified: list[tuple[str, str]] = []
@@ -106,7 +116,8 @@ def evaluate(fields: dict[str, str], *, dialog_text: str = "") -> dict:
         "metrics": [
             {"name": "结构完整性", "value": _pct(structural, len(SECTION_KEYS)), "basis": "七段是否齐全"},
             {"name": "信息完整性", "value": _pct(informational, len(SECTION_KEYS)), "basis": "非「未采集」的段占比"},
-            {"name": "逻辑一致性", "value": consistency, "basis": "初步诊断在其他段能否找到支撑"},
+            {"name": "逻辑一致性", "value": consistency,
+             "basis": "已选诊断在病历里能否找到支撑" if consistency is not None else "尚未选择诊断"},
             {"name": "用语规范性", "value": wording, "basis": "是否出现未经问诊的否定表述"},
         ],
         "gaps": gaps,

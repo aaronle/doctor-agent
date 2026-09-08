@@ -22,7 +22,7 @@ FIXTURES = Path(__file__).resolve().parents[3] / "references/ui-demo/extracted/f
 
 
 def test_f03_record_sections_are_a_closed_set():
-    """F03：病历七段是**闭集**。
+    """F03：病历六段是**闭集**。
 
     服务端按段切分流式下发，多一段前端无从对齐 —— 那一段会静默丢失。
     """
@@ -30,7 +30,7 @@ def test_f03_record_sections_are_a_closed_set():
 
     assert SECTION_KEYS == (
         "chief_complaint", "present_illness", "past_history", "personal_history",
-        "physical_exam", "auxiliary_exam", "preliminary_diagnosis",
+        "physical_exam", "auxiliary_exam",
     )
 
 
@@ -595,3 +595,48 @@ def test_a_patient_with_many_allergies_exists_in_the_seed():
         for name in r["allergies"]:
             assert isinstance(name, str) and name, "过敏原仍应是字符串"
             assert reactions.get(name), f"{r['id']} 的「{name}」没有记反应类型"
+
+
+# ──────────────────────── 病历去掉「初步诊断」（2026-09-08）
+
+
+def test_record_has_six_sections_not_seven():
+    """
+    病历段落从七段变**六段**：去掉「初步诊断」。
+
+    诊断的唯一入口是「诊断管理」—— 在那里勾选、标主诊断、回写，
+    并受红线门禁约束。病历里再放一段自由文本的「初步诊断」，
+    等于给同一件事开了第二个出口，而那个出口**不受任何门禁**。
+
+    两处并存的代价很具体：模型在病历里写的诊断，与医生在诊断管理里
+    勾选的那几条，谁也不保证一致；打印出来的病历以哪一份为准，没人说得清。
+    """
+    from app.agents.record import RECORD_SECTIONS, SECTION_KEYS
+
+    assert len(RECORD_SECTIONS) == 6
+    assert "preliminary_diagnosis" not in SECTION_KEYS
+    assert SECTION_KEYS == (
+        "chief_complaint", "present_illness", "past_history",
+        "personal_history", "physical_exam", "auxiliary_exam",
+    )
+
+
+def test_seed_records_do_not_carry_a_preliminary_diagnosis():
+    """种子里也要清掉 —— 留着它，接口照样会把它下发，界面照样有人渲染。"""
+    import json
+    from pathlib import Path
+
+    data = json.loads(
+        (Path(__file__).resolve().parents[3] / "references/ui-demo/extracted/fixtures/record-content.json")
+        .read_text(encoding="utf-8")
+    )
+    for pid, rec in data.items():
+        assert "preliminary_diagnosis" not in rec, f"{pid} 的病历里还留着初步诊断"
+
+
+def test_generated_record_has_no_diagnosis_section(client):
+    """生成出来的草稿也不该有这一段。"""
+    client.post("/api/emr/analysis/unlock", json={"patient_id": "P001", "reason": "skipped"})
+    body = client.post("/api/emr/generate-record-auto", json={"patient_id": "P001"}).json()
+    fields = body.get("fields") or body.get("record") or {}
+    assert "preliminary_diagnosis" not in fields

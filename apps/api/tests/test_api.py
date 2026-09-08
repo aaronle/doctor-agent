@@ -184,7 +184,8 @@ def test_report_summary_degrades_without_model_instead_of_failing(client):
     """模型不可用时必须部分就绪，而不是整个请求失败。"""
     body = client.get("/api/emr/report-summary/P001").json()
     assert set(body["_meta"]["degraded_agents"]) == {"summary", "risk", "diagnosis", "comorbidity"}
-    assert body["record_nodes"] and len(body["record_nodes"]) == 7
+    # 2026-09-08 病历从七段变六段（去掉「初步诊断」，诊断只留「诊断管理」一个出口）
+    assert body["record_nodes"] and len(body["record_nodes"]) == 6
 
 
 def test_degraded_result_is_not_cached(client):
