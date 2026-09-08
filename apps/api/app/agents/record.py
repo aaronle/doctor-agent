@@ -119,12 +119,23 @@ class RecordAgent(Agent):
     def task_instruction(self, ctx: dict, **kwargs) -> str:
         note = str(kwargs.get("note_text") or "").strip()
         extra = f"\n医生已录入的内容（须保留其含义，可整理措辞）：\n{note}" if note else ""
+        # 患者候诊时自己填的那一份。**必须让模型标出来源**：
+        # 它与医生问出来的可信度不同，混在一起写，病历上就再也分不出
+        # 哪句话是医生确认过的、哪句是患者手机上点的。
+        previsit = (
+            "\n上下文中的 `previsit` 是**患者候诊时自己填的**，不是医生问出来的。"
+            "用它的内容时必须标注「患者自述」四个字；"
+            "其中的过敏史**只作参考，不得写进既往史当作已确认**——"
+            "医生尚未核对。"
+            if isinstance(ctx.get("previsit"), dict) and ctx["previsit"].get("answers")
+            else ""
+        )
         return (
             "起草本次就诊的门诊病历七段。\n"
             "资料来源仅限患者上下文中的主诉、既往史、检验值、体征、对话脚本。"
             f"任何一段**它自己的来源里**没有可用资料，才写「{UNCOLLECTED}」——"
             "主档已记载的既往史属于有资料。"
-            f"{extra}"
+            f"{previsit}{extra}"
         )
 
     def validate(self, data: dict, ctx: dict) -> dict:

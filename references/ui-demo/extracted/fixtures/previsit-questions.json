@@ -1,0 +1,98 @@
+{
+  "_doc": "预问诊问题集。通用组所有科室都问；专科组按 dept 取。患者读得懂是第一位的 —— 术语一律翻成人话。",
+  "common": [
+    {
+      "key": "chief_complaint",
+      "label": "这次主要哪里不舒服？",
+      "hint": "可以多选，也可以在下面补充。",
+      "type": "multi_text",
+      "options": ["肚子疼", "头晕头痛", "胸闷气短", "发热", "咳嗽", "关节疼", "其他"],
+      "record_segment": "present_illness"
+    },
+    {
+      "key": "duration",
+      "label": "这个情况持续多久了？",
+      "type": "single",
+      "options": ["今天", "几天", "1–4 周", "1–6 个月", "半年以上", "记不清了"],
+      "record_segment": "present_illness"
+    },
+    {
+      "key": "allergy",
+      "label": "有没有对药物过敏？",
+      "hint": "这一条最要紧 —— 医生开药前必须知道。",
+      "type": "single_text",
+      "options": ["有", "没有", "不确定"],
+      "text_when": "有",
+      "text_placeholder": "对什么药过敏？",
+      "notice": "你填的会给医生参考，但医生还会再问一次并确认后才写进病历。",
+      "record_segment": "past_history"
+    },
+    {
+      "key": "current_meds",
+      "label": "最近在吃什么药？",
+      "hint": "包括别的医院开的、自己买的。",
+      "type": "text",
+      "options": ["没在吃药"],
+      "record_segment": "past_history"
+    }
+  ],
+  "by_dept": {
+    "妇科": [
+      {
+        "key": "lmp",
+        "label": "上一次月经是哪天开始的？",
+        "hint": "医生问的「末次月经」就是这个。",
+        "type": "date",
+        "options": ["记不清了", "已经绝经"],
+        "record_segment": "menstrual_history"
+      },
+      {
+        "key": "cycle_regular",
+        "label": "月经规律吗？",
+        "type": "single",
+        "options": ["规律", "不太规律", "已绝经", "说不好"],
+        "record_segment": "menstrual_history"
+      },
+      {
+        "key": "obstetric",
+        "label": "怀孕生育情况",
+        "hint": "影响用药和检查怎么选，所以要问。",
+        "type": "pair",
+        "pair_labels": ["怀过几次", "生过几个"],
+        "record_segment": "marital_history"
+      },
+      {
+        "key": "pregnancy_possible",
+        "label": "现在有没有可能怀孕？",
+        "hint": "有可能的话，有些检查和药就不能用。",
+        "type": "single",
+        "options": ["不可能", "有可能", "正在备孕", "已绝经"],
+        "record_segment": "menstrual_history"
+      }
+    ],
+    "内分泌科": [
+      { "key": "last_glucose", "label": "最近一次测血糖是什么时候？多少？", "hint": "空腹还是餐后也写一下。", "type": "text", "options": ["最近没测"], "record_segment": "present_illness" },
+      { "key": "hypoglycemia", "label": "有没有出现过心慌、出冷汗、手抖？", "hint": "这些可能是低血糖，医生要知道。", "type": "single", "options": ["有过", "没有", "不确定"], "record_segment": "present_illness" },
+      { "key": "med_adherence", "label": "降糖药或胰岛素有没有漏用过？", "type": "single", "options": ["都按时用", "偶尔漏", "经常漏", "已经停了"], "record_segment": "past_history" },
+      { "key": "foot_check", "label": "脚上有没有伤口、发麻或者没知觉？", "type": "single", "options": ["没有", "有麻木", "有伤口", "不确定"], "record_segment": "present_illness" }
+    ],
+    "心内科": [
+      { "key": "onset_context", "label": "胸口不舒服的时候，一般是什么情况下？", "type": "single", "options": ["活动或爬楼时", "休息时也有", "情绪激动时", "说不清"], "record_segment": "present_illness" },
+      { "key": "episode_duration", "label": "一次大概持续多久？", "type": "single", "options": ["几分钟", "十几分钟", "半小时以上", "一直有", "说不好"], "record_segment": "present_illness" },
+      { "key": "night_symptoms", "label": "夜里有没有憋醒过？脚肿吗？", "type": "single", "options": ["都没有", "夜里憋醒过", "脚肿", "两样都有"], "record_segment": "present_illness" },
+      { "key": "med_adherence", "label": "降压药、他汀有没有按时吃？", "type": "single", "options": ["都按时吃", "偶尔漏", "经常漏", "已经停了"], "record_segment": "past_history" }
+    ],
+    "骨科": [
+      { "key": "site", "label": "主要是哪个部位疼？", "type": "multi_text", "options": ["膝盖", "腰", "髋", "肩", "颈", "其他"], "record_segment": "present_illness" },
+      { "key": "pain_timing", "label": "什么时候最疼？", "type": "single", "options": ["走路时", "上下楼时", "夜里", "一直疼", "说不好"], "record_segment": "present_illness" },
+      { "key": "walk_distance", "label": "不休息能连续走多远？", "type": "single", "options": ["1 公里以上", "500 米左右", "200 米左右", "走几步就得歇", "走不了"], "record_segment": "present_illness" },
+      { "key": "falls", "label": "最近半年有没有摔倒过？", "type": "single", "options": ["没有", "摔过 1 次", "摔过多次", "差点摔但没倒"], "record_segment": "present_illness" }
+    ],
+    "神经内科": [
+      { "key": "weakness", "label": "有没有一侧手脚没劲或者发麻？", "type": "single", "options": ["没有", "有过，现在好了", "现在还有", "不确定"], "record_segment": "present_illness" },
+      { "key": "speech", "label": "说话有没有不利索过？", "type": "single", "options": ["没有", "有过，现在好了", "现在还有"], "record_segment": "present_illness" },
+      { "key": "onset_pattern", "label": "这些不舒服是突然出现的，还是慢慢来的？", "hint": "突然和慢慢，医生要查的东西不一样。", "type": "single", "options": ["突然出现", "慢慢加重", "反复发作", "说不好"], "record_segment": "present_illness" },
+      { "key": "syncope", "label": "有没有摔倒或者晕过去？", "type": "single", "options": ["没有", "摔倒过", "晕过去过", "眼前发黑但没晕"], "record_segment": "present_illness" }
+    ]
+  }
+}

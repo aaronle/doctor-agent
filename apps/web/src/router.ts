@@ -23,6 +23,10 @@ const routes: RouteRecordRaw[] = [
   // 个人配置。同样不占用 V4.3 定义的五个医生端页面 ——
   // 它不在原件里，所以 fidelity / coverage 两道界面闸不比对它，靠单测守。
   { path: '/settings', name: 'Settings', component: () => import('./views/SettingsView.vue'), meta: { title: '个人配置' } },
+  // 患者端预问诊。**它与医生端是两条完全不同的路**：患者只填自己的情况，
+  // 接口一个临床字段都不下发（见 `routers/previsit.py`）。
+  // 桌面尺寸下也能打开 —— 患者可能用平板，把它挡掉只会让人以为坏了。
+  { path: '/previsit', name: 'PreVisit', component: () => import('./views/PreVisitView.vue'), meta: { title: '就诊前填写' } },
   { path: '/outpatient/:patientId', name: 'OutpatientWorkstation', component: () => import('./views/WorkstationView.vue'), meta: { title: '门诊工作站' } },
 ]
 

@@ -158,14 +158,22 @@ describe('移动端字号', () => {
   const mobile = fs.readFileSync(path.join(STYLES, 'mobile.css'), 'utf8')
 
   it('三个非标准档各有一条规则', () => {
-    for (const [level, zoom] of [['small', '0.9'], ['large', '1.15'], ['xlarge', '1.3']]) {
+    // 2026-09-08 标尺整体右移：默认档从 1.0 提到 1.3（产品反馈「移动端字太小」），
+    // 四档随之变成 1.15 / 1.3 / 1.45 / 1.6。数值的**语义**由
+    // `mobileFont.spec.ts` 守（默认＝原特大、单调递增），这里只守「每档都有规则」
+    for (const [level, zoom] of [['small', '1.15'], ['large', '1.45'], ['xlarge', '1.6']]) {
       expect(mobile).toContain(`[data-font='${level}']`)
       expect(mobile).toMatch(new RegExp(`\\[data-font='${level}'\\][^}]*zoom:\\s*${zoom}`, 's'))
     }
   })
 
-  it('**不给 normal 写规则** —— zoom:1 会凭空造一个包含块', () => {
+  it('**不给 normal 写属性选择器** —— 默认档走无属性的基准规则', () => {
+    // 原来的理由是「zoom:1 会凭空造一个包含块」。现在默认档不再是 1，
+    // 而是 1.3，所以基准规则必须存在 —— 但它仍然不该写成
+    // `[data-font='normal']`：那个属性在默认态下压根不会被设上去
+    // （`usePreferences` 只在非默认档才 setAttribute）。
     expect(mobile).not.toContain("[data-font='normal']")
+    expect(mobile).toMatch(/MOBILE_BASE_ZOOM/)
   })
 
   it('挂的是 .m-body 不是 .m-page', () => {

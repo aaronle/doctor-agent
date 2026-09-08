@@ -25,6 +25,7 @@ from .agent_config import tier_models
 from .config import get_ai_settings, get_settings
 from .database import SessionLocal, engine, init_database
 from .models import OperationLog
+from .routers import previsit as previsit_router
 from .routers import admin as admin_router
 from .routers import telemetry as telemetry_router
 from .routers import data_console as data_console_router
@@ -117,6 +118,7 @@ app.include_router(admin_router.router)
 app.include_router(delivery_router.router)
 app.include_router(telemetry_router.router)
 app.include_router(data_console_router.router)
+app.include_router(previsit_router.router)
 app.include_router(preferences_router.router)
 
 

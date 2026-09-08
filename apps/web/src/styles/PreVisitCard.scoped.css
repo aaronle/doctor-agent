@@ -1,0 +1,83 @@
+/* 医生端的「患者候诊时填的」卡片。桌面端与移动端共用一份样式。
+ *
+ * 绿色边框是刻意的：它与红色的安全条、蓝色的 AI 产出都要分得开 ——
+ * 这块内容既不是告警也不是模型推断，是**患者本人说的**。
+ */
+
+.pvc {
+  margin-bottom: 10px;
+  padding: 14px 16px 12px;
+  border: 1px solid #c7e9d3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.pvc-loading {
+  padding: 10px 0;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.pvc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 11px;
+}
+.pvc-tag {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #16a34a;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.pvc-title { flex: 1 1 auto; font-size: 14px; font-weight: 700; color: #1f2937; }
+.pvc-time { flex: 0 0 auto; font-size: 12px; color: #9ca3af; }
+
+.pvc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 5px 0;
+}
+.pvc-k {
+  flex: 0 0 auto;
+  width: 64px;
+  font-size: 12.5px;
+  color: #6b7280;
+  line-height: 1.55;
+}
+.pvc-v {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.55;
+}
+
+/* 待确认的那一行给红色 —— 它是这张卡里唯一需要医生做动作的地方 */
+.pvc-row.needs-confirm .pvc-v { color: #d97706; }
+.pvc-flag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #fffbeb;
+  color: #d97706;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.pvc-note {
+  margin: 9px 0 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #d97706;
+  font-size: 12px;
+  line-height: 1.6;
+}

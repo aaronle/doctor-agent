@@ -11,6 +11,7 @@ import { runDiagnosisCommand, type DiagnosisEntry, type DiagnosisState } from '.
 import AgentMascot from './AgentMascot.vue'
 import DepartmentBoard from './DepartmentBoard.vue'
 import SettingsPanel from './SettingsPanel.vue'
+import PreVisitCard from './PreVisitCard.vue'
 import FollowUpHints from './FollowUpHints.vue'
 import { AUTO_OPEN_AFTER_MESSAGES, useFollowUp } from '../composables/useFollowUp'
 import { useResizable } from '../composables/useResizable'
@@ -2297,6 +2298,12 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           <!-- ---------------- 健康档案 ---------------- -->
           <div v-show="activeTab === '健康档案'" class="tips-tab-pane">
             <div class="tab-section archive-panel">
+              <!--
+                患者候诊时自己填的。**放在档案最前面** —— 它是这一次就诊里
+                最新的一手信息，而下面那些是历史。埋在既往就诊后面，
+                医生翻不到，那次采集就白做了。
+              -->
+              <PreVisitCard v-if="ws.patientId" :patient-id="ws.patientId" />
               <div class="archive-overview">
                 <div class="ao-title">疾病与就诊概览</div>
                 <div class="ao-row">

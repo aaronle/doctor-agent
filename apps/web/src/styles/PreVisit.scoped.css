@@ -1,0 +1,181 @@
+/* 预问诊（患者端）。设计稿：Figma「12 · 移动端重构」①–⑤
+ *
+ * 字号基准是**上调之后的**：正文 16–19px，不是原来的 13px。
+ * 用它的人正在候诊区、光线差、可能还上了年纪 —— 患者端尤其不能小。
+ *
+ * 这里不复用 `mobile.css`：那一套是医生端的信息密度（一屏塞八块），
+ * 患者端要的恰恰相反 —— 一次一题，留白足够。两套目标混在一个文件里，
+ * 改任何一个都会波及另一个。
+ */
+
+.pv-page {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f4f6fa;
+  color: #1f2937;
+  font-size: 17px;
+  -webkit-text-size-adjust: 100%;
+}
+
+.pv-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0 24px calc(24px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+}
+.pv-scroll { padding-top: 16px; }
+
+/* ───────────────────────────────────────────── 登录 */
+
+.pv-hero { padding: 56px 0 34px; }
+.pv-org { display: block; font-size: 15px; color: #6b7280; margin-bottom: 8px; }
+.pv-h1 { margin: 0; font-size: 28px; font-weight: 700; line-height: 1.35; }
+.pv-lead { margin: 12px 0 0; font-size: 16px; line-height: 1.65; color: #374151; }
+.pv-lead-tight { margin: 0 0 16px; font-size: 15.5px; color: #4b5563; }
+.pv-lead b { color: #1f2937; }
+.pv-center { text-align: center; }
+
+.pv-label { display: block; font-size: 15px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+.pv-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 17px 16px;
+  border: 1px solid #e8ebf0;
+  border-radius: 12px;
+  background: #fff;
+  /* 16px 是 iOS 的分界线：小于它，聚焦时 Safari 会自动放大整页 */
+  font-size: 18px;
+  color: #1f2937;
+  font-family: inherit;
+}
+.pv-input::placeholder { color: #9ca3af; }
+.pv-input:focus { outline: none; border-color: #1677ff; border-width: 1.5px; }
+.pv-input-inline { padding: 14px 15px; font-size: 17px; }
+.pv-hint { margin: 7px 0 20px; font-size: 13px; color: #9ca3af; }
+
+.pv-primary,
+.pv-submit {
+  width: 100%;
+  padding: 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #1677ff;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: inherit;
+}
+.pv-submit { background: #16a34a; margin-top: 4px; }
+.pv-primary:disabled,
+.pv-submit:disabled { background: #c7d2e0; }
+
+.pv-ghost {
+  width: 100%;
+  padding: 15px;
+  margin-top: 20px;
+  border: 1px solid #e8ebf0;
+  border-radius: 12px;
+  background: #fff;
+  color: #1677ff;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.pv-foot { margin: 20px 0 0; font-size: 13px; line-height: 1.65; color: #9ca3af; }
+.pv-error {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #e6191a;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+/* ───────────────────────────────────────────── 填写 */
+
+.pv-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  background: #fff;
+  border-bottom: 1px solid #eef1f5;
+}
+.pv-top-name { flex: 1 1 auto; font-size: 17px; font-weight: 700; }
+.pv-top-step { flex: 0 0 auto; font-size: 14px; color: #6b7280; }
+
+.pv-question {
+  margin-bottom: 12px;
+  padding: 18px;
+  border-radius: 14px;
+  background: #fff;
+}
+.pv-q-head { display: flex; align-items: flex-start; gap: 9px; }
+.pv-q-num {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #eaf1ff;
+  color: #1677ff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+.pv-q-label { flex: 1 1 auto; font-size: 19px; font-weight: 600; line-height: 1.45; }
+.pv-q-hint { margin: 7px 0 0; font-size: 13.5px; line-height: 1.55; color: #9ca3af; }
+
+.pv-chips { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.pv-chip {
+  padding: 11px 15px;
+  border: 1px solid #e8ebf0;
+  border-radius: 10px;
+  background: #f4f6fa;
+  color: #374151;
+  /* 触控目标 ≥44px 高：11+11+行高 ≈ 46 */
+  font-size: 16px;
+  font-family: inherit;
+}
+.pv-chip.on { background: #1677ff; border-color: #1677ff; color: #fff; font-weight: 600; }
+
+.pv-followup { margin-top: 12px; }
+.pv-date { margin-top: 14px; }
+.pv-pair { display: flex; gap: 12px; margin-top: 14px; }
+.pv-pair-col { flex: 1 1 0; display: flex; flex-direction: column; gap: 7px; }
+.pv-pair-lab { font-size: 14px; color: #6b7280; }
+
+/* 过敏那题的说明。**这条不能删** —— 患者自报不改档案状态，
+ * 不说清楚他会以为填了就算数，医生再问时反而觉得系统没记住 */
+.pv-notice {
+  margin: 12px 0 0;
+  padding: 11px 12px;
+  border-radius: 9px;
+  background: #fffbeb;
+  color: #d97706;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ───────────────────────────────────────────── 完成 */
+
+.pv-done { align-items: center; padding-top: 86px; }
+.pv-tick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 26px;
+  border-radius: 50%;
+  background: #f0fdf4;
+  color: #16a34a;
+  font-size: 40px;
+  font-weight: 700;
+}
+.pv-done .pv-h1 { font-size: 27px; }

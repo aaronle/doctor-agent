@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import PreVisitCard from '../components/PreVisitCard.vue'
 
 import { api, type LabResult, type PatientOrder } from '../api'
 import { useWorkstation } from '../stores/workstation'
@@ -218,6 +219,8 @@ watch(() => ws.patientId, loadSaved)
 
     <!-- 健康档案 -->
     <template v-else>
+      <!-- 患者候诊时自己填的，放最前 —— 它是这次就诊里最新的一手信息 -->
+      <PreVisitCard v-if="patient?.id" :patient-id="patient.id" />
       <div class="m-field-card">
         <span class="m-field-label">基本信息</span>
         <span class="m-field-value">

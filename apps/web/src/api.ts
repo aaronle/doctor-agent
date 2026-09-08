@@ -687,6 +687,16 @@ export const api = {
   /** 科室看板：诊疗进度 × 风险两个维度 */
   departmentBoard: () => get<BoardResponse>('/api/his/board'),
 
+  /** 患者候诊时自己填的预问诊。医生端读，患者端另有一套写入接口 */
+  preVisitAnswers: (id: string) =>
+    get<{
+      patient_id: string
+      source: string
+      answers: Record<string, { choice?: string; choices?: string[]; text?: string; date?: string; pair?: [string, string] }>
+      submitted_at: string
+      needs_confirmation: boolean
+    }>(`/api/previsit/answers/${id}`),
+
   // ---------------------------------------------------------------- 数据看板
   usageSummary: (days = 7) => get<UsageSummary>(`/api/telemetry/usage?days=${days}`),
   trainingSummary: () => get<TrainingSummary>('/api/telemetry/training'),

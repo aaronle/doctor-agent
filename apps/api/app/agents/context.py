@@ -80,6 +80,19 @@ def build_context(
     if examinations:
         ctx["examinations"] = examinations
 
+    # 患者候诊时自己填的那一份（预问诊）。
+    #
+    # **单独一层，带 `source`，不与医生问出来的内容合并。** 来源不同、
+    # 可信度不同，写进病历的措辞也该不同 —— 提示词里据此要求标「患者自述」。
+    # 合并进 `chief_complaint` 之类的字段会让这条来源线索当场消失。
+    previsit = payload.get("previsit")
+    if isinstance(previsit, dict) and previsit.get("answers"):
+        ctx["previsit"] = {
+            "source": previsit.get("source", "patient"),
+            "answers": previsit.get("answers") or {},
+            "submitted_at": previsit.get("submitted_at", ""),
+        }
+
     if include_dialog:
         ctx["dialog_script"] = latest_dialog(session, patient.id, seed_fallback=seed_dialog_fallback)
         # 这一场就诊到底有没有真做过问诊。界面据此标「含本次问诊」还是「未含问诊」，
