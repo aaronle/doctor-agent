@@ -87,8 +87,12 @@ async function section(name, fn) {
 
 /** 每个页面都挂错误钩子 —— 控制台报错是零容忍的 */
 function watch(page, area) {
-  // 默认 30s 太长 —— 一处点不到就烧半分钟，整轮走查会被拖成十几分钟
-  page.setDefaultTimeout(8000);
+  // Playwright 默认 30s 太长 —— 一处点不到就烧半分钟，整轮走查拖成十几分钟。
+  // **但 8s 是按本地调的**：跨洋跑 `--base https://da.aaronhealth.cn` 时，
+  // 光首字节就可能吃掉大半，于是超时的是网络、报出来却是「走查中断」，
+  // 那一整段十几项跟着作废 —— 连着四轮线上走查栽在这上面，
+  // 每次崩在不同的 `goto`，看着像四个不同的毛病。
+  page.setDefaultTimeout(LOCAL ? 8000 : 20000);
   page.on('pageerror', (e) => bad(area, '页面异常', e.message.slice(0, 120)));
   page.on('requestfailed', (r) => {
     // 埋点是 fire-and-forget，导航时被取消是正常的（useTelemetry 明确不重试）
