@@ -529,6 +529,56 @@ onBeforeUnmount(() => window.removeEventListener('da:open-tab', onOpenTab))
 const summary = computed(() => ws.summary)
 const patient = computed(() => ws.patient)
 
+/* ===================== AI 病情概要的折叠 ===================== */
+
+/**
+ * 折叠态给**叙述性内容**的字数预算。
+ *
+ * 概要原来整段全出，P009 实测 498px —— 把下面的推荐诊断整个推出屏幕，
+ * 而那才是医生要动手的地方。概要是背景不是结论，背景不该占掉一屏。
+ *
+ * **这个数只约束叙述，不约束风险。** 信息冲突（`conflicts`）整句给全、
+ * 不参与截断：它是「不看会出事」的那一类，放进折叠态的理由与 100 这个数无关。
+ * 风险句本身超过 100 字时，叙述一句不给，风险句照样全给 ——
+ * 「因为超预算所以不给医生看过敏冲突」不是一个可选项。
+ */
+const SUMMARY_BUDGET = 100
+
+const overviewNarrative = computed(() => String(summary.value?.overall_conclusion?.summary ?? ''))
+const overviewProblems = computed(() => summary.value?.overall_conclusion?.problems ?? [])
+const overviewConflicts = computed(() => summary.value?.overall_conclusion?.conflicts ?? [])
+
+/**
+ * 折叠态藏起来的字数。**按钮上要写出来** ——
+ * 光「更多」两个字答不了医生真正在问的那句「值不值得点」。
+ */
+const overviewHidden = computed(
+  () => Math.max(0, overviewNarrative.value.length - SUMMARY_BUDGET)
+    + overviewProblems.value.join('').length,
+)
+/** 没有东西可藏就不给按钮 —— 一个点不动的按钮比没有更糟 */
+const overviewExpandable = computed(() => overviewHidden.value > 0)
+const overviewExpanded = ref(false)
+
+const overviewText = computed(() =>
+  overviewExpanded.value || overviewNarrative.value.length <= SUMMARY_BUDGET
+    ? overviewNarrative.value
+    : overviewNarrative.value.slice(0, SUMMARY_BUDGET) + '…',
+)
+
+function toggleOverview() {
+  overviewExpanded.value = !overviewExpanded.value
+  track('overview_toggle', overviewExpanded.value ? 'expand' : 'collapse')
+}
+
+/**
+ * 换一份分析就收回去。
+ *
+ * **展开是「看完就收」的临时动作，不进偏好、也不跟着人走。**
+ * 记住了的话，下一位患者一进来又是 500px 的概要 —— 而那正是这次要解决的事。
+ */
+watch(summary, () => { overviewExpanded.value = false })
+
 /**
  * 患者信息行第二行：性别 · 出生年月。
  *
@@ -1882,17 +1932,29 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                       {{ summary.overall_conclusion.risk_level }}
                     </el-tag>
                   </div>
-                  <div class="coc-summary">
-                    <p>{{ summary?.overall_conclusion?.summary || '智能体分析中…' }}</p>
+                  <div class="coc-summary coc-narrative">
+                    <p>{{ overviewText || '智能体分析中…' }}</p>
                   </div>
-                  <div v-if="summary?.overall_conclusion?.problems?.length" class="coc-summary">
-                    <p v-for="problem in summary.overall_conclusion.problems" :key="problem">· {{ problem }}</p>
+                  <!--
+                    问题列表**折叠态整个不出**。它是逐条展开的证据，截一半比不给
+                    更误导 —— 医生会以为只有这几条。
+                  -->
+                  <div v-if="overviewExpanded && overviewProblems.length" class="coc-summary coc-problems">
+                    <p v-for="problem in overviewProblems" :key="problem">· {{ problem }}</p>
                   </div>
-                  <div v-if="summary?.overall_conclusion?.conflicts?.length" class="coc-summary">
-                    <p v-for="conflict in summary.overall_conclusion.conflicts" :key="conflict">
+                  <!--
+                    **信息冲突不参与截断，折叠态也整句给全。**
+                    那 100 字是给叙述用的预算，风险不进预算 ——
+                    「因为超预算所以不给医生看过敏冲突」不是一个可选项。
+                  -->
+                  <div v-if="overviewConflicts.length" class="coc-summary coc-conflicts">
+                    <p v-for="conflict in overviewConflicts" :key="conflict">
                       <strong>信息冲突：</strong>{{ conflict }}
                     </p>
                   </div>
+                  <button v-if="overviewExpandable" class="coc-more" @click="toggleOverview">
+                    {{ overviewExpanded ? '收起' : `更多（还有 ${overviewHidden} 字）` }}
+                  </button>
                 </div>
 
                 <div class="dd-card">

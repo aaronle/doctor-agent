@@ -1008,6 +1008,80 @@ describe('浮窗调宽', () => {
   })
 })
 
+describe('AI 病情概要 · 100 字 + 「更多」', () => {
+  const NARRATIVE = '甲'.repeat(300)
+  const CONFLICT = '既往史记载青霉素过敏（皮疹伴喉头水肿），但当前医嘱中含阿莫西林克拉维酸钾片（在用），二者存在冲突，需医生核实'
+
+  async function mountOverview(conclusion: Record<string, unknown>) {
+    stubFetch()
+    const pinia = createPinia()
+    const wrapper = mount(AiEmrFloat, {
+      global: { plugins: [pinia, router, ElementPlus] }, attachTo: document.body,
+    })
+    const ws = useWorkstation(pinia)
+    ws.visit = { ...UNLOCKED_VISIT, interview_turns: 4 } as never
+    ws.summary = { _meta: { degraded_agents: [] }, overall_conclusion: conclusion } as never
+    await vi.waitFor(() => expect(wrapper.find('.ai-emr-root').exists()).toBe(true))
+    await expandAssistant(wrapper)
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('叙述超过 100 字时截断，并给出「更多」', async () => {
+    const wrapper = await mountOverview({ summary: NARRATIVE })
+
+    expect(wrapper.find('.coc-narrative').text()).toBe('甲'.repeat(100) + '…')
+    expect(wrapper.find('.coc-more').exists()).toBe(true)
+  })
+
+  it('「更多」写明还藏着多少字 —— 光两个字答不了「值不值得点」', async () => {
+    const wrapper = await mountOverview({ summary: NARRATIVE, problems: ['乙'.repeat(50)] })
+
+    // 叙述超出的 200 字 + 整个 problems 的 50 字
+    expect(wrapper.find('.coc-more').text()).toContain('250')
+  })
+
+  it('不足 100 字就没有「更多」—— 一个点不动的按钮比没有更糟', async () => {
+    const wrapper = await mountOverview({ summary: '甲'.repeat(80) })
+
+    expect(wrapper.find('.coc-narrative').text()).toBe('甲'.repeat(80))
+    expect(wrapper.find('.coc-more').exists()).toBe(false)
+  })
+
+  it('**信息冲突在折叠态整句给全**，不参与那 100 字的截断', async () => {
+    // 这是整条需求的要害：预算是给叙述用的，风险不进预算。
+    // 「因为超预算所以不给医生看过敏冲突」不是一个可选项。
+    const wrapper = await mountOverview({ summary: NARRATIVE, conflicts: [CONFLICT] })
+
+    expect(wrapper.find('.coc-conflicts').text()).toContain(CONFLICT)
+  })
+
+  it('问题列表折叠态不出，展开后才出 —— 截一半比不给更误导', async () => {
+    const wrapper = await mountOverview({ summary: NARRATIVE, problems: ['乙'.repeat(50)] })
+    expect(wrapper.find('.coc-problems').exists()).toBe(false)
+
+    await wrapper.find('.coc-more').trigger('click')
+
+    expect(wrapper.find('.coc-problems').text()).toContain('乙'.repeat(50))
+    expect(wrapper.find('.coc-narrative').text()).toBe(NARRATIVE)
+  })
+
+  it('换一位患者回到折叠态 —— 展开是看完就收的临时动作，不跟着人走', async () => {
+    const wrapper = await mountOverview({ summary: NARRATIVE })
+    await wrapper.find('.coc-more').trigger('click')
+    expect(wrapper.find('.coc-narrative').text()).toBe(NARRATIVE)
+
+    const ws = useWorkstation()
+    ws.summary = {
+      _meta: { degraded_agents: [] },
+      overall_conclusion: { summary: '丙'.repeat(300) },
+    } as never
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.coc-narrative').text()).toBe('丙'.repeat(100) + '…')
+  })
+})
+
 describe('推荐诊断「不能漏」标记与置信度', () => {
   /**
    * 两条诊断：30% 的 critical 与 55% 的 routine。
