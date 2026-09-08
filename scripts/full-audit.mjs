@@ -408,6 +408,57 @@ await section('桌面端 1600×1000', async () => {
     await page.keyboard.press('Escape').catch(() => {});
   } else bad('诊断管理', '找不到「确认诊断」按钮', `当前标签 ${tabIdx}`);
 
+  // ═══ 推荐诊断：置信度降序 + 每条都有百分比（2026-09-08）
+  //
+  // **自己切回智慧诊疗再数，不复用上面那个 `hasAnalysis`** ——
+  // 那个数是在「诊断管理」页上量的，而 `.dd-primary-name` 长在智慧诊疗页，
+  // 于是它恒为 0，挂在它下面的检查会静悄悄地全部跳过（这一节第一版就是这样，
+  // 线上跑了两轮一条都没执行，输出里也看不出少了什么）。
+  {
+    const idx = tabs.findIndex((t) => t.includes('智慧诊疗'));
+    if (idx >= 0) { await page.locator('.ttab').nth(idx).click(); await page.waitForTimeout(800); }
+    const names = await page.locator('.dd-primary-name').count();
+    const confs = await page.evaluate(() =>
+      [...document.querySelectorAll('.dd-confidence')].map((e) => parseInt(e.innerText, 10)));
+    if (!names) {
+      console.log('   · 智慧诊疗页没有诊断（分析未返回），跳过推荐诊断与概要检查');
+    } else if (confs.length !== names) {
+      bad('推荐诊断', '有诊断没显示置信度', `${confs.length} 个百分比 / ${names} 条诊断`);
+    } else if (confs.some((c) => !Number.isFinite(c))) {
+      bad('推荐诊断', '置信度渲染成了非数字', JSON.stringify(confs));
+    } else {
+      ok(`每条推荐诊断都有置信度（${confs.join('/')}）`);
+      const desc = confs.every((c, i) => i === 0 || confs[i - 1] >= c);
+      desc ? ok('推荐诊断按置信度降序')
+        : bad('推荐诊断', '排序不是置信度降序', confs.join(' → '));
+    }
+
+    // ═══ AI 病情概要：折叠态不该占掉一屏
+    const coc = !names ? null : await page.evaluate(() => {
+      const c = document.querySelector('.condition-overview-card');
+      if (!c) return null;
+      return {
+        h: Math.round(c.getBoundingClientRect().height),
+        more: document.querySelector('.coc-more')?.innerText.trim() ?? '',
+        problems: !!document.querySelector('.coc-problems'),
+        conflicts: !!document.querySelector('.coc-conflicts'),
+      };
+    });
+    if (!coc) {
+      if (names) bad('病情概要', '找不到概要卡');
+    } else {
+      // 折叠前的实测是 498px。300 是「还能看见下面的推荐诊断」的界限，
+      // 不是一个凑出来的数
+      coc.h <= 300 ? ok(`病情概要折叠态 ${coc.h}px`)
+        : bad('病情概要', '折叠态仍占掉大半屏', `${coc.h}px`);
+      if (coc.more) {
+        /\d/.test(coc.more) ? ok(`「更多」写了字数：${coc.more}`)
+          : bad('病情概要', '「更多」没写还剩多少字', coc.more);
+        coc.problems ? bad('病情概要', '折叠态把问题列表也放出来了') : ok('折叠态不出问题列表');
+      }
+    }
+  }
+
   // ═══ 切患者：上一位的状态不能残留
   console.log('\n  · 切患者');
   const nameBefore = await page.locator('.ttab-patient-name, .patient-name').first().innerText().catch(() => '');
@@ -506,8 +557,11 @@ for (const [path, name, must] of [
 ]) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
   watch(page, name);
-  await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1200);
+  // **不能等 `networkidle`。** 这几页都挂着埋点 keepalive，网络永远闲不下来 ——
+  // 线上连着两轮走查都是在这里超时崩掉的，而页面其实早就渲染好了。
+  // 等 `domcontentloaded`，再等那个关键元素自己出现，判据和后面那句是同一个。
+  await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
+  await page.locator(must).first().waitFor({ timeout: 15000 }).catch(() => {});
   (await page.locator(must).count()) ? ok(`${name} 渲染正常`) : bad(name, '关键元素没渲染', must);
   await page.close();
 }
