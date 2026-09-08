@@ -379,3 +379,59 @@ def test_reset_makes_the_row_absent_again(client):
 
     client.delete("/api/preferences", params={"actor": "复位医生"})
     assert client.get("/api/preferences", params={"actor": "复位医生"}).json()["stored"] is False
+
+
+# ────────────────────────── AI 助手开机自动显示（2026-09-08）
+
+
+def test_assistant_autostart_defaults_to_off(client):
+    """
+    **默认不自动展开。**
+
+    这与 2026-09-02 定的「一进来只有医生智能体」是同一条：
+    病历、鉴别诊断、风险、共病都由这一场问诊推导，问诊前先把结论摆出来，
+    会让医生把「模型基于旧资料的猜测」当成本次判断。
+
+    但那是**默认**，不该是强制 —— 复诊、跟台、只想快速扫一眼的场景确实存在，
+    所以给一个开关，而不是把行为写死。
+    """
+    body = client.get("/api/preferences/options").json()
+    assert body["defaults"]["assistant_autostart"] is False
+    assert "assistant_autostart" in body["defaults"]
+
+
+def test_assistant_autostart_round_trips(client):
+    """开了要存得住，读回来还是开着。"""
+    client.put("/api/preferences", json={"actor": "张医生", "prefs": {"assistant_autostart": True}})
+    got = client.get("/api/preferences?actor=张医生").json()
+    assert got["prefs"]["assistant_autostart"] is True
+    assert got["stored"] is True
+
+
+def test_assistant_autostart_rejects_non_boolean(client):
+    """
+    服务端自己校验。界面上是个开关，但接口能被绕过 ——
+    存进一个字符串 'true'，前端 `v-if` 会当成真，而「关掉」就再也关不掉了。
+    """
+    bad = client.put("/api/preferences", json={"actor": "张医生", "prefs": {"assistant_autostart": "true"}})
+    assert bad.status_code == 400
+
+
+def test_follow_up_off_is_the_only_way_to_kill_the_hint_float(client):
+    """
+    追问提示的「彻底关闭」只有配置这一条路。
+
+    浮框上的 ✕ 2026-09-08 撤掉了 —— 关掉之后没有任何地方能把它叫回来
+    （它不像 AI 助手有个把手），医生随手一点就再也看不到追问建议，
+    而他多半以为只是「收起来了」。
+
+    所以 `follow_up: 'off'` 必须仍然是合法取值，且**改回 auto 时能恢复**。
+    """
+    options = client.get("/api/preferences/options").json()
+    assert "off" in options["follow_up_modes"], "关掉的入口没了，配置里这一档就不能再少"
+
+    client.put("/api/preferences", json={"actor": "张医生", "prefs": {"follow_up": "off"}})
+    assert client.get("/api/preferences?actor=张医生").json()["prefs"]["follow_up"] == "off"
+
+    client.put("/api/preferences", json={"actor": "张医生", "prefs": {"follow_up": "auto"}})
+    assert client.get("/api/preferences?actor=张医生").json()["prefs"]["follow_up"] == "auto"

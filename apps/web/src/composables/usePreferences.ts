@@ -51,6 +51,7 @@ export const FALLBACK_DEFAULTS: Preferences = {
   font_level: 'normal',
   follow_up: 'auto',
   remember_windows: true,
+  assistant_autostart: false,
   windows: {},
 }
 
@@ -230,7 +231,7 @@ export function usePreferences() {
    */
   async function pushLocalUp(local: Partial<Preferences>) {
     const patch: Partial<Preferences> = {}
-    for (const key of ['theme', 'font_level', 'follow_up', 'remember_windows'] as const) {
+    for (const key of ['theme', 'font_level', 'follow_up', 'remember_windows', 'assistant_autostart'] as const) {
       const v = local[key]
       if (v !== undefined && v !== FALLBACK_DEFAULTS[key]) (patch as Record<string, unknown>)[key] = v
     }

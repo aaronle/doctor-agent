@@ -151,11 +151,36 @@ async function onResetWindows() {
         </div>
       </div>
 
+      <!--
+        AI 助手开机是否自动展开（2026-09-08 新增）。
+        放在「医生智能体」这一组：它管的是这个面板旁边那个抽屉。
+      -->
+      <div class="switch-row">
+        <span>进入工作站时自动展开 AI 助手</span>
+        <button
+          class="switch"
+          :class="{ on: prefs.assistant_autostart }"
+          type="button"
+          role="switch"
+          :aria-checked="prefs.assistant_autostart"
+          @click="update({ assistant_autostart: !prefs.assistant_autostart })"
+        >
+          <i />
+        </button>
+      </div>
+      <p class="hint">
+        默认关。病历、推荐诊断、风险、共病都由这一场问诊推导 ——
+        问诊前先把结论摆出来，容易把「模型基于旧资料的猜测」当成本次判断。
+        复诊或只想快速扫一眼时可以打开。
+      </p>
+
       <p class="safety-note">
         <b>!</b>
         <span>
           「完全关闭」只关闭追问清单这一个浮层，不影响风险预警、硬规则红线与写回门禁。
           医生可以选择不看追问建议，不能选择不看危急值。
+          <b>浮框上没有关闭按钮</b>，只能缩小 —— 关掉之后没有任何地方能把它叫回来，
+          所以这个决定放在这里做，而不是问诊中途手一滑。
         </span>
       </p>
     </section>

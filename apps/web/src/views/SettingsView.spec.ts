@@ -164,3 +164,25 @@ describe('配置页 · 后端不可达仍可用', () => {
     expect(wrapper.find('.sync-warn').exists()).toBe(true)
   })
 })
+
+describe('AI 助手开机自动展开（2026-09-08）', () => {
+  it('配置页里有这个开关，且默认是关的', async () => {
+    const wrapper = await render()
+    const rows = wrapper.findAll('.switch-row').map((r) => r.text())
+    expect(rows.join(' ')).toContain('自动展开 AI 助手')
+  })
+
+  it('说明里写清**为什么默认关** —— 不写，医生只会觉得是漏做了', async () => {
+    // 问诊前把结论摆出来会让医生把「模型基于旧资料的猜测」当成本次判断，
+    // 这正是问诊门禁存在的理由。开关可以给，理由必须写。
+    const wrapper = await render()
+    expect(wrapper.text()).toContain('问诊前先把结论摆出来')
+  })
+
+  it('追问提示那一组要说明**浮框上已经没有关闭按钮**', async () => {
+    // 三处文案咬合：浮框只留缩小、配置里才能彻底关、这里解释为什么。
+    // 少了这一句，医生会在浮框上找 ✕ 找不到
+    const wrapper = await render()
+    expect(wrapper.text()).toContain('浮框上没有关闭按钮')
+  })
+})

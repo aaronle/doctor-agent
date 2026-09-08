@@ -146,18 +146,12 @@ describe('追问提示浮框 · 标题栏当把手，但按钮要能点', () => 
     expect(await dragFrom(w, w.find('.hf-btn[title="缩小"]').element)).toBe(false)
   })
 
-  it('**在关闭按钮上按下同理**', async () => {
-    const w = mountHints()
-    expect(await dragFrom(w, w.find('.hf-btn[title^="关闭"]').element)).toBe(false)
-  })
-
   it('按钮的 click 照常发出去', async () => {
+    // 关闭按钮 2026-09-08 撤掉了（只留缩小），原先针对它的两条用例
+    // 合并到这里 —— 守的性质没变：**标题栏当把手，但按钮仍要能点**
     const w = mountHints()
     await w.find('.hf-btn[title="缩小"]').trigger('click')
-    await w.find('.hf-btn[title^="关闭"]').trigger('click')
-
     expect(w.emitted('update:minimized')?.[0]).toEqual([true])
-    expect(w.emitted('close')).toHaveLength(1)
   })
 
   it('在标题栏空白处按下才开始拖', async () => {
@@ -169,5 +163,35 @@ describe('追问提示浮框 · 标题栏当把手，但按钮要能点', () => 
     await w.vm.$nextTick()
 
     expect(w.find('.hint-float').attributes('style')).toContain('left')
+  })
+})
+
+describe('追问提示 · 只许缩小，不许关闭（2026-09-08）', () => {
+  /**
+   * 去掉关闭按钮。
+   *
+   * 理由是这个浮框**关掉之后没有任何地方能把它叫回来** —— 它不像
+   * AI 助手有个把手。医生随手点了 ✕，这一轮问诊就再也看不到追问建议，
+   * 而他多半以为只是"收起来了"。
+   *
+   * 真想彻底不要，去个人配置里关：那是一个**明确的、可逆的、下次还记得**
+   * 的决定，而不是问诊中途手一滑。
+   */
+  it('头部没有关闭按钮', () => {
+    const wrapper = mountHints()
+    const titles = wrapper.findAll('.hf-btn').map((b) => b.attributes('title') ?? '')
+    expect(titles.some((t) => t.includes('关闭'))).toBe(false)
+    expect(wrapper.findAll('.hf-btn').map((b) => b.text())).not.toContain('✕')
+  })
+
+  it('缩小还在 —— 挡住内容时要能让开', () => {
+    const wrapper = mountHints()
+    expect(wrapper.findAll('.hf-btn').some((b) => (b.attributes('title') ?? '').includes('缩小'))).toBe(true)
+  })
+
+  it('**不再向外发 close 事件** —— 没有入口就不该留出口', () => {
+    const wrapper = mountHints()
+    for (const b of wrapper.findAll('.hf-btn')) b.trigger('click')
+    expect(wrapper.emitted('close')).toBeUndefined()
   })
 })

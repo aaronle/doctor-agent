@@ -105,7 +105,16 @@ const activeTab = ref<Tab>('智慧诊疗')
  *
  * 点「生成」后自动展开（见 generateNow），医生也可以随时手动开合。
  */
+/**
+ * AI 助手是否展开。
+ *
+ * **默认收起**（2026-09-02），但 2026-09-08 起可由个人配置改成自动展开：
+ * 复诊、跟台、只想快速扫一眼的场景确实存在，默认不该变成强制。
+ * 偏好读到之后由下面那个 watch 应用一次 —— 只应用一次，
+ * 之后医生自己开合的意愿优先于配置。
+ */
 const tipsOpen = ref(false)
+let autostartApplied = false
 const panelOpen = ref(true)
 
 /** 这次展开是「结束问诊」自动触发的，用于在开关上标一句，让医生知道是谁打开的。 */
@@ -306,6 +315,23 @@ watch(() => dock.merged.value, (merged) => {
 })
 
 watch(tipsOpen, (open) => { if (open) placeIfUndocked('drawer') })
+
+/**
+ * 偏好里开了「自动展开」就展开一次。
+ *
+ * **只应用一次**（`autostartApplied`）。偏好是异步拉回来的，
+ * 若每次变化都跟着开，医生刚手动收起来、配置一刷新它又弹开 ——
+ * 与追问提示浮框「缩起来的不再自动展开」是同一条。
+ */
+watch(
+  () => prefs.prefs.value.assistant_autostart,
+  (on) => {
+    if (autostartApplied || !on) return
+    autostartApplied = true
+    tipsOpen.value = true
+  },
+  { immediate: true },
+)
 watch(panelOpen, (open) => { if (open) placeIfUndocked('panel') })
 
 function beginDrag(key: 'drawer' | 'panel', e: PointerEvent) {
@@ -1343,18 +1369,33 @@ watch(
   },
 )
 
+/**
+ * 彻底关掉追问提示。**入口只在个人配置里**（`follow_up: 'off'`）——
+ * 浮框上那个 ✕ 已于 2026-09-08 撤掉。
+ *
+ * 理由：关掉之后没有任何地方能把它叫回来（它不像 AI 助手有个把手），
+ * 医生随手一点就再也看不到追问建议，而他多半以为只是「收起来了」。
+ * 配置里关是明确的、可逆的、下次还记得的决定。
+ */
 function closeHints() {
   hintOpen.value = false
   hintDismissed.value = true
   // 「被关掉多少次」是这个功能有没有用的最直接信号
-  track('hints_dismiss', '', { pending: voice.hints.value.length })
+  track('hints_dismiss', 'settings', { pending: voice.hints.value.length })
 }
 
-/** 暂停/生成时把浮框叫出来 —— 医生停下来，通常就是在想「还该问什么」。 */
+/**
+ * 暂停/生成时把浮框叫出来 —— 医生停下来，通常就是在想「还该问什么」。
+ *
+ * **但缩起来的不再展开。** 原来这里无条件把 `hintMinimized` 复位，
+ * 于是医生刚把它收起来，一点「生成」它又弹开 —— 等于缩不掉。
+ * 关闭按钮撤掉之后（2026-09-08），缩小是他唯一的让路手段，
+ * 更不能被系统随手撤销。
+ */
 function offerHints() {
   if (hintDismissed.value || !hasHints.value) return
+  if (hintMinimized.value) return
   hintOpen.value = true
-  hintMinimized.value = false
 }
 
 /**
@@ -1785,7 +1826,10 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                       title="全选诊断"
                       @change="toggleAll"
                     />
-                    <span class="dd-title">鉴别诊断</span>
+                    <!-- 「推荐诊断」是**界面文案**（2026-09-08 改）。
+                       段落键仍是「鉴别诊断」—— ＋菜单、focus 跳转、埋点都按键走，
+                       跟着文案改会让那几处一起跳不过来 -->
+                    <span class="dd-title">推荐诊断</span>
                     <button class="todo-action-btn tab-record dd-confirm-btn" @click="confirmDiagnoses">确认诊断</button>
                   </div>
 
@@ -1858,7 +1902,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
                     </div>
 
                     <div v-if="!summary?.suspected_diagnoses?.length" class="diag-empty">
-                      {{ ws.loadingSummary ? '智能体分析中…' : '暂无鉴别诊断' }}
+                      {{ ws.loadingSummary ? '智能体分析中…' : '暂无推荐诊断' }}
                     </div>
                   </div>
                 </div>
@@ -2710,7 +2754,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           v-if="hintOpen && hasHints"
           v-model:minimized="hintMinimized"
           :items="followUp.items.value"
-          @close="closeHints"
         />
 
         <div class="copilot-tab-bar" :style="font.style.value">
@@ -2821,8 +2864,27 @@ onBeforeUnmount(() => document.removeEventListener('click', closePlusMenu))
           </div>
 
           <div class="action-bar">
+            <!--
+              **「生成」一直在**（2026-09-08）。原来只有问诊开始后才渲染它，
+              医生必须先点「开始问诊」才看得到 —— 而复诊患者常常不需要再问一遍，
+              那种情况下他得去锁定页里翻「跳过问诊，直接分析」，埋了两层。
+
+              生成本来就是随时可点、可重复点的（只落库、不结束问诊），
+              没有理由把它藏在一次问诊之后。
+            -->
             <el-button v-if="voice.state.value === 'idle'" type="primary" size="small" @click="voice.start()">
               ● 开始问诊
+            </el-button>
+            <el-button
+              v-if="voice.state.value === 'idle'"
+              class="ib-secondary"
+              size="small"
+              plain
+              :loading="finishing"
+              title="不问诊，直接按 HIS 已有资料生成分析。随后仍可开始问诊，问完重算一次。"
+              @click="generateNow"
+            >
+              生成
             </el-button>
 
             <!--

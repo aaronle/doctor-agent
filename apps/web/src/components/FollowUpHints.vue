@@ -36,7 +36,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:minimized': [boolean]
-  close: []
 }>()
 
 const pending = computed(() => props.items.filter((i) => !i.done))
@@ -92,8 +91,17 @@ watch(() => props.minimized, () => void nextTick(measure))
         <span class="hf-title">AI 追问提示</span>
         <span class="hf-spacer" />
         <span class="hf-progress">{{ done.length }}/{{ props.items.length }}</span>
+        <!--
+          **只有缩小，没有关闭**（2026-09-08）。
+
+          关掉之后没有任何地方能把它叫回来 —— 它不像 AI 助手有个把手。
+          医生随手点了 ✕，这一轮问诊就再也看不到追问建议，
+          而他多半以为只是「收起来了」。
+
+          真想彻底不要，去个人配置里关：那是一个明确的、可逆的、
+          下次还记得的决定，而不是问诊中途手一滑。
+        -->
         <button class="hf-btn" title="缩小" @click="emit('update:minimized', true)">—</button>
-        <button class="hf-btn" title="关闭（本轮不再自动弹）" @click="emit('close')">✕</button>
       </div>
 
       <div ref="bodyEl" class="hf-body" :class="{ 'has-more': hiddenBelow > 0 }" @scroll="measure">

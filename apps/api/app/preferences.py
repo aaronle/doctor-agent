@@ -75,6 +75,15 @@ DEFAULTS: dict = {
     #: 关掉时每次进工作站都回到默认布局。默认开 —— 医生每天重复调一遍窗口
     #: 是现在最磨人的一项（拖完刷新即丢，见 useDockedWindows 的纯内存实现）
     "remember_windows": True,
+    #: AI 助手（那八个标签页）一进工作站要不要自动展开。
+    #:
+    #: **默认关**，与 2026-09-02 定的「一进来只有医生智能体」一致：
+    #: 病历、鉴别诊断、风险、共病都由这一场问诊推导，问诊前先把结论摆出来，
+    #: 会让医生把「模型基于旧资料的猜测」当成本次判断。
+    #:
+    #: 但那是默认不是强制 —— 复诊、跟台、只想快速扫一眼的场景确实存在，
+    #: 所以给一个开关，而不是把行为写死。
+    "assistant_autostart": False,
     #: 记忆下来的几何值。**由前端在医生拖拽后自动写入，不是配置页上手填的**；
     #: 配置页只提供「恢复默认布局」把它清空。`merged` 是合并/分离态。
     "windows": {},
@@ -88,7 +97,7 @@ _ENUMS = {
     "follow_up": FOLLOW_UP_MODES,
 }
 
-_BOOLS = ("remember_windows",)
+_BOOLS = ("remember_windows", "assistant_autostart")
 
 
 class PreferenceError(ValueError):

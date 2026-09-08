@@ -1362,17 +1362,22 @@ describe('AI 追问提示浮框 · 三态与实时清单', () => {
     expect(wrapper.findAll('.hf-item')).toHaveLength(3)
   }, 20000)
 
-  it('关掉之后本轮不再自动弹 —— 否则对话一推进就弹回来，等于关不掉', async () => {
+  it('**缩小之后不会自己弹回来** —— 一推进就弹回，等于缩不掉', async () => {
+    /*
+     * 原来这条测的是「关掉之后不再自动弹」。关闭按钮 2026-09-08 撤了
+     * （只留缩小，要彻底关去个人配置），所以改测缩小态的同一个性质：
+     * 医生把它收起来了，就不该被下一轮对话推回展开。
+     */
     const wrapper = await withHints(THREE)
-    await wrapper.find('.hf-btn[title^="关闭"]').trigger('click')
-    expect(wrapper.find('.hint-float').exists()).toBe(false)
+    await wrapper.find('.hf-btn[title="缩小"]').trigger('click')
+    expect(wrapper.find('.hint-float.mini').exists()).toBe(true)
 
-    // 再走一次产品路径（点生成），它必须保持关着
+    // 再走一次产品路径（点生成），它必须保持缩着
     await wrapper.find('.action-bar .ib-primary').trigger('click')
     await vi.waitFor(() =>
       expect((wrapper.vm as unknown as { finishing: boolean }).finishing).toBe(false),
     )
-    expect(wrapper.find('.hint-float').exists()).toBe(false)
+    expect(wrapper.find('.hint-float.mini').exists()).toBe(true)
   }, 20000)
 
   it('**已问到的划掉、留在底下**，不删除 —— 医生要能看见「问过了」', async () => {
@@ -1829,5 +1834,30 @@ describe('患者信息行 · 两行式 + 过敏三档', () => {
       expect(b.classes()).toContain('warn')
       expect(b.text()).toContain('未采集')
     })
+  })
+})
+
+describe('2026-09-08 三条产品调整', () => {
+  it('**「生成」按钮一直在** —— 问诊没开始也能点', async () => {
+    /*
+     * 原来只有 `voice.state !== 'idle'` 才渲染它：医生必须先「开始问诊」
+     * 才看得到「生成」。而复诊患者常常不需要再问一遍 ——
+     * 那种情况下他要去锁定页里找「跳过问诊，直接分析」，埋了两层。
+     *
+     * 生成本来就是随时可点、可重复点的（只落库、不结束问诊），
+     * 没有理由把它藏在一次问诊之后。
+     */
+    const wrapper = await renderFloat()
+    const labels = wrapper.findAll('.action-bar button, .action-bar .el-button').map((b) => b.text())
+    expect(labels.join(' ')).toContain('开始问诊')
+    expect(labels.join(' '), '未开始问诊时看不到「生成」').toContain('生成')
+  })
+
+  it('AI 助手里那一栏叫「推荐诊断」，不叫「鉴别诊断」', async () => {
+    // 卡片长在**智慧诊疗**页里，而那一页在未解锁时是锁着的 ——
+    // 不给已解锁的就诊态，`.dd-title` 压根不渲染，断言会假红
+    const wrapper = await mountWithPatient()
+    await vi.waitFor(() => expect(wrapper.find('.dd-title').exists()).toBe(true))
+    expect(wrapper.find('.dd-title').text()).toBe('推荐诊断')
   })
 })

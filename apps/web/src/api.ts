@@ -938,6 +938,8 @@ export interface Preferences {
   font_level: string
   follow_up: string
   remember_windows: boolean
+  /** AI 助手一进工作站要不要自动展开。默认关 —— 见 preferences.py 的注释 */
+  assistant_autostart: boolean
   windows: WindowPrefs
 }
 
