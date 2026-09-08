@@ -139,7 +139,8 @@ await section('桌面端 1600×1000', async () => {
   });
 
   // ---- 候诊列表
-  await page.goto(`${BASE}/outpatient/list`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/outpatient/list`, { waitUntil: 'domcontentloaded' });
+  await page.locator('.patient-card, [class*=patient-card]').first().waitFor({ timeout: 15000 }).catch(() => {});
   const cards = await page.locator('.patient-card, [class*=patient-card]').count();
   cards > 0 ? ok(`候诊列表 ${cards} 张卡`) : bad('候诊列表', '一张患者卡都没有');
 
@@ -386,12 +387,19 @@ await section('桌面端 1600×1000', async () => {
     else ok(`「${name}」有内容（${body.length} 字）`);
   }
 
-  // 写回门禁：红线未处置时必须拦
-  // 标签文本带角标（「诊断管理5」），用 hasText 精确匹配会落空 —— 按序号切
-  const tabIdx = tabs.findIndex((t) => t.includes('诊断管理'));
+  // 写回门禁：红线未处置时必须拦。
+  //
+  // 两次找错按钮的记录留在这儿，因为它们是同一个坑的两面：
+  // ① `.writeback-primary-btn` 是**病历管理**页的「采纳草稿」，不是诊断回写；
+  // ② `.dd-confirm-btn`（「确认诊断」）长在**智慧诊疗**页，不在诊断管理页。
+  //
+  // ② 更阴：标签页是 `v-show`，按钮一直在 DOM 里 —— `count()` 数得到、
+  // `isVisible()` 是 false。所以停在诊断管理页找它，报出来是「找不到按钮」。
+  // 这条只在分析真的回来时才暴露，之前几轮分析都没回来，一直是绿的。
+  //
+  // 标签文本带角标（「诊断管理5」），用 hasText 精确匹配会落空 —— 按序号切。
+  const tabIdx = tabs.findIndex((t) => t.includes('智慧诊疗'));
   if (tabIdx >= 0) { await page.locator('.ttab').nth(tabIdx).click(); await page.waitForTimeout(800); }
-  // **`.writeback-primary-btn` 是病历管理页的「采纳草稿」，不是诊断回写** ——
-  // 第一版拿它当回写按钮，于是在诊断管理页永远找不到，报了个假 bug
   const hasAnalysis = (await page.locator('.dd-primary-name').count()) > 0;
   const wb = page.locator('.dd-confirm-btn').first();
   if (!hasAnalysis) {
@@ -406,17 +414,13 @@ await section('桌面端 1600×1000', async () => {
     if (openRed > 0 && !blocked && !box) bad('安全', '有未处置红线却没拦住回写', msg.slice(0, 80));
     else ok(openRed > 0 ? `红线未处置时被拦：「${(msg || box).slice(0, 28)}」` : '无未处置红线，走到确认框');
     await page.keyboard.press('Escape').catch(() => {});
-  } else bad('诊断管理', '找不到「确认诊断」按钮', `当前标签 ${tabIdx}`);
+  } else bad('智慧诊疗', '找不到「确认诊断」按钮', `当前标签 ${tabIdx}`);
 
   // ═══ 推荐诊断：置信度降序 + 每条都有百分比（2026-09-08）
-  //
-  // **自己切回智慧诊疗再数，不复用上面那个 `hasAnalysis`** ——
-  // 那个数是在「诊断管理」页上量的，而 `.dd-primary-name` 长在智慧诊疗页，
-  // 于是它恒为 0，挂在它下面的检查会静悄悄地全部跳过（这一节第一版就是这样，
-  // 线上跑了两轮一条都没执行，输出里也看不出少了什么）。
+  // 上面已经停在智慧诊疗页了，直接数。**不要在诊断管理页数** ——
+  // `.dd-primary-name` 长在智慧诊疗页，在别处数恒为 0，挂在它下面的检查
+  // 会静悄悄全部跳过，而输出里看不出少了什么。
   {
-    const idx = tabs.findIndex((t) => t.includes('智慧诊疗'));
-    if (idx >= 0) { await page.locator('.ttab').nth(idx).click(); await page.waitForTimeout(800); }
     const names = await page.locator('.dd-primary-name').count();
     const confs = await page.evaluate(() =>
       [...document.querySelectorAll('.dd-confidence')].map((e) => parseInt(e.innerText, 10)));
@@ -488,7 +492,9 @@ await section('桌面端 1600×1000', async () => {
 await section('移动端 390×844', async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   watch(page, '移动');
-  await page.goto(`${BASE}/outpatient/P009`, { waitUntil: 'networkidle' });
+  // `networkidle` 在这里是等不到的：埋点 keepalive 让网络一直不闲。
+  // 下一行本来就在等 `.m-page`，那才是「移动端 IA 生效」的判据
+  await page.goto(`${BASE}/outpatient/P009`, { waitUntil: 'domcontentloaded' });
   await page.locator('.m-page').waitFor({ timeout: 15000 });
   ok('移动端 IA 生效');
 
@@ -560,9 +566,17 @@ for (const [path, name, must] of [
   // **不能等 `networkidle`。** 这几页都挂着埋点 keepalive，网络永远闲不下来 ——
   // 线上连着两轮走查都是在这里超时崩掉的，而页面其实早就渲染好了。
   // 等 `domcontentloaded`，再等那个关键元素自己出现，判据和后面那句是同一个。
-  await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
-  await page.locator(must).first().waitFor({ timeout: 15000 }).catch(() => {});
-  (await page.locator(must).count()) ? ok(`${name} 渲染正常`) : bad(name, '关键元素没渲染', must);
+  //
+  // `goto` 要单独给超时：`page.setDefaultTimeout(8000)` 对公网首字节太紧，
+  // 而**它抛出来会掀掉整轮走查**（这一段在 `section()` 外面）。
+  // 一次跨洋 TLS 握手慢一点，不该让前面几十项的结论一起作废。
+  try {
+    await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.locator(must).first().waitFor({ timeout: 15000 }).catch(() => {});
+    (await page.locator(must).count()) ? ok(`${name} 渲染正常`) : bad(name, '关键元素没渲染', must);
+  } catch (e) {
+    bad(name, '打不开', String(e.message).split('\n')[0].slice(0, 90));
+  }
   await page.close();
 }
 
